@@ -1,25 +1,42 @@
-// src/App.tsx
-import { TonConnectUIProvider } from '@tonconnect/ui-react';
-import { MyMainTMAComponent } from './components/MyMainTMAComponent.tsx'; 
-// Asegúrate de que este componente exista o reemplaza con la lógica de tu TMA
-import { Header } from './components/Header.tsx'; // ⬅️ 1. Importación con nombre (con llaves)
+import { useState } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
+import { TonConnectUIProvider } from '@tonconnect/ui-react';
+import { Header } from './components/Header';
+import { BottomNav } from './components/BottomNav';
+import { MyMainTMAComponent } from './components/MyMainTMAComponent';
+import { MarketDashboard } from './components/MarketDashboard';
+import { BulkStore } from './components/BulkStore';
 
-
-// URL HTTPS pública donde se encuentra el archivo tonconnect-manifest.json
-// ¡REEMPLAZA ESTA URL CON TU URL REAL DE DESPLIEGUE!
-const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json';
+const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
 export default function App() {
+  const [currentTab, setCurrentTab] = useState('mine');
+
   return (
-    <AuthProvider> {/* Si estás usando AuthProvider */}
+    <AuthProvider>
       <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
         <div className="app-container">
-          
-          {/* 2. Asegúrate de que el componente esté siendo usado aquí: */}
-          TMA Tap-to-Earn <Header /> 
-          
-          <MyMainTMAComponent />
+          {/* Header is always visible */}
+          <Header />
+
+          {/* Tab: MINE */}
+          {currentTab === 'mine' && (
+            <div style={{paddingTop: '20px'}}>
+               {/* Show Market Stats on Home too for FOMO */}
+               <div style={{padding: '0 20px'}}><MarketDashboard /></div>
+               <MyMainTMAComponent />
+            </div>
+          )}
+
+          {/* Tab: MARKET */}
+          {currentTab === 'market' && <BulkStore />}
+
+          {/* Other Tabs (Placeholders) */}
+          {currentTab === 'mission' && <div style={{padding: 20}}>Coming Soon: Expedition...</div>}
+          {currentTab === 'squad' && <div style={{padding: 20}}>Coming Soon: Referrals...</div>}
+          {currentTab === 'wallet' && <div style={{padding: 20}}>Wallet Profile</div>}
+
+          <BottomNav activeTab={currentTab} setTab={setCurrentTab} />
         </div>
       </TonConnectUIProvider>
     </AuthProvider>
