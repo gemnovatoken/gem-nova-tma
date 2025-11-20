@@ -115,53 +115,79 @@ export const MyMainTMAComponent: React.FC = () => {
         setLoading(false);
     };
 
-    return (
-        <div style={{ textAlign: 'center', padding: '20px', maxWidth: '400px', margin: '0 auto', fontFamily: 'Arial, sans-serif' }}>
+   return (
+        <div style={{ textAlign: 'center', padding: '20px', paddingBottom: '100px', maxWidth: '500px', margin: '0 auto' }}>
             
-            <h1 style={{ fontSize: '40px', margin: '10px 0' }}>💎 {score.toLocaleString()}</h1>
+            {/* --- HEADER --- */}
+            <div style={{ marginBottom: '30px' }}>
+                <p style={{ color: '#888', fontSize: '12px', letterSpacing: '2px', textTransform: 'uppercase' }}>Total Balance</p>
+                <h1 style={{ fontSize: '48px', margin: '0', fontWeight: '900' }}>
+                    💎 {score.toLocaleString()}
+                </h1>
+            </div>
             
-            <div style={{ margin: '20px 0' }}>
+            {/* --- CIRCULO TAP --- */}
+            <div style={{ position: 'relative', height: '260px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                {/* Efecto de brillo detrás */}
+                <div style={{ 
+                    position: 'absolute', width: '240px', height: '240px', 
+                    background: 'radial-gradient(circle, rgba(0,242,254,0.2) 0%, rgba(0,0,0,0) 70%)',
+                    zIndex: 0 
+                }} />
+                
                 <button 
                     onClick={handleTap}
                     disabled={!user}
                     style={{ 
-                        width: '220px', height: '220px', borderRadius: '50%', border: 'none',
-                        background: 'radial-gradient(circle at 30% 30%, #4facfe, #00f2fe)',
+                        width: '220px', height: '220px', borderRadius: '50%', border: '4px solid rgba(255,255,255,0.1)',
+                        background: 'linear-gradient(180deg, #00C6FF 0%, #0072FF 100%)', // Azul vibrante
                         color: 'white', fontSize: '28px', fontWeight: 'bold', cursor: 'pointer',
-                        boxShadow: '0 10px 25px rgba(0,100,255,0.4)',
-                        transition: 'transform 0.1s',
-                        // Efecto visual si no hay energía suficiente
-                        opacity: energy < tapValue ? 0.5 : 1 
+                        boxShadow: '0 0 30px rgba(0, 114, 255, 0.4), inset 0 5px 15px rgba(255,255,255,0.4)',
+                        position: 'relative', zIndex: 1,
+                        transition: 'transform 0.05s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
                     }}
                     onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
                     onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
-                    TAP! (+{tapValue})
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <span>TAP!</span>
+                        <span style={{ fontSize: '16px', opacity: 0.8 }}>+{tapValue}</span>
+                    </div>
                 </button>
-                <div style={{ height: '20px', color: 'orange', fontWeight: 'bold' }}>{message}</div>
+                
+                {/* Mensaje Flotante */}
+                <div style={{ position: 'absolute', bottom: '0', height: '20px', color: '#FFD700', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
+                    {message}
+                </div>
             </div>
 
-            <div style={{ textAlign: 'left', marginBottom: '30px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: '#555', marginBottom: '5px' }}>
-                    <span>⚡ Energía</span>
-                    <span>{Math.floor(energy)} / {maxEnergy} (+{regenRate}/s)</span>
+            {/* --- BARRA DE ENERGÍA --- */}
+            <div className="glass-card" style={{ padding: '15px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#aaa', marginBottom: '8px', fontWeight: 'bold' }}>
+                    <span>⚡ ENERGY</span>
+                    <span>{Math.floor(energy)} / {maxEnergy}</span>
                 </div>
-                <div style={{ width: '100%', height: '12px', background: '#ddd', borderRadius: '6px', overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: '10px', background: 'rgba(0,0,0,0.5)', borderRadius: '5px', overflow: 'hidden' }}>
                     <div style={{ 
                         width: `${Math.min(100, (energy / maxEnergy) * 100)}%`, 
                         height: '100%', 
-                        background: 'linear-gradient(90deg, #f1c40f, #f39c12)',
+                        background: 'linear-gradient(90deg, #F7971E, #FFD200)', // Gradiente Amarillo/Naranja
+                        boxShadow: '0 0 10px rgba(255, 210, 0, 0.5)',
                         transition: 'width 0.2s linear'
                     }} />
                 </div>
             </div>
 
-            <div style={{ background: '#f8f9fa', borderRadius: '15px', padding: '15px', textAlign: 'left', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
-                <h3 style={{ marginTop: 0, borderBottom: '1px solid #eee', paddingBottom: '10px' }}>🚀 Tienda de Mejoras</h3>
+            {/* --- TIENDA (Fix del fondo blanco) --- */}
+            <div className="glass-card">
+                <h3 style={{ marginTop: 0, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px', textAlign: 'left', color: '#fff' }}>
+                    🚀 Boost Store
+                </h3>
                 
                 <BoostItem 
-                    title={`👆 Multitap (Nvl ${levels.multitap})`}
-                    desc="+2 Puntos por click"
+                    title="👆 Multitap"
+                    level={levels.multitap}
+                    desc="+1 point per tap"
                     price={800}
                     isMax={levels.multitap >= 2}
                     onBuy={() => buyBoost('multitap')}
@@ -169,8 +195,9 @@ export const MyMainTMAComponent: React.FC = () => {
                 />
                 
                 <BoostItem 
-                    title={`🔋 Tanque (Nvl ${levels.limit})`}
-                    desc="Límite 2500 Energía"
+                    title="🔋 Energy Tank"
+                    level={levels.limit}
+                    desc="Limit 2500"
                     price={1000}
                     isMax={levels.limit >= 2}
                     onBuy={() => buyBoost('limit')}
@@ -178,8 +205,9 @@ export const MyMainTMAComponent: React.FC = () => {
                 />
 
                 <BoostItem 
-                    title={`⚡ Velocidad (Nvl ${levels.speed})`}
-                    desc="Recarga +2/seg"
+                    title="⚡ Recharging Speed"
+                    level={levels.speed}
+                    desc="+2 energy/sec"
                     price={500}
                     isMax={levels.speed >= 2}
                     onBuy={() => buyBoost('speed')}
@@ -190,8 +218,10 @@ export const MyMainTMAComponent: React.FC = () => {
     );
 };
 
+// --- COMPONENTE VISUAL ACTUALIZADO ---
 interface BoostItemProps {
   title: string;
+  level: number;
   desc: string;
   price: number;
   isMax: boolean;
@@ -199,26 +229,25 @@ interface BoostItemProps {
   canAfford: boolean;
 }
 
-const BoostItem: React.FC<BoostItemProps> = ({ title, desc, price, isMax, onBuy, canAfford }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-        <div>
-            <div style={{ fontWeight: 'bold' }}>{title}</div>
-            <div style={{ fontSize: '12px', color: '#777' }}>{desc}</div>
+const BoostItem: React.FC<BoostItemProps> = ({ title, level, desc, price, isMax, onBuy, canAfford }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', padding: '10px', background: 'rgba(255,255,255,0.03)', borderRadius: '12px' }}>
+        <div style={{ textAlign: 'left' }}>
+            <div style={{ fontWeight: 'bold', color: '#fff' }}>{title} <span style={{color: '#00F2FE', fontSize: '12px'}}>Lvl {level}</span></div>
+            <div style={{ fontSize: '11px', color: '#888' }}>{desc}</div>
         </div>
         <button 
+            className="btn-neon"
             onClick={onBuy}
             disabled={isMax || !canAfford}
             style={{ 
-                padding: '8px 16px', 
-                borderRadius: '8px', 
-                border: 'none', 
-                background: isMax ? '#4CAF50' : (canAfford ? '#2196F3' : '#ccc'),
-                color: 'white', 
-                cursor: (isMax || !canAfford) ? 'default' : 'pointer',
-                fontWeight: 'bold'
+                fontSize: '12px',
+                padding: '8px 12px',
+                background: isMax ? '#2ecc71' : (canAfford ? undefined : 'rgba(255,255,255,0.1)'), // Verde si es Max, Gris si no alcanza
+                color: (isMax || canAfford) ? '#000' : '#555',
+                boxShadow: canAfford ? undefined : 'none'
             }}
         >
-            {isMax ? 'MAX' : `${price} 💰`}
+            {isMax ? 'MAX' : `${price} 💎`}
         </button>
     </div>
 );
