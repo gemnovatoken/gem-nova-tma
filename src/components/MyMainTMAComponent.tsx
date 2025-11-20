@@ -1,8 +1,6 @@
-// src/components/MyMainTMAComponent.tsx
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-
 
 export const MyMainTMAComponent: React.FC = () => {
     const { user } = useAuth();
@@ -12,7 +10,6 @@ export const MyMainTMAComponent: React.FC = () => {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // CAMBIO AQUÍ: Base es 500 ahora
     const maxEnergy = levels.limit >= 2 ? 2500 : 500;
     const regenRate = levels.speed >= 2 ? 2 : 1;
     const tapValue = levels.multitap;
@@ -43,20 +40,17 @@ export const MyMainTMAComponent: React.FC = () => {
         fetchInitialData();
     }, [user]);
 
-    // 2. ⚡ REGENERACIÓN AUTOMÁTICA (ESTO SOLUCIONA EL PROBLEMA DEL 0) ⚡
+    // 2. Regeneración Automática Visual
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy((prevEnergy) => {
-                // Si ya está lleno, no hacemos nada
                 if (prevEnergy >= maxEnergy) return prevEnergy;
-                // Si no, sumamos la tasa de regeneración sin pasarnos del máximo
                 return Math.min(maxEnergy, prevEnergy + regenRate);
             });
-        }, 1000); // Se ejecuta cada 1000ms (1 segundo)
+        }, 1000);
 
-        // Limpieza al desmontar
         return () => clearInterval(timer);
-    }, [maxEnergy, regenRate]); // Se reinicia si cambian estas variables
+    }, [maxEnergy, regenRate]);
 
     // 3. Lógica del Tap
     const handleTap = async () => {
@@ -66,8 +60,6 @@ export const MyMainTMAComponent: React.FC = () => {
             setScore(s => s + tapValue);
             setEnergy(e => Math.max(0, e - tapValue));
         } else {
-            // Ahora es difícil que entres aquí porque se regenera solo, 
-            // pero lo dejamos por seguridad.
             setMessage("¡Sin energía!");
             setTimeout(() => setMessage(''), 1000);
             return;
@@ -81,8 +73,6 @@ export const MyMainTMAComponent: React.FC = () => {
             const result = data[0];
             if (result.success) {
                 setScore(result.new_score);
-                // Opcional: Sincronizar energía exacta del servidor
-                // setEnergy(result.new_energy); 
             } else {
                 setEnergy(result.new_energy);
                 setMessage("Sincronizando...");
@@ -115,7 +105,7 @@ export const MyMainTMAComponent: React.FC = () => {
         setLoading(false);
     };
 
-   return (
+    return (
         <div style={{ textAlign: 'center', padding: '20px', paddingBottom: '100px', maxWidth: '500px', margin: '0 auto' }}>
             
             {/* --- HEADER --- */}
@@ -128,7 +118,6 @@ export const MyMainTMAComponent: React.FC = () => {
             
             {/* --- CIRCULO TAP --- */}
             <div style={{ position: 'relative', height: '260px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                {/* Efecto de brillo detrás */}
                 <div style={{ 
                     position: 'absolute', width: '240px', height: '240px', 
                     background: 'radial-gradient(circle, rgba(0,242,254,0.2) 0%, rgba(0,0,0,0) 70%)',
@@ -140,7 +129,7 @@ export const MyMainTMAComponent: React.FC = () => {
                     disabled={!user}
                     style={{ 
                         width: '220px', height: '220px', borderRadius: '50%', border: '4px solid rgba(255,255,255,0.1)',
-                        background: 'linear-gradient(180deg, #00C6FF 0%, #0072FF 100%)', // Azul vibrante
+                        background: 'linear-gradient(180deg, #00C6FF 0%, #0072FF 100%)',
                         color: 'white', fontSize: '28px', fontWeight: 'bold', cursor: 'pointer',
                         boxShadow: '0 0 30px rgba(0, 114, 255, 0.4), inset 0 5px 15px rgba(255,255,255,0.4)',
                         position: 'relative', zIndex: 1,
@@ -155,7 +144,6 @@ export const MyMainTMAComponent: React.FC = () => {
                     </div>
                 </button>
                 
-                {/* Mensaje Flotante */}
                 <div style={{ position: 'absolute', bottom: '0', height: '20px', color: '#FFD700', fontWeight: 'bold', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>
                     {message}
                 </div>
@@ -171,14 +159,14 @@ export const MyMainTMAComponent: React.FC = () => {
                     <div style={{ 
                         width: `${Math.min(100, (energy / maxEnergy) * 100)}%`, 
                         height: '100%', 
-                        background: 'linear-gradient(90deg, #F7971E, #FFD200)', // Gradiente Amarillo/Naranja
+                        background: 'linear-gradient(90deg, #F7971E, #FFD200)',
                         boxShadow: '0 0 10px rgba(255, 210, 0, 0.5)',
                         transition: 'width 0.2s linear'
                     }} />
                 </div>
             </div>
 
-            {/* --- TIENDA (Fix del fondo blanco) --- */}
+            {/* --- TIENDA DE MEJORAS (CORREGIDA) --- */}
             <div className="glass-card">
                 <h3 style={{ marginTop: 0, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '15px', textAlign: 'left', color: '#fff' }}>
                     🚀 Boost Store
@@ -218,7 +206,7 @@ export const MyMainTMAComponent: React.FC = () => {
     );
 };
 
-// --- COMPONENTE VISUAL ACTUALIZADO ---
+// Componente Auxiliar
 interface BoostItemProps {
   title: string;
   level: number;
@@ -242,9 +230,11 @@ const BoostItem: React.FC<BoostItemProps> = ({ title, level, desc, price, isMax,
             style={{ 
                 fontSize: '12px',
                 padding: '8px 12px',
-                background: isMax ? '#2ecc71' : (canAfford ? undefined : 'rgba(255,255,255,0.1)'), // Verde si es Max, Gris si no alcanza
-                color: (isMax || canAfford) ? '#000' : '#555',
-                boxShadow: canAfford ? undefined : 'none'
+                // Fondo dinámico: Verde si es Max, Transparente si no alcanza, Neón si puede comprar
+                background: isMax ? '#2ecc71' : (canAfford ? undefined : 'rgba(255,255,255,0.1)'), 
+                color: (isMax || !canAfford) ? '#aaa' : '#000',
+                boxShadow: canAfford && !isMax ? undefined : 'none',
+                cursor: (isMax || !canAfford) ? 'not-allowed' : 'pointer'
             }}
         >
             {isMax ? 'MAX' : `${price} 💎`}
