@@ -6,6 +6,7 @@ import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
 import { MarketDashboard } from './components/MarketDashboard';
 import { BulkStore } from './components/BulkStore';
+import { WalletRoadmap } from './components/WalletRoadmap';
 
 // URL de tu manifiesto (Verifica que sea la de Vercel)
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
@@ -39,35 +40,7 @@ export default function App() {
           )}
 
           {/* --- Tab: WALLET / AIRDROP (NUEVO BLOQUE SEPARADO) --- */}
-          {currentTab === 'wallet' && (
-            <div style={{ padding: '20px', textAlign: 'left', animation: 'fadeIn 0.5s' }}>
-                <h2 style={{display:'flex', alignItems:'center', gap:'10px', marginTop: 0}}>
-                    🪂 Airdrop Status
-                </h2>
-                
-                <div className="glass-card">
-                    <div style={{color: '#aaa', fontSize: '12px', marginBottom: '5px'}}>STATUS</div>
-                    <div style={{color: '#00F2FE', fontWeight: 'bold', fontSize: '18px'}}>PHASE 1: MINING</div>
-                    <p style={{fontSize: '13px', marginTop: '10px'}}>
-                        Keep tapping and upgrading. Listing date will be announced once we hit the liquidity goal.
-                    </p>
-                </div>
-
-                {/* SECCIÓN LEGAL - EL TOQUE PROFESIONAL */}
-                <div style={{
-                    marginTop: '30px', 
-                    padding: '15px', 
-                    borderLeft: '3px solid #FFD700', 
-                    background: 'rgba(255, 215, 0, 0.05)',
-                    borderRadius: '0 8px 8px 0'
-                }}>
-                    <p style={{fontSize: '10px', color: '#888', margin: 0, lineHeight: '1.5'}}>
-                        <strong>LEGAL DISCLAIMER:</strong><br/>
-                        "GNOVA Points are game assets. Future conversion to tokens involves risk and depends on community liquidity goals. Not financial advice."
-                    </p>
-                </div>
-            </div>
-          )}
+         {currentTab === 'wallet' && <WalletRoadmap />}
 
           {/* --- Tabs: COMING SOON (Solo Mission y Squad) --- */}
           {(currentTab === 'mission' || currentTab === 'squad') && (
