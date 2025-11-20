@@ -25,7 +25,7 @@ export const BulkStore: React.FC = () => {
                 title="Starter" 
                 points="100,000" 
                 price="0.15 TON" 
-                roi="+25%" 
+                bonus="+25%" 
                 color="#00F2FE" 
                 onClick={() => buyPack('starter')} 
             />
@@ -35,7 +35,7 @@ export const BulkStore: React.FC = () => {
                 title="Pro" 
                 points="500,000" 
                 price="0.70 TON" 
-                roi="+34%" 
+                bonus="+34%" 
                 color="#4CAF50" 
                 onClick={() => buyPack('pro')} 
             />
@@ -80,18 +80,18 @@ interface PackCardProps {
     title: string;
     points: string;
     price: string;
-    roi: string;
+    bonus: string;
     color: string;
     onClick: () => void;
 }
 
 // Usar la interfaz en lugar de 'any'
-const PackCard: React.FC<PackCardProps> = ({ title, points, price, roi, color, onClick }) => (
+const PackCard: React.FC<PackCardProps> = ({ title, points, price, bonus, color, onClick }) => (
     <div className="glass-card" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
         <div>
             <div style={{fontWeight:'bold', fontSize: '16px'}}>{title}</div>
             <div style={{color: '#fff', fontSize:'12px'}}>{points} Pts</div>
-            <div style={{fontSize:'10px', color: color}}>{roi} ROI</div>
+            <div style={{fontSize:'10px', color: color}}>{bonus} BONUS</div>
         </div>
         <button className="btn-neon" style={{padding: '8px 16px', fontSize:'12px'}} onClick={onClick}>
             {price}
