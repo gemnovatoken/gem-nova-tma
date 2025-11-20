@@ -1,121 +1,111 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Users, Copy, Share2, Trophy } from 'lucide-react';
-
-// 1. 👇 INTERFAZ PARA ELIMINAR EL "ANY"
-// Definimos qué datos tiene un miembro del equipo
-interface SquadMember {
-    user_id: string; // O 'id' dependiendo de tu base de datos
-    score: number;
-    username?: string; // Opcional, por si no tenemos el nombre
-}
+// Importamos solo lo que vamos a usar
+import { Users, Copy, Lock, Share2, Flame } from 'lucide-react';
 
 export const SquadZone: React.FC = () => {
     const { user } = useAuth();
+    const [userCount, setUserCount] = useState(0);
+    const [referrals, setReferrals] = useState(0);
+    const targetUsers = 1000; // Meta para desbloquear
     
-    // 2. 👇 Usamos la interfaz aquí
-    const [friends, setFriends] = useState<SquadMember[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [copied, setCopied] = useState(false);
-
-    // Link de invitación (Usamos el ID del usuario como ref)
-    const inviteLink = `https://t.me/GemNovaBot/start?startapp=${user?.id}`;
+    const BOT_USERNAME = "GemNova_GameBot"; 
+    const inviteLink = `https://t.me/${BOT_USERNAME}?start=ref_${user?.id}`;
 
     useEffect(() => {
-        if (!user) return;
-
-        const fetchSquad = async () => {
-            // Buscamos usuarios que hayan sido referidos por mí
-            // Nota: Esto asume que tienes una columna 'referred_by' en user_score
-            // Si no la tienes aún, esto devolverá una lista vacía sin errores.
-            const { data, error } = await supabase
-                .from('user_score')
-                .select('user_id, score') // Seleccionamos columnas específicas
-                .eq('referred_by', user.id)
-                .order('score', { ascending: false })
-                .limit(10);
-
-            if (error) {
-                console.error("Error loading squad", error);
-            } else if (data) {
-                // 3. 👇 Casting seguro para TypeScript
-                setFriends(data as unknown as SquadMember[]);
-            }
-            setLoading(false);
+        const fetchGlobal = async () => {
+            const { count } = await supabase.from('user_score').select('*', { count: 'exact', head: true });
+            if (count !== null) setUserCount(count);
         };
+        fetchGlobal();
 
-        fetchSquad();
+        if(user) {
+            supabase.from('user_score').select('referral_count').eq('user_id', user.id).single()
+                .then(({data}) => { if(data) setReferrals(data.referral_count) });
+        }
     }, [user]);
 
-    const copyToClipboard = () => {
+    const handleCopy = () => {
         navigator.clipboard.writeText(inviteLink);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        alert("Link Copied!");
     };
 
-    return (
-        <div style={{ padding: '20px', paddingBottom: '100px', textAlign: 'center' }}>
-            
-            {/* Encabezado */}
-            <h1 className="text-gradient" style={{ fontSize: '32px', marginBottom: '10px', display:'flex', justifyContent:'center', alignItems:'center', gap:'10px' }}>
-                <Users size={32} /> SQUAD ZONE
-            </h1>
-            <p style={{ color: '#aaa', fontSize: '14px', marginBottom: '30px' }}>
-                Invite friends and earn 10% of their earnings!
-            </p>
+    const progress = Math.min(100, (userCount / targetUsers) * 100);
 
-            {/* Caja de Invitación */}
-            <div className="glass-card" style={{ padding: '20px', border: '1px solid #00F2FE' }}>
-                <div style={{ marginBottom: '10px', fontSize: '12px', color: '#00F2FE', fontWeight: 'bold' }}>YOUR INVITE LINK</div>
+    return (
+        <div style={{ 
+            height: '75vh', width: '100%', position: 'relative', overflow: 'hidden', 
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            border: '1px solid #FF512F', borderRadius: '20px', background: '#000'
+        }}>
+            
+            {/* --- FONDO: EL JUEGO DEL SOL (VISUAL) --- */}
+            <div style={{ position: 'absolute', inset: 0, display:'flex', alignItems:'center', justifyContent:'center', zIndex: 0, opacity: 0.4 }}>
+                <div style={{
+                    width: '280px', height: '280px', borderRadius: '50%', 
+                    background: 'radial-gradient(circle, #F09819 0%, #FF512F 100%)',
+                    boxShadow: '0 0 60px #FF512F',
+                    animation: 'pulse 3s infinite ease-in-out'
+                }}></div>
+            </div>
+
+            {/* --- CAPA DE BLOQUEO --- */}
+            <div className="glass-card" style={{ 
+                zIndex: 10, width: '85%', padding: '20px', textAlign: 'center', 
+                background: 'rgba(0, 0, 0, 0.85)', border: '1px solid #FF512F', backdropFilter: 'blur(8px)'
+            }}>
                 
-                <div style={{ display: 'flex', gap: '10px', background: 'rgba(0,0,0,0.3)', padding: '10px', borderRadius: '8px', alignItems: 'center' }}>
-                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '12px', color: '#fff', flex: 1 }}>
-                        {inviteLink}
-                    </div>
-                    <button onClick={copyToClipboard} style={{ background: 'none', border: 'none', cursor: 'pointer', color: copied ? '#4CAF50' : '#fff' }}>
-                        {copied ? 'COPIED!' : <Copy size={18} />}
-                    </button>
+                <div style={{ display: 'inline-block', padding: '15px', background: 'rgba(255, 81, 47, 0.1)', borderRadius: '50%', marginBottom: '10px' }}>
+                    <Lock size={32} color="#FF512F" />
                 </div>
 
-                <button className="btn-neon" style={{ width: '100%', marginTop: '15px', padding: '12px' }} onClick={() => window.open(`https://t.me/share/url?url=${inviteLink}&text=Join Gem Nova and earn crypto!`, '_blank')}>
-                    <Share2 size={18} style={{ marginRight: '8px' }} /> SHARE LINK
-                </button>
-            </div>
+                <h2 style={{ margin: '0 0 5px 0', color: '#fff', fontSize: '20px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
+                    <Flame size={20} fill="#FF512F" color="#FF512F"/> RAID LOCKED
+                </h2>
+                
+                <p style={{ color: '#ccc', fontSize: '12px', marginBottom: '15px' }}>
+                    Global Raid unlocks at <strong>1,000 Miners</strong>.
+                </p>
 
-            {/* Lista de Amigos */}
-            <h3 style={{ textAlign: 'left', marginTop: '30px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <Trophy size={20} color="#FFD700" /> YOUR RECRUITS
-            </h3>
+                {/* Barra de Progreso Global */}
+                <div style={{ marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#aaa', marginBottom: '5px' }}>
+                        <span>Community Progress</span>
+                        <span>{userCount} / {targetUsers}</span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: '#333', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ width: `${progress}%`, height: '100%', background: '#FF512F' }} />
+                    </div>
+                </div>
 
-            <div className="glass-card" style={{ minHeight: '150px' }}>
-                {loading ? (
-                    <p style={{ marginTop: '50px', color: '#666' }}>Loading recruits...</p>
-                ) : friends.length === 0 ? (
-                    <div style={{ padding: '30px 0', opacity: 0.5 }}>
-                        <Users size={40} color="#555" />
-                        <p>No recruits yet. Share your link!</p>
+                {/* SECCIÓN DE INVITACIÓN */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px' }}>
+                    
+                    {/* Botón Invitar Principal */}
+                    <button className="btn-neon" onClick={() => window.open(`https://t.me/share/url?url=${inviteLink}&text=🔥 Join Gem Nova! Get 50k Points Bonus before halving!`, '_blank')}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#fff', color: '#000', fontSize:'14px', marginBottom:'10px' }}>
+                        <Share2 size={16} /> INVITE FRIENDS
+                    </button>
+
+                    {/* Botón Copiar Link (Aquí usamos el icono Copy) */}
+                    <button onClick={handleCopy} style={{
+                        background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px',
+                        color:'#fff', padding:'8px', width:'100%', fontSize:'12px', cursor:'pointer',
+                        display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
+                    }}>
+                        <Copy size={14}/> Copy My Link
+                    </button>
+
+                    {/* Contador de Referidos (Aquí usamos el icono Users) */}
+                    <div style={{ marginTop: '15px', fontSize: '12px', color: '#888', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px' }}>
+                        <Users size={14} /> My Squad: <span style={{ color: '#fff', fontWeight: 'bold' }}>{referrals}</span>
                     </div>
-                ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                        {friends.map((friend, index) => (
-                            <div key={friend.user_id || index} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#333', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>
-                                        {index + 1}
-                                    </div>
-                                    <div style={{ fontSize: '14px' }}>
-                                        User {friend.user_id.slice(0, 4)}...
-                                    </div>
-                                </div>
-                                <div style={{ color: '#FFD700', fontWeight: 'bold', fontSize: '14px' }}>
-                                    {friend.score.toLocaleString()} pts
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                </div>
+
             </div>
+            
+            <style>{`@keyframes pulse { 0% { transform: scale(0.95); opacity: 0.5; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(0.95); opacity: 0.5; } }`}</style>
         </div>
     );
 };
