@@ -2,7 +2,7 @@
   font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-  color-scheme: dark; /* Obliga al navegador a usar modo oscuro */
+  color-scheme: dark;
 }
 
 body {
@@ -10,17 +10,17 @@ body {
   padding: 0;
   min-width: 320px;
   min-height: 100vh;
-  background-color: #0B0E14; /* Negro Espacial Profundo */
+  background-color: #0B0E14;
   color: #ffffff;
-  background-image: radial-gradient(circle at 50% 0%, #1a2e44 0%, #0B0E14 60%); /* Luz superior */
+  background-image: radial-gradient(circle at 50% 0%, #1a2e44 0%, #0B0E14 60%);
 }
 
-/* CLASE MAESTRA: Efecto Vidrio (Glassmorphism) */
+/* Efecto Vidrio */
 .glass-card {
-  background: rgba(255, 255, 255, 0.05); /* 5% Blanco transparente */
-  backdrop-filter: blur(12px);           /* Difuminado de fondo */
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1); /* Borde sutil */
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px); /* Soporte para Safari */
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 20px;
   padding: 20px;
   margin-bottom: 20px;
@@ -32,7 +32,7 @@ body {
   background: linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%);
   border: none;
   border-radius: 12px;
-  color: #000; /* Texto negro para contraste */
+  color: #000;
   font-weight: 800;
   padding: 10px 20px;
   cursor: pointer;
@@ -54,9 +54,17 @@ body {
   cursor: not-allowed;
 }
 
-/* Texto con degradado */
+/* Texto con degradado (AQUÍ ESTABA EL ERROR) */
 .text-gradient {
   background: linear-gradient(to right, #00F2FE, #4FACFE);
+  
+  /* Propiedad estándar (Solución al error) */
+  background-clip: text; 
+  
+  /* Propiedad para navegadores Webkit (Chrome/Safari) */
   -webkit-background-clip: text;
+  
+  /* Relleno transparente para que se vea el fondo */
   -webkit-text-fill-color: transparent;
+  color: transparent;
 }
