@@ -6,9 +6,10 @@ import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
 import { MarketDashboard } from './components/MarketDashboard';
 import { BulkStore } from './components/BulkStore';
+// 👇 IMPORTACIONES NUEVAS
+import { SquadZone } from './components/SquadZone';
 import { WalletRoadmap } from './components/WalletRoadmap';
 
-// URL de tu manifiesto (Verifica que sea la de Vercel)
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
 export default function App() {
@@ -17,41 +18,50 @@ export default function App() {
   return (
     <AuthProvider>
       <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
-        {/* 👇 IMPORTANTE: paddingBottom evita que el menú tape el contenido */}
         <div className="app-container" style={{ minHeight: '100vh', paddingBottom: '100px', color: 'white' }}>
           
-          {/* Header siempre visible */}
           <Header />
 
-          {/* --- Tab: MINE (Juego) --- */}
+          {/* --- PESTAÑA 1: MINAR --- */}
           {currentTab === 'mine' && (
             <div style={{ paddingTop: '10px', animation: 'fadeIn 0.5s' }}>
-               {/* Mostramos el Mercado aquí también para dar FOMO */}
                <div style={{ padding: '0 20px' }}><MarketDashboard /></div>
                <MyMainTMAComponent />
             </div>
           )}
 
-          {/* --- Tab: MARKET (Tesorería) --- */}
+          {/* --- PESTAÑA 2: MERCADO --- */}
           {currentTab === 'market' && (
              <div style={{ animation: 'fadeIn 0.5s' }}>
                 <BulkStore />
              </div>
           )}
 
-          {/* --- Tab: WALLET / AIRDROP (NUEVO BLOQUE SEPARADO) --- */}
-         {currentTab === 'wallet' && <WalletRoadmap />}
-
-          {/* --- Tabs: COMING SOON (Solo Mission y Squad) --- */}
-          {(currentTab === 'mission' || currentTab === 'squad') && (
+          {/* --- PESTAÑA 3: MISIÓN (Aún en construcción) --- */}
+          {currentTab === 'mission' && (
              <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.7, animation: 'fadeIn 0.5s' }}>
-                <div style={{ fontSize: '50px', marginBottom: '15px' }}>🚧</div>
-                <h2>Coming Soon</h2>
-                <p style={{ color: '#aaa' }}>This feature will be unlocked in Phase 2.</p>
+                <div style={{ fontSize: '50px', marginBottom: '15px' }}>🗺️</div>
+                <h2>Expedition</h2>
+                <p style={{ color: '#aaa' }}>Daily Quests coming in Phase 1.5.</p>
              </div>
           )}
 
-          {/* Menú de Navegación Inferior */}
+          {/* --- PESTAÑA 4: SQUAD (REFERIDOS) --- */}
+          {/* 👇 AQUÍ CONECTAMOS EL COMPONENTE NUEVO */}
+          {currentTab === 'squad' && (
+             <div style={{ animation: 'fadeIn 0.5s' }}>
+                 <SquadZone />
+             </div>
+          )}
+
+          {/* --- PESTAÑA 5: AIRDROP (WALLET) --- */}
+          {/* 👇 AQUÍ CONECTAMOS EL ROADMAP */}
+          {currentTab === 'wallet' && (
+             <div style={{ animation: 'fadeIn 0.5s' }}>
+                 <WalletRoadmap />
+             </div>
+          )}
+
           <BottomNav activeTab={currentTab} setTab={setCurrentTab} />
           
         </div>
