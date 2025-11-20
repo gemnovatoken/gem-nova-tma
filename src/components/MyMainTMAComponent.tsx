@@ -2,20 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 
-// ⚙️ CONFIGURACIÓN DE NIVELES (ACTUALIZADA)
+// ⚙️ CONFIGURACIÓN DE NIVELES (CORREGIDA)
+// Hemos reestructurado esto para que coincida con la lógica de tu componente
 const GAME_CONFIG = {
     multitap: {
-        costs: [0, 300, 500, 3000, 4000],
-        values: [1, 2, 3, 4, 5]
+        // Cuánto da cada tap por nivel (Nivel 1 = 1, Nivel 2 = 2...)
+        values: [1, 2, 3, 4, 5, 6, 7, 8],
+        // El costo para subir AL SIGUIENTE nivel. (El 0 inicial es relleno para alinear índices)
+        costs: [0, 1000, 2500, 5000, 10000, 20000, 50000, 100000] 
     },
     limit: {
-        costs: [0, 500, 750, 1000, 1500, 2000, 3000, 4000],
-        values: [500, 1000, 1500, 2000, 3000, 4000, 5500, 7500]
+        // Energía Máxima por nivel (Base 500 + 500 por nivel)
+        values: [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000],
+        costs: [0, 1000, 2500, 5000, 10000, 20000, 50000, 100000]
     },
     speed: {
-        // 👇 AQUÍ ESTÁN LOS NUEVOS COSTOS
-        costs: [0, 500, 1000, 3000, 5000, 7500], 
-        values: [1, 2, 3, 4, 5, 6]
+        // Regeneración por segundo
+        values: [1, 2, 3, 4, 5, 6],
+        costs: [0, 500, 1000, 3000, 5000, 7500]
     }
 };
 
@@ -23,20 +27,22 @@ export const MyMainTMAComponent: React.FC = () => {
     const { user } = useAuth();
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0);
+    // Inicializamos en Nivel 1
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Valores actuales basados en nivel (con fallback de seguridad)
-    const currentLimitLvl = Math.max(1, Math.min(levels.limit, GAME_CONFIG.limit.values.length));
-    const currentSpeedLvl = Math.max(1, Math.min(levels.speed, GAME_CONFIG.speed.values.length));
-    const currentMultiLvl = Math.max(1, Math.min(levels.multitap, GAME_CONFIG.multitap.values.length));
+    // Cálculos seguros para evitar errores de índice
+    const currentMultiLvl = Math.min(Math.max(1, levels.multitap), GAME_CONFIG.multitap.values.length);
+    const currentLimitLvl = Math.min(Math.max(1, levels.limit), GAME_CONFIG.limit.values.length);
+    const currentSpeedLvl = Math.min(Math.max(1, levels.speed), GAME_CONFIG.speed.values.length);
 
+    // Valores actuales del juego
+    const tapValue = GAME_CONFIG.multitap.values[currentMultiLvl - 1];
     const maxEnergy = GAME_CONFIG.limit.values[currentLimitLvl - 1];
     const regenRate = GAME_CONFIG.speed.values[currentSpeedLvl - 1];
-    const tapValue = GAME_CONFIG.multitap.values[currentMultiLvl - 1];
 
-    // 1. Cargar datos
+    // 1. Cargar datos desde Supabase
     useEffect(() => {
         const fetchInitialData = async () => {
             if (user) {
@@ -52,9 +58,9 @@ export const MyMainTMAComponent: React.FC = () => {
                     setScore(data.score);
                     setEnergy(data.energy);
                     setLevels({
-                        multitap: data.multitap_level ?? 1,
-                        limit: data.limit_level ?? 1,
-                        speed: data.speed_level ?? 1
+                        multitap: data.multitap_level || 1,
+                        limit: data.limit_level || 1,
+                        speed: data.speed_level || 1
                     });
                 }
             }
@@ -62,7 +68,7 @@ export const MyMainTMAComponent: React.FC = () => {
         fetchInitialData();
     }, [user]);
 
-    // 2. Regeneración Automática Visual
+    // 2. Regeneración Automática de Energía
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy((prev) => {
@@ -73,34 +79,47 @@ export const MyMainTMAComponent: React.FC = () => {
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
 
-    // 3. Tap
+    // 3. Lógica del Tap
     const handleTap = async () => {
-        if (!user || energy < tapValue) {
-            if (energy < tapValue) {
-                setMessage("¡Sin energía!");
-                setTimeout(() => setMessage(''), 1000);
-            }
+        if (!user) return;
+        
+        if (energy < tapValue) {
+            setMessage("¡Sin energía!");
+            setTimeout(() => setMessage(''), 1000);
             return;
         }
 
-        // Optimistic UI
+        // Optimistic UI (Actualizar visualmente antes de la DB)
         setScore(s => s + tapValue);
         setEnergy(e => Math.max(0, e - tapValue));
 
+        // Enviar a Supabase
         const { data } = await supabase.rpc('tap_and_earn', { user_id_in: user.id });
+        
+        // Si la DB devuelve datos nuevos (sync), los usamos
         if (data && data[0] && data[0].success) {
-            setScore(data[0].new_score);
-        } else {
-            // Revertir visualmente si hubo error de sync
-            // setEnergy... (Opcional, la regeneración lo arregla)
+            // Opcional: Sincronizar score exacto si quieres precisión total
+            // setScore(data[0].new_score); 
         }
     };
 
-    // 4. Comprar
+    // 4. Comprar Mejoras
     const buyBoost = async (type: 'multitap' | 'limit' | 'speed') => {
         if (!user || loading) return;
-        setLoading(true);
+        
+        // Verificamos costo localmente antes de llamar a la API
+        const currentLvl = levels[type];
+        const config = GAME_CONFIG[type];
+        // Si ya es max level, no hacemos nada
+        if (currentLvl >= config.values.length) return;
+        
+        const cost = config.costs[currentLvl]; // Costo del nivel actual para subir al siguiente
+        if (score < cost) {
+            alert("Insufficent Points!");
+            return;
+        }
 
+        setLoading(true);
         const { data, error } = await supabase.rpc('buy_boost', { user_id_in: user.id, boost_type: type });
 
         if (!error && data && data[0].success) {
@@ -108,25 +127,20 @@ export const MyMainTMAComponent: React.FC = () => {
             setLevels(prev => ({ ...prev, [type]: data[0].new_level }));
             alert(data[0].message);
         } else {
-            alert(error ? "Error" : data[0].message);
+            alert(error ? "Error connection" : data?.[0]?.message || "Error");
         }
         setLoading(false);
     };
 
-    // Helper para calcular datos del siguiente nivel
+    // Helper para mostrar info en la tienda
     const getNextLevelInfo = (type: 'multitap' | 'limit' | 'speed', currentLvl: number) => {
         const config = GAME_CONFIG[type];
-        // Ajustamos índice (Nvl 1 es índice 0)
         const idx = currentLvl - 1;
-        
-        // Si ya estamos en el último elemento del array, es MAX
         const isMax = idx >= config.values.length - 1;
         
-        // El costo del SIGUIENTE nivel está en el índice actual + 1 en la tabla de costos?
-        // NO, en nuestra lógica: costs[1] es el costo para subir al nivel 2.
-        // costs[currentLvl] es el costo para subir al nivel (currentLvl + 1).
+        // El costo está en el índice del nivel actual (ej: si soy Nvl 1, el costo para Nvl 2 está en costs[1])
         const nextCost = isMax ? 0 : config.costs[currentLvl]; 
-
+        
         const currentVal = config.values[idx];
         const nextVal = isMax ? currentVal : config.values[idx + 1];
 
@@ -144,7 +158,7 @@ export const MyMainTMAComponent: React.FC = () => {
             <div style={{ marginBottom: '30px' }}>
                 <p style={{ color: '#888', fontSize: '12px', letterSpacing: '2px', textTransform: 'uppercase' }}>Total Balance</p>
                 <h1 className="text-gradient" style={{ fontSize: '48px', margin: '0', fontWeight: '900' }}>
-                    💎 {score.toLocaleString()}
+                    💎 {Math.floor(score).toLocaleString()}
                 </h1>
             </div>
             
@@ -164,6 +178,8 @@ export const MyMainTMAComponent: React.FC = () => {
                     }}
                     onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
                     onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                    onTouchStart={e => e.currentTarget.style.transform = 'scale(0.95)'}
+                    onTouchEnd={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         <span>TAP!</span>
