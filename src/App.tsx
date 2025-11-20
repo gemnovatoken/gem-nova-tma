@@ -8,7 +8,7 @@ import { AuthProvider } from './contexts/AuthContext';
 
 // URL HTTPS pública donde se encuentra el archivo tonconnect-manifest.json
 // ¡REEMPLAZA ESTA URL CON TU URL REAL DE DESPLIEGUE!
-const MANIFEST_URL = 'https://openings-international-fit-dinner.trycloudflare.com/tonconnect-manifest.json';
+const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json';
 
 export default function App() {
   return (
