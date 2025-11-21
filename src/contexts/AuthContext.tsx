@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Suscripción a cambios de estado para manejar logout/refresh
         const { data: authListener } = supabase.auth.onAuthStateChange(
-          (event, session) => {
+          (_event, session) => { // ✅ SOLUCIÓN: Usamos _event para indicar que se ignora
             if (session) {
               setUser(session.user);
             } else {
