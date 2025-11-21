@@ -138,7 +138,8 @@ export const StakingBank = () => {
             setShowSuccess(true); 
             fetchData();
         } else {
-            alert("Error creating stake");
+            console.error("Error de Supabase:", stakeError); // Para ver en consola
+            alert(`Error creating stake: ${stakeError.message}`); // Para ver en pantalla
             setLoading(false);
         }
     };
