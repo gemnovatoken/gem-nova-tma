@@ -1,13 +1,18 @@
-// src/main.tsx
+// src/main.tsx (CORREGIDO Y LISTO)
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-// 🎯 SOLUCIÓN: Importación por defecto (SIN LLAVES)
 import App from './App.tsx'; 
 import './index.css';
 
+// 1. Importar el AuthProvider
+import { AuthProvider } from './contexts/AuthContext'; 
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    {/* 2. El AuthProvider DEBE envolver a App */}
+    <AuthProvider>
+        <App />
+    </AuthProvider>
   </React.StrictMode>,
 );

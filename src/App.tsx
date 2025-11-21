@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { AuthProvider } from './contexts/AuthContext';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -9,7 +8,7 @@ import { BulkStore } from './components/BulkStore';
 import { SquadZone } from './components/SquadZone';
 import { WalletRoadmap } from './components/WalletRoadmap';
 import { supabase } from './services/supabase';
-import { useAuth } from './hooks/useAuth'; // La línea crucial
+import { useAuth } from './hooks/useAuth';
 
 // Configuración High Stakes (Necesaria para calcular niveles)
 const GAME_CONFIG = {
@@ -22,7 +21,7 @@ const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json';
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
-    // ESTADOS CENTRALES DEL JUEGO (Persisten entre pestañas)
+    // ESTADOS CENTRALES DEL JUEGO
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
@@ -34,7 +33,7 @@ export default function App() {
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // 1. CARGA INICIAL DE DATOS (Se ejecuta UNA sola vez al inicio)
+    // 1. CARGA INICIAL DE DATOS
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -49,7 +48,7 @@ export default function App() {
         }
     }, [user, authLoading]);
 
-    // 2. REGENERACIÓN AUTOMÁTICA (Persistente)
+    // 2. REGENERACIÓN AUTOMÁTICA
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -62,7 +61,7 @@ export default function App() {
 
 
     return (
-        <AuthProvider>
+        
             <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
                 <div className="app-container" style={{ minHeight: '100vh', paddingBottom: '100px', color: 'white' }}>
                     
@@ -72,12 +71,16 @@ export default function App() {
                     {currentTab === 'mine' && (
                         <div style={{ paddingTop: '10px', animation: 'fadeIn 0.5s' }}>
                             <div style={{ padding: '0 20px' }}><MarketDashboard /></div>
-                            {/* 🎯 SOLUCIÓN AL ERROR DE PROPIEDADES (TS2740) 🎯 */}
+                            {/* 🎯 SOLUCIÓN AL ERROR: Pasamos TODAS las props requeridas 🎯 */}
                             <MyMainTMAComponent 
-                                score={score} setScore={setScore} 
-                                energy={energy} setEnergy={setEnergy} 
-                                levels={levels} setLevels={setLevels}
-                                maxEnergy={maxEnergy} regenRate={regenRate}
+                                score={score} 
+                                setScore={setScore} 
+                                energy={energy} 
+                                setEnergy={setEnergy} 
+                                levels={levels} 
+                                setLevels={setLevels}
+                                maxEnergy={maxEnergy} 
+                                regenRate={regenRate}
                             />
                         </div>
                     )}
@@ -115,6 +118,6 @@ export default function App() {
                     <BottomNav activeTab={currentTab} setTab={setCurrentTab} />
                 </div>
             </TonConnectUIProvider>
-        </AuthProvider>
+      
     );
 }
