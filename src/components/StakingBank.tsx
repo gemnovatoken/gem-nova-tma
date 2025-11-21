@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { CheckCircle, Lock, Clock, Calendar } from 'lucide-react';
+import { CheckCircle, Lock, Calendar, Info } from 'lucide-react';
+
 interface StakeData {
     id: string;
     amount: number;
@@ -11,33 +12,51 @@ interface StakeData {
     end_at: string;
 }
 
-// ⚙️ CONFIGURACIÓN DE DÍAS Y RETORNO
 const LOCK_OPTIONS = [
     { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, // 5%
     { days: 30, roi: 0.15, label: '30D', color: '#00F2FE' }, // 15%
     { days: 60, roi: 0.35, label: '60D', color: '#FF0055' }, // 35%
-    { days: 90, roi: 0.60, label: '90D', color: '#FFD700' }  // 60% (Whale)
+    { days: 90, roi: 0.60, label: '90D', color: '#FFD700' }  // 60%
 ];
 
 export const StakingBank = () => {
     const { user } = useAuth();
     
     const [stakes, setStakes] = useState<StakeData[]>([]);
-    const [totalBalance, setTotalBalance] = useState(0);
+    
+    // Estados de Saldo
+    const [totalScore, setTotalScore] = useState(0);
+    const [purchasedPoints, setPurchasedPoints] = useState(0);
+    const [userLevel, setUserLevel] = useState(1); // Usamos limit_level como referencia
+    
     const [loading, setLoading] = useState(false);
     const [amountToStake, setAmountToStake] = useState('');
-    const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[1]); // Default 30d
+    const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[1]); 
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // 💰 LÓGICA DEL 70%
-    // Solo permitimos stakear el 70% del balance total
-    const maxStakeable = Math.floor(totalBalance * 0.70);
+    // 💰 LÓGICA PROGRESIVA DE NIVELES
+    const getUnlockPercentage = (level: number) => {
+        if (level >= 8) return 0.70; // 70%
+        if (level === 7) return 0.50; // 50%
+        if (level === 6) return 0.35; // 35%
+        if (level === 5) return 0.20; // 20%
+        return 0; // Nivel 1-4: 0%
+    };
 
-    // 1. Función para cargar datos
+    const unlockPct = getUnlockPercentage(userLevel);
+    
+    // 1. Calculamos puntos jugados
+    const earnedPoints = Math.max(0, totalScore - purchasedPoints);
+    
+    // 2. Aplicamos el porcentaje según nivel
+    const stakeableEarned = Math.floor(earnedPoints * unlockPct);
+    
+    // 3. Total disponible para Staking
+    const maxStakeable = purchasedPoints + stakeableEarned;
+
     const fetchData = async () => {
         if(!user) return;
         
-        // A. Cargar historial de stakes activos
         const { data: stakeData } = await supabase
             .from('stakes') 
             .select('*')
@@ -47,29 +66,29 @@ export const StakingBank = () => {
         
         if (stakeData) setStakes(stakeData as StakeData[]);
 
-        // B. Cargar saldo actual del usuario
         const { data: userData } = await supabase
             .from('user_score')
-            .select('score')
+            .select('score, purchased_points, limit_level')
             .eq('user_id', user.id)
             .single();
         
-        if (userData) setTotalBalance(userData.score);
+        if (userData) {
+            setTotalScore(userData.score);
+            setPurchasedPoints(userData.purchased_points || 0);
+            setUserLevel(userData.limit_level || 1);
+        }
     };
 
-    // 2. Ejecutar al inicio
     useEffect(() => {
         if (!user) return;
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
-    // Calcular ganancia estimada en tiempo real
     const calculatedProfit = amountToStake 
         ? Math.floor(parseInt(amountToStake) * selectedOption.roi) 
         : 0;
 
-    // Botones de porcentaje (Basados en el maxStakeable, no el total)
     const setPercentage = (pct: number) => {
         if (maxStakeable <= 0) return;
         const val = Math.floor(maxStakeable * pct);
@@ -80,27 +99,24 @@ export const StakingBank = () => {
         if (!user || !amountToStake) return;
         const amount = parseInt(amountToStake);
         
-        // Validación estricta
         if (amount <= 0) {
             alert("Enter a valid amount");
             return;
         }
         if (amount > maxStakeable) {
-            alert(`⚠️ You can only stake up to 70% of your balance (${maxStakeable.toLocaleString()} pts) to keep liquidity for the game.`);
+            alert(`⚠️ Limit Exceeded!\n\nMax Stakeable: ${maxStakeable.toLocaleString()}\n\nReason:\n- Purchased: 100% Unlocked\n- Gameplay: ${unlockPct * 100}% Unlocked (Lvl ${userLevel})`);
             return;
         }
-        if (amount > totalBalance) {
+        if (amount > totalScore) {
             alert("Insufficient balance.");
             return;
         }
 
         setLoading(true);
 
-        // Calcular fecha de fin
         const unlockDate = new Date();
         unlockDate.setDate(unlockDate.getDate() + selectedOption.days);
 
-        // 1. Insertar en tabla de Stakes
         const { error: stakeError } = await supabase.from('stakes').insert({
             user_id: user.id,
             amount: amount,
@@ -111,28 +127,32 @@ export const StakingBank = () => {
         });
 
         if (!stakeError) {
-            // 2. Restar los puntos del usuario (Importante: Quitar el dinero de la cuenta)
             await supabase.rpc('deduct_points', { 
                 user_id_in: user.id, 
                 amount_in: amount 
             });
             
-            // Éxito visual
             await new Promise(r => setTimeout(r, 800));
             setLoading(false);
             setAmountToStake('');
             setShowSuccess(true); 
-            fetchData(); // Recargar datos
+            fetchData();
         } else {
             alert("Error creating stake");
             setLoading(false);
         }
     };
 
-    // Formatear fecha bonita
     const formatDate = (dateString: string) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
+    // Color dinámico para el texto de porcentaje
+    const getPctColor = () => {
+        if (unlockPct === 0) return '#FF5252';
+        if (unlockPct < 0.5) return '#FFD700';
+        return '#4CAF50';
     };
 
     return (
@@ -141,19 +161,34 @@ export const StakingBank = () => {
                 <Lock size={20} color="#FFD700"/> Vault Staking
             </h3>
             
-            {/* --- INFORMACIÓN DE SALDO --- */}
-            <div style={{background:'rgba(0,242,254,0.05)', padding:'10px', borderRadius:'8px', marginBottom:'20px', borderLeft:'3px solid #00F2FE'}}>
-                <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#aaa'}}>
+            {/* --- PANEL DE REGLAS DE LIQUIDEZ --- */}
+            <div style={{background:'rgba(0,0,0,0.3)', padding:'12px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #333'}}>
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#aaa', marginBottom:'8px'}}>
                     <span>Total Balance:</span>
-                    <span>{totalBalance.toLocaleString()}</span>
+                    <span style={{color:'#fff'}}>{totalScore.toLocaleString()}</span>
                 </div>
-                <div style={{display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold', marginTop:'5px'}}>
-                    <span>Available to Stake (70%):</span>
-                    <span style={{color:'#00F2FE'}}>{maxStakeable.toLocaleString()}</span>
+                
+                <div style={{fontSize:'11px', color:'#666', marginBottom:'5px', display:'flex', gap:'5px', alignItems:'center'}}>
+                    <Info size={10}/> ALLOWANCE (Lvl {userLevel}):
+                </div>
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'2px'}}>
+                    <span style={{color:'#00F2FE'}}>Purchased (100%):</span>
+                    <span>{purchasedPoints.toLocaleString()}</span>
+                </div>
+                <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
+                    <span style={{color: getPctColor()}}>
+                        Gameplay ({unlockPct * 100}%):
+                    </span>
+                    <span>{stakeableEarned.toLocaleString()}</span>
+                </div>
+
+                <div style={{borderTop:'1px dashed #444', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold'}}>
+                    <span>MAX STAKEABLE:</span>
+                    <span style={{color:'#FFD700'}}>{maxStakeable.toLocaleString()}</span>
                 </div>
             </div>
 
-            {/* --- SELECTOR DE DÍAS (15, 30, 60, 90) --- */}
+            {/* --- SELECTOR DE DÍAS --- */}
             <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'8px', marginBottom:'15px'}}>
                 {LOCK_OPTIONS.map((opt) => (
                     <button 
@@ -176,7 +211,7 @@ export const StakingBank = () => {
                 ))}
             </div>
 
-            {/* --- INPUT Y BOTÓN --- */}
+            {/* --- INPUT --- */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                 <div style={{position:'relative', width:'100%'}}>
                     <input 
@@ -193,7 +228,7 @@ export const StakingBank = () => {
                 </button>
             </div>
 
-            {/* --- PORCENTAJES RAPIDOS --- */}
+            {/* --- PORCENTAJES --- */}
             <div style={{display:'flex', gap:'5px', marginBottom:'20px'}}>
                 {[0.25, 0.50, 0.75, 1].map((pct) => (
                     <button key={pct} onClick={() => setPercentage(pct)} style={{flex:1, padding:'6px', background:'rgba(255,255,255,0.05)', border:'none', borderRadius:'4px', color:'#aaa', fontSize:'10px', cursor:'pointer'}}>
@@ -210,14 +245,14 @@ export const StakingBank = () => {
                 </div>
             )}
 
-            {/* --- HISTORIAL DE STAKES ACTIVOS --- */}
+            {/* --- HISTORIAL --- */}
             <h4 style={{margin:'0 0 15px 0', fontSize:'12px', color:'#aaa', textTransform:'uppercase', letterSpacing:'1px', borderTop:'1px dashed #333', paddingTop:'15px'}}>
                 Active Vaults ({stakes.length})
             </h4>
             
             {stakes.length === 0 ? (
                 <div style={{ padding:'20px', textAlign:'center', opacity:0.5 }}>
-                    <Clock size={30} color="#555" style={{marginBottom:'5px'}}/>
+                    <Lock size={30} color="#555" style={{marginBottom:'5px'}}/>
                     <p style={{ color: '#888', fontSize: '12px', margin:0 }}>Your vault is empty.</p>
                 </div>
             ) : (
@@ -239,7 +274,7 @@ export const StakingBank = () => {
                 </div>
             )}
 
-            {/* --- MODAL DE ÉXITO --- */}
+            {/* --- MODAL ÉXITO --- */}
             {showSuccess && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
