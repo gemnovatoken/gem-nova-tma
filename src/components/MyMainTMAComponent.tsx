@@ -1,111 +1,93 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { Trophy, Zap, Video, Gamepad2 } from 'lucide-react';
+import type { SetStateAction, Dispatch } from 'react'; // Importar tipos para limpieza
 
-// CONFIGURACIÓN HIGH STAKES (8 Niveles)
+// Definiciones de tipos para el estado centralizado (¡ESTO ES LA CLAVE!)
+interface GameProps {
+    score: number; setScore: Dispatch<SetStateAction<number>>;
+    energy: number; setEnergy: Dispatch<SetStateAction<number>>;
+    levels: { multitap: number; limit: number; speed: number }; 
+    setLevels: Dispatch<SetStateAction<{ multitap: number; limit: number; speed: number }>>;
+    maxEnergy: number; regenRate: number;
+}
+
+// Configuración HIGH STAKES (Solo para lookup de costos)
 const GAME_CONFIG = {
     multitap: { costs: [5000, 25000, 100000, 500000, 1500000, 3500000, 8000000], values: [1, 2, 3, 4, 6, 8, 10, 15] },
     limit:    { costs: [5000, 25000, 100000, 500000, 1500000, 3500000, 8000000], values: [500, 1000, 1500, 2000, 4000, 6000, 8500, 12000] },
     speed:    { costs: [5000, 25000, 100000, 500000, 1000000, 2000000, 5000000], values: [1, 2, 3, 4, 5, 6, 8, 10] }
 };
 
-export const MyMainTMAComponent: React.FC = () => {
+// 🛑 AHORA EL COMPONENTE SABE EXACTAMENTE QUÉ PROPS RECIBE 🛑
+export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const { user } = useAuth();
-    const [score, setScore] = useState(0);
-    const [energy, setEnergy] = useState(0);
-    const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     const [showRanking, setShowRanking] = useState(false);
     const [showLucky, setShowLucky] = useState(false);
-    
-    const [multiplier, setMultiplier] = useState(1); // x3 por video
+    const [multiplier, setMultiplier] = useState(1);
     const [turboActive, setTurboActive] = useState(false);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Cálculos seguros con fallback
-    const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
-    const speedIdx = Math.min(Math.max(0, levels.speed - 1), 7);
-    const multiIdx = Math.min(Math.max(0, levels.multitap - 1), 7);
-
-    const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
-    const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
-    const baseTap = GAME_CONFIG.multitap.values[multiIdx] || 1;
+    // Desestructuración de props
+    const { score, setScore, energy, setEnergy, levels, setLevels, maxEnergy, regenRate } = props;
+    const baseTap = GAME_CONFIG.multitap.values[Math.min(levels.multitap - 1, 7)] || 1;
     const finalTap = baseTap * multiplier;
 
-    // 1. Cargar Datos
-    useEffect(() => {
-        const fetchInitialData = async () => {
-            if (user) {
-                const { data } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
-                if (data) {
-                    setScore(data.score);
-                    setEnergy(data.energy);
-                    setLevels({ 
-                        multitap: data.multitap_level || 1, 
-                        limit: data.limit_level || 1, 
-                        speed: data.speed_level || 1 
-                    });
-                }
-            }
-        };
-        fetchInitialData();
-    }, [user]);
-
-    // 2. Regeneración
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setEnergy(p => {
-                if (p >= maxEnergy) return p;
-                return Math.min(maxEnergy, p + regenRate);
-            });
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [maxEnergy, regenRate]);
-
-    // 3. Tap
+    // LÓGICA DE TAP (AHORA SEGURO)
     const handleTap = async () => {
         if (!user || energy < finalTap) {
-            if(energy < finalTap) setMessage("¡Sin energía!");
+            if(energy < finalTap) setMessage("Low Energy!");
             setTimeout(() => setMessage(''), 1000);
             return;
         }
+
+        setScore(s => s + finalTap);
+        setEnergy(e => Math.max(0, e - finalTap)); 
 
         if (turboActive) {
             document.body.style.backgroundColor = '#220011';
             setTimeout(() => document.body.style.backgroundColor = '#0B0E14', 100);
         }
 
-        setScore(s => s + finalTap);
-        setEnergy(e => Math.max(0, e - finalTap)); 
+        const { data, error } = await supabase.rpc('tap_and_earn', { user_id_in: user.id, multiplier: multiplier });
+        
+        if (error) {
+             console.error('RPC Error:', error);
+             setMessage("Sync Error. Try again!");
+             return;
+        }
 
-        const { data } = await supabase.rpc('tap_and_earn', { user_id_in: user.id, multiplier: multiplier });
-        if(data && data[0].success) setScore(data[0].new_score);
+        if(data && data[0].success) {
+             setScore(data[0].new_score); 
+        } else {
+             setMessage(data?.[0]?.message || "Sync error!");
+        }
     };
 
-    // 4. Videos
-    const watchVideo = (type: 'turbo' | 'refill') => {
-        const confirm = window.confirm("📺 ¿Ver anuncio publicitario para obtener recompensa?");
+    // Lógica de Video
+    const watchVideo = useCallback((type: 'turbo' | 'refill') => {
+        const confirm = window.confirm("📺 Watch ad for reward?");
         if(!confirm) return;
         
-        console.log("Simulando Ad..."); 
         setTimeout(() => {
             if (type === 'turbo') {
                 setMultiplier(3);
                 setTurboActive(true);
-                alert("🚀 TURBO x3 ACTIVADO (60s)");
+                alert("🚀 TURBO x3 ACTIVATED (60s)");
                 setTimeout(() => { setMultiplier(1); setTurboActive(false); }, 60000);
             } else {
                 setEnergy(maxEnergy);
-                alert("🔋 Energía Rellenada");
+                alert("🔋 Energy Refilled");
             }
         }, 2000);
-    };
+    }, [maxEnergy, setEnergy]);
 
-    // 5. Comprar Mejoras
-    const buyBoost = async (type: 'multitap' | 'limit' | 'speed') => {
+    // Lógica de Comprar Mejoras
+    const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
         if (loading) return;
         setLoading(true);
         const { data, error } = await supabase.rpc('buy_boost', { user_id_in: user!.id, boost_type: type });
@@ -115,15 +97,31 @@ export const MyMainTMAComponent: React.FC = () => {
             setLevels(p => ({ ...p, [type]: data[0].new_level }));
             alert(data[0].message);
         } else {
-            alert(data?.[0]?.message || "Error o Puntos Insuficientes");
+            alert(data?.[0]?.message || "Error buying boost.");
         }
         setLoading(false);
-    };
+    }, [user, setScore, setLevels, loading]);
+
+    // Helper para obtener info del siguiente nivel
+    const getNextLevelInfo = useCallback((type: 'multitap' | 'limit' | 'speed', currentLvl: number) => {
+        const config = GAME_CONFIG[type];
+        const idx = currentLvl - 1;
+        const isMax = idx >= config.values.length - 1;
+        const nextCost = isMax ? 0 : config.costs[currentLvl]; 
+        const currentVal = config.values[idx];
+        const nextVal = isMax ? currentVal : config.values[idx + 1];
+        return { isMax, nextCost, currentVal, nextVal };
+    }, []);
+
+    const multiInfo = getNextLevelInfo('multitap', levels.multitap);
+    const limitInfo = getNextLevelInfo('limit', levels.limit);
+    const speedInfo = getNextLevelInfo('speed', levels.speed);
+
 
     return (
         <div style={{ textAlign: 'center', padding: '20px', paddingBottom: '120px', maxWidth: '500px', margin: '0 auto' }}>
             
-            {/* RANKING BAR */}
+            {/* RANKING BAR (Omitting for brevity) */}
             <div onClick={() => setShowRanking(true)} className="glass-card" 
                 style={{ padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', border: '1px solid #FFD700', background:'rgba(255,215,0,0.05)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -135,7 +133,7 @@ export const MyMainTMAComponent: React.FC = () => {
 
             <h1 className="text-gradient" style={{ fontSize: '48px', margin: '15px 0' }}>💎 {score.toLocaleString()}</h1>
 
-            {/* CIRCLE */}
+            {/* CIRCLE (Omitting for brevity) */}
             <div style={{ margin: '20px 0', position: 'relative' }}>
                 <button onClick={handleTap} disabled={!user}
                     style={{
@@ -161,7 +159,7 @@ export const MyMainTMAComponent: React.FC = () => {
             <div className="glass-card" style={{ padding: '10px', marginBottom:'15px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#aaa' }}>
                     <span>⚡ Energy</span>
-                    <span>{Math.floor(energy)} / {maxEnergy}</span>
+                    <span>{Math.floor(energy)} / {maxEnergy} <span style={{color:'#4FACFE'}}>(+{regenRate}/s)</span></span>
                 </div>
                 <div style={{ width: '100%', height: '8px', background: '#333', borderRadius: '4px', marginTop: '5px' }}>
                     <div style={{ width: `${Math.min(100, (energy/maxEnergy)*100)}%`, height: '100%', background: '#FFD700', borderRadius: '4px' }} />
@@ -175,29 +173,37 @@ export const MyMainTMAComponent: React.FC = () => {
                 <ActionButton icon={<Gamepad2 color="#E040FB"/>} title="LUCKY?" sub="Casino" color="#E040FB" onClick={() => setShowLucky(true)} />
             </div>
 
-            {/* SHOP */}
+            {/* SHOP - FIXING THE UNUSED VARIABLE WARNINGS HERE */}
             <div className="glass-card">
                 <h3 style={{margin:'0 0 15px 0', textAlign:'left'}}>🚀 Upgrades</h3>
                 
+                {/* MULTITAP - USES multiInfo */}
                 <BoostItem 
-                    title="👆 Multitap" level={levels.multitap} desc="+Points" 
-                    price={GAME_CONFIG.multitap.costs[levels.multitap-1]||0} 
-                    isMax={levels.multitap>=8} 
-                    canAfford={score >= (GAME_CONFIG.multitap.costs[levels.multitap-1]||0)}
+                    title="👆 Multitap" level={levels.multitap} 
+                    desc={`+${multiInfo.currentVal} ➔ +${multiInfo.nextVal} pts`} 
+                    price={multiInfo.nextCost} 
+                    isMax={multiInfo.isMax} 
+                    canAfford={score >= multiInfo.nextCost}
                     onBuy={()=>buyBoost('multitap')} 
                 />
+                
+                {/* ENERGY TANK - USES limitInfo (FIXES THE REPORTED ERROR) */}
                 <BoostItem 
-                    title="🔋 Tank" level={levels.limit} desc="+Max Energy" 
-                    price={GAME_CONFIG.limit.costs[levels.limit-1]||0} 
-                    isMax={levels.limit>=8} 
-                    canAfford={score >= (GAME_CONFIG.limit.costs[levels.limit-1]||0)}
+                    title="🔋 Tank" level={levels.limit} 
+                    desc={`${limitInfo.currentVal} ➔ ${limitInfo.nextVal} Energy Cap`} 
+                    price={limitInfo.nextCost} 
+                    isMax={limitInfo.isMax} 
+                    canAfford={score >= limitInfo.nextCost}
                     onBuy={()=>buyBoost('limit')} 
                 />
+                
+                {/* SPEED - USES speedInfo */}
                 <BoostItem 
-                    title="⚡ Speed" level={levels.speed} desc="+Regen/s" 
-                    price={GAME_CONFIG.speed.costs[levels.speed-1]||0} 
-                    isMax={levels.speed>=8} 
-                    canAfford={score >= (GAME_CONFIG.speed.costs[levels.speed-1]||0)}
+                    title="⚡ Speed" level={levels.speed} 
+                    desc={`+${speedInfo.currentVal} ➔ +${speedInfo.nextVal} /s Regen`} 
+                    price={speedInfo.nextCost} 
+                    isMax={speedInfo.isMax} 
+                    canAfford={score >= speedInfo.nextCost}
                     onBuy={()=>buyBoost('speed')} 
                 />
             </div>

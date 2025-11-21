@@ -1,16 +1,21 @@
-// src/hooks/useAuth.ts
-import { useContext, createContext } from 'react';
-// Importamos el tipo de dato desde el archivo principal
-import type { AuthContextType } from '../contexts/AuthContext'; 
+import { createContext, useContext } from 'react';
+import type { User } from '@supabase/supabase-js';
 
-// 1. Declarar y EXPORTAR el Contexto aquí
+// Definimos la estructura del Contexto (EXPORTADA para que AuthContext.tsx la use)
+export interface AuthContextType {
+    user: User | null;
+    loading: boolean;
+}
+
+// Creamos y exportamos el objeto Context (para que el Provider lo use)
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// 2. Declarar y EXPORTAR el Hook aquí
+// El Hook que los componentes usarán
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        // Lanza error si alguien usa useAuth fuera de AuthProvider
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
 };
