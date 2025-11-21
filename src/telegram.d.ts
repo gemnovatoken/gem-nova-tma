@@ -11,7 +11,7 @@ interface TelegramWebApp {
     isClosingConfirmationEnabled: boolean;
     ready: () => void;
     expand: () => void;
-    close: () => void;
+    close: () => void;q
 }
 
 interface Window {
