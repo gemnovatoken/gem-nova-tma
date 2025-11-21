@@ -6,9 +6,9 @@ import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
 import { MarketDashboard } from './components/MarketDashboard';
 import { BulkStore } from './components/BulkStore';
-// 👇 IMPORTACIONES NUEVAS
 import { SquadZone } from './components/SquadZone';
 import { WalletRoadmap } from './components/WalletRoadmap';
+import { MissionTerminal } from './components/MissionTerminal';
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
@@ -37,17 +37,15 @@ export default function App() {
              </div>
           )}
 
-          {/* --- PESTAÑA 3: MISIÓN (Aún en construcción) --- */}
+          {/* --- PESTAÑA 3: MISIÓN (CORREGIDA) --- */}
+          {/* 👇 AQUÍ ESTÁ EL CAMBIO: Ahora mostramos la Terminal del Whitepaper */}
           {currentTab === 'mission' && (
-             <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.7, animation: 'fadeIn 0.5s' }}>
-                <div style={{ fontSize: '50px', marginBottom: '15px' }}>🗺️</div>
-                <h2>Expedition</h2>
-                <p style={{ color: '#aaa' }}>Daily Quests coming in Phase 1.5.</p>
+             <div style={{ animation: 'fadeIn 0.5s' }}>
+                <MissionTerminal />
              </div>
           )}
 
           {/* --- PESTAÑA 4: SQUAD (REFERIDOS) --- */}
-          {/* 👇 AQUÍ CONECTAMOS EL COMPONENTE NUEVO */}
           {currentTab === 'squad' && (
              <div style={{ animation: 'fadeIn 0.5s' }}>
                  <SquadZone />
@@ -55,7 +53,6 @@ export default function App() {
           )}
 
           {/* --- PESTAÑA 5: AIRDROP (WALLET) --- */}
-          {/* 👇 AQUÍ CONECTAMOS EL ROADMAP */}
           {currentTab === 'wallet' && (
              <div style={{ animation: 'fadeIn 0.5s' }}>
                  <WalletRoadmap />
