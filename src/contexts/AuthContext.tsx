@@ -1,10 +1,14 @@
+// src/contexts/AuthContext.tsx (Versión Final con Limpieza de URL)
+
 import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
-import { AuthContext } from '../hooks/useAuth'; // 1. Importamos el Contexto del nuevo archivo
+import { AuthContext } from '../hooks/useAuth'; 
 
-// URL de tu proyecto Supabase (se lee desde el cliente)
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+// URL base de tu proyecto Supabase (con potencial barra al final)
+const SUPABASE_URL_RAW = import.meta.env.VITE_SUPABASE_URL;
+// 👇 CORRECCIÓN CRÍTICA: Eliminar la barra diagonal al final si existe
+const SUPABASE_URL = SUPABASE_URL_RAW.replace(/\/$/, '');
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -14,10 +18,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const getSession = async () => {
             setLoading(true);
             
-            // Lógica para Login Nativo de Telegram
             const initData = window.Telegram?.WebApp?.initData;
 
             if (initData) {
+                // 🛑 AHORA LA URL ES PERFECTA (sin doble barra)
                 const response = await fetch(`${SUPABASE_URL}/functions/v1/tg-auth`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -25,14 +29,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 });
 
                 const data = await response.json();
-
+                // ... (resto de la lógica de setSession y error handling)
+                
                 if (response.ok && data.token) {
-                    // Establece la sesión de Supabase
                     const { data: sessionData } = await supabase.auth.setSession({
                         access_token: data.token,
                         refresh_token: data.refresh_token
                     });
-                    
                     if (sessionData.user) setUser(sessionData.user);
 
                 } else {
@@ -40,18 +43,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             }
             
-            // Fallback: Siempre verificar si ya hay una sesión guardada localmente
+            // ... (resto del código de Fallback y Listener) ...
             const { data: { user: existingUser } } = await supabase.auth.getUser();
             if (existingUser) setUser(existingUser);
-
             setLoading(false);
         };
 
         getSession();
 
-        // Suscripción a cambios de estado para manejar logout/refresh
         const { data: authListener } = supabase.auth.onAuthStateChange(
-          (_event, session) => { // ✅ SOLUCIÓN: Usamos _event para indicar que se ignora
+          (_event, session) => {
             if (session) {
               setUser(session.user);
             } else {
