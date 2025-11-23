@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+// ❌ ELIMINAMOS 'AuthProvider' de aquí
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -21,7 +22,7 @@ const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json';
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
-    // ESTADOS CENTRALES DEL JUEGO
+    // ESTADOS CENTRALES DEL JUEGO (La llamada a useAuth está bien aquí)
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
@@ -61,63 +62,55 @@ export default function App() {
 
 
     return (
-        
-            <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
-                <div className="app-container" style={{ minHeight: '100vh', paddingBottom: '100px', color: 'white' }}>
-                    
-                    <Header />
+        // 🛑 ELIMINAMOS LA ETIQUETA <AuthProvider> AQUÍ
+        <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
+            <div className="app-container" style={{ minHeight: '100vh', paddingBottom: '100px', color: 'white' }}>
+                
+                <Header />
 
-                    {/* --- PESTAÑA 1: MINAR --- */}
-                    {currentTab === 'mine' && (
-                        <div style={{ paddingTop: '10px', animation: 'fadeIn 0.5s' }}>
-                            <div style={{ padding: '0 20px' }}><MarketDashboard /></div>
-                            {/* 🎯 SOLUCIÓN AL ERROR: Pasamos TODAS las props requeridas 🎯 */}
-                            <MyMainTMAComponent 
-                                score={score} 
-                                setScore={setScore} 
-                                energy={energy} 
-                                setEnergy={setEnergy} 
-                                levels={levels} 
-                                setLevels={setLevels}
-                                maxEnergy={maxEnergy} 
-                                regenRate={regenRate}
-                            />
-                        </div>
-                    )}
-                    
-                    {/* --- PESTAÑA 2: MERCADO --- */}
-                    {currentTab === 'market' && (
-                        <div style={{ animation: 'fadeIn 0.5s' }}>
-                            <BulkStore />
-                        </div>
-                    )}
+                {/* --- PESTAÑA 1: MINAR --- */}
+                {currentTab === 'mine' && (
+                    <div style={{ paddingTop: '10px', animation: 'fadeIn 0.5s' }}>
+                        <div style={{ padding: '0 20px' }}><MarketDashboard /></div>
+                        <MyMainTMAComponent 
+                            score={score} setScore={setScore} 
+                            energy={energy} setEnergy={setEnergy} 
+                            levels={levels} setLevels={setLevels}
+                            maxEnergy={maxEnergy} regenRate={regenRate}
+                        />
+                    </div>
+                )}
+                
+                {/* ... Resto de Pestañas (igual) ... */}
+                {currentTab === 'market' && (
+                    <div style={{ animation: 'fadeIn 0.5s' }}>
+                        <BulkStore />
+                    </div>
+                )}
 
-                    {/* --- PESTAÑA 3: MISIÓN --- */}
-                    {currentTab === 'mission' && (
-                        <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.7, animation: 'fadeIn 0.5s' }}>
-                            <div style={{ fontSize: '50px', marginBottom: '15px' }}>🗺️</div>
-                            <h2>Expedition</h2>
-                            <p style={{ color: '#aaa' }}>Daily Quests coming in Phase 1.5.</p>
-                        </div>
-                    )}
+                {currentTab === 'mission' && (
+                    <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.7, animation: 'fadeIn 0.5s' }}>
+                        <div style={{ fontSize: '50px', marginBottom: '15px' }}>🗺️</div>
+                        <h2>Expedition</h2>
+                        <p style={{ color: '#aaa' }}>Daily Quests coming in Phase 1.5.</p>
+                    </div>
+                )}
 
-                    {/* --- PESTAÑA 4: SQUAD --- */}
-                    {currentTab === 'squad' && (
-                        <div style={{ padding: '20px', animation: 'fadeIn 0.5s' }}>
-                            <SquadZone />
-                        </div>
-                    )}
+                {currentTab === 'squad' && (
+                    <div style={{ padding: '20px', animation: 'fadeIn 0.5s' }}>
+                        <SquadZone />
+                    </div>
+                )}
 
-                    {/* --- PESTAÑA 5: AIRDROP/WALLET --- */}
-                    {currentTab === 'wallet' && (
-                        <div style={{ animation: 'fadeIn 0.5s' }}>
-                            <WalletRoadmap />
-                        </div>
-                    )}
+                {currentTab === 'wallet' && (
+                    <div style={{ animation: 'fadeIn 0.5s' }}>
+                        <WalletRoadmap />
+                    </div>
+                )}
 
-                    <BottomNav activeTab={currentTab} setTab={setCurrentTab} />
-                </div>
-            </TonConnectUIProvider>
-      
+                <BottomNav activeTab={currentTab} setTab={setCurrentTab} />
+            </div>
+        </TonConnectUIProvider>
+        // 🛑 FIN DE LA ELIMINACIÓN DE LA ETIQUETA </AuthProvider>
     );
 }

@@ -1,4 +1,4 @@
-// src/main.tsx (CORREGIDO Y LISTO)
+// src/main.tsx (El archivo que monta la aplicación)
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';

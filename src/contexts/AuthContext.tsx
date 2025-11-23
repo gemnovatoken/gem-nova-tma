@@ -1,14 +1,15 @@
-// src/contexts/AuthContext.tsx (Versión Final con Limpieza de URL)
+// src/contexts/AuthContext.tsx (CORREGIDO Y LISTO)
 
 import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
+
+// 🛑 Importamos el Contexto (AuthContext) desde el nuevo archivo
 import { AuthContext } from '../hooks/useAuth'; 
 
-// URL base de tu proyecto Supabase (con potencial barra al final)
 const SUPABASE_URL_RAW = import.meta.env.VITE_SUPABASE_URL;
-// 👇 CORRECCIÓN CRÍTICA: Eliminar la barra diagonal al final si existe
-const SUPABASE_URL = SUPABASE_URL_RAW.replace(/\/$/, '');
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY; 
+const SUPABASE_URL = SUPABASE_URL_RAW.replace(/\/$/, ''); 
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -21,21 +22,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const initData = window.Telegram?.WebApp?.initData;
 
             if (initData) {
-                // 🛑 AHORA LA URL ES PERFECTA (sin doble barra)
                 const response = await fetch(`${SUPABASE_URL}/functions/v1/tg-auth`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}` 
+                    },
                     body: JSON.stringify({ initData })
                 });
 
                 const data = await response.json();
-                // ... (resto de la lógica de setSession y error handling)
-                
+
                 if (response.ok && data.token) {
                     const { data: sessionData } = await supabase.auth.setSession({
                         access_token: data.token,
                         refresh_token: data.refresh_token
                     });
+                    
                     if (sessionData.user) setUser(sessionData.user);
 
                 } else {
@@ -43,9 +46,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             }
             
-            // ... (resto del código de Fallback y Listener) ...
             const { data: { user: existingUser } } = await supabase.auth.getUser();
             if (existingUser) setUser(existingUser);
+
             setLoading(false);
         };
 
@@ -72,3 +75,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         </AuthContext.Provider>
     );
 };
+// 🛑 Ya no exportamos useAuth ni AuthContext desde aquí.
