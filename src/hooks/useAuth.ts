@@ -1,5 +1,4 @@
-// src/hooks/useAuth.ts (Contiene el Contexto y el Hook)
-
+// src/hooks/useAuth.ts
 import { createContext, useContext } from 'react';
 import type { User } from '@supabase/supabase-js';
 
@@ -9,10 +8,10 @@ export interface AuthContextType {
     loading: boolean;
 }
 
-// 2. Creamos y exportamos el objeto Context (para que el Provider lo use)
+// 2. Creamos el Contexto aquí
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// 3. El Hook (Consumidor)
+// 3. Hook para usarlo
 export const useAuth = () => {
     const context = useContext(AuthContext);
     if (context === undefined) {
