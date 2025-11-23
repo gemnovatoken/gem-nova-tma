@@ -1,131 +1,116 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Zap, Star, Crown, AlertTriangle } from 'lucide-react';import { StakingBank } from './StakingBank';
+import { StakingBank } from './StakingBank';
+
+// Interfaz para evitar errores de 'any'
+interface PackCardProps {
+    title: string;
+    points: string;
+    bonus?: string; // Opcional porque el primero no tiene bono
+    price: string;
+    color: string;
+    isBestValue?: boolean;
+    onClick: () => void;
+}
 
 export const BulkStore: React.FC = () => {
     const { user } = useAuth();
-    
-    // Estado para el Pop-up de confirmación
-    const [confirmData, setConfirmData] = useState<{pack: string, price: string} | null>(null);
-    const [processing, setProcessing] = useState(false);
 
-    const initiateBuy = (pack: string, price: string) => {
-        setConfirmData({ pack, price });
-    };
-
-    const confirmPurchase = async () => {
-        if(!user || !confirmData) return;
-        setProcessing(true);
-
-        const { error } = await supabase.rpc('buy_bulk_pack', { 
-            user_id_in: user.id, 
-            pack_type: confirmData.pack 
-        });
-
-        setProcessing(false);
-        setConfirmData(null); // Cerrar modal
-
-        if(!error) {
-            alert('✅ Purchase Successful! Points added & Launchpad Updated 🚀');
-        } else {
-            alert('❌ Error processing transaction. Please try again.');
-        }
+    const buyPack = async (pack: string) => {
+        if(!user) return;
+        // Aquí iría la transacción real de TON
+        const { error } = await supabase.rpc('buy_bulk_pack', { user_id_in: user.id, pack_type: pack });
+        if(!error) alert('Purchase Successful! Points added 🚀');
+        else alert('Error purchasing pack');
     };
 
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
-            <h2 style={{marginTop: 0, display: 'flex', alignItems: 'center', gap: '10px'}}>
-                🏦 Treasury <span style={{fontSize: '12px', background: '#333', padding: '2px 8px', borderRadius: '10px'}}>Bulk Buy</span>
-            </h2>
-            <p style={{fontSize: '13px', color: '#aaa', marginBottom: '20px'}}>
-                Acquire Gem Points instantly. Every purchase pushes the token price up.
-            </p>
             
-            {/* Starter Pack */}
-            <div className="glass-card" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
-                    <div style={{background: 'rgba(0, 242, 254, 0.1)', padding: '10px', borderRadius: '50%'}}>
-                        <Zap size={24} color="#00F2FE" />
-                    </div>
-                    <div>
-                        <div style={{fontWeight: 'bold', fontSize: '16px'}}>Starter Pack</div>
-                        <div style={{color: '#00F2FE', fontWeight: 'bold'}}>100,000 Pts</div>
-                    </div>
-                </div>
-                <button className="btn-neon" style={{padding: '8px 16px', fontSize: '14px'}} onClick={() => initiateBuy('starter', '0.15')}>
-                    0.15 TON
-                </button>
+            <div style={{textAlign:'center', marginBottom:'20px'}}>
+                <h2 style={{marginTop: 0, fontSize:'28px', marginBottom:'5px'}}>🏦 Treasury</h2>
+                <p style={{fontSize: '13px', color: '#aaa'}}>
+                    Get points instantly. Higher tiers include <span style={{color:'#4CAF50'}}>FREE BONUS POINTS</span>.
+                </p>
             </div>
+            
+            {/* 1. Starter (Base) */}
+            <PackCard 
+                title="Starter" 
+                points="100,000" 
+                price="0.15 TON" 
+                color="#00F2FE" 
+                onClick={() => buyPack('starter')} 
+            />
+            
+            {/* 2. Pro (+5%) */}
+            <PackCard 
+                title="Pro" 
+                points="525,000" 
+                bonus="+5% BONUS"
+                price="0.75 TON" 
+                color="#4CAF50" 
+                onClick={() => buyPack('pro')} 
+            />
 
-            {/* Pro Pack */}
-            <div className="glass-card" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid rgba(255, 215, 0, 0.3)'}}>
-                <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
-                    <div style={{background: 'rgba(255, 215, 0, 0.1)', padding: '10px', borderRadius: '50%'}}>
-                        <Star size={24} color="#FFD700" />
-                    </div>
-                    <div>
-                        <div style={{fontWeight: 'bold', fontSize: '16px', color: '#FFD700'}}>Pro Pack</div>
-                        <div style={{color: '#fff', fontWeight: 'bold'}}>500,000 Pts</div>
-                    </div>
-                </div>
-                <button className="btn-neon" style={{padding: '8px 16px', fontSize: '14px', background: 'linear-gradient(90deg, #FFD700, #FFA500)'}} onClick={() => initiateBuy('pro', '3.50')}>
-                    3.50 TON
-                </button>
-            </div>
+            {/* 3. Whale (+10%) */}
+            <PackCard 
+                title="Whale" 
+                points="1,100,000" 
+                bonus="+10% BONUS"
+                price="1.50 TON" 
+                color="#FFD700" 
+                onClick={() => buyPack('whale')} 
+            />
+            
+            {/* 4. Tycoon (+20%) - Destacado */}
+            <PackCard 
+                title="TYCOON 👑" 
+                points="6,000,000" 
+                bonus="+20% (1M FREE)"
+                price="7.50 TON" 
+                color="#E040FB" 
+                isBestValue={true}
+                onClick={() => buyPack('tycoon')} 
+            />
 
-             {/* Whale Pack */}
-             <div className="glass-card" style={{border: '1px solid #bd00ff', background: 'linear-gradient(145deg, rgba(189,0,255,0.05), rgba(0,0,0,0))'}}>
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                    <div style={{display: 'flex', gap: '15px', alignItems: 'center'}}>
-                        <div style={{background: 'rgba(189, 0, 255, 0.1)', padding: '10px', borderRadius: '50%'}}>
-                            <Crown size={24} color="#bd00ff" />
-                        </div>
-                        <div>
-                            <div style={{fontWeight: 'bold', fontSize: '18px', color: '#bd00ff'}}>Whale Pack 🐳</div>
-                            <div style={{color: '#fff', fontSize: '20px', fontWeight: 'bold'}}>1,000,000 Pts</div>
-                            <div style={{fontSize: '10px', color: '#4CAF50', marginTop: '4px'}}>+ GLOBAL IMPACT</div>
-                        </div>
-                    </div>
-                </div>
-                <button className="btn-neon" style={{width: '100%', marginTop: '15px', padding: '12px', background: 'linear-gradient(90deg, #bd00ff, #7b00ff)', color: 'white'}} onClick={() => initiateBuy('whale', '6.75')}>
-                    Buy for 6.75 TON
-                </button>
-            </div>
-
-            {/* --- SECCIÓN DE STAKING --- */}
-            <div style={{marginTop: '40px'}}>
-                <StakingBank />
-            </div>
-
-            {/* --- MODAL DE CONFIRMACIÓN (POP UP) --- */}
-            {confirmData && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.85)', zIndex: 5000,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
-                }}>
-                    <div className="glass-card" style={{width: '100%', maxWidth: '320px', textAlign: 'center', border: '1px solid #00F2FE', boxShadow: '0 0 30px rgba(0, 242, 254, 0.2)'}}>
-                        <div style={{margin: '0 auto 15px', width: '60px', height: '60px', background: 'rgba(0, 242, 254, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
-                            <AlertTriangle color="#00F2FE" size={30} />
-                        </div>
-                        <h3 style={{color: '#fff', marginTop: 0}}>Confirm Transaction?</h3>
-                        <p style={{color: '#ccc', fontSize: '14px'}}>
-                            You are about to spend <strong>{confirmData.price} TON</strong> to acquire the <strong>{confirmData.pack.toUpperCase()}</strong> pack.
-                        </p>
-                        
-                        <div style={{display: 'flex', gap: '10px', marginTop: '25px'}}>
-                            <button onClick={() => setConfirmData(null)} style={{flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #555', background: 'transparent', color: '#aaa', cursor: 'pointer'}}>
-                                CANCEL
-                            </button>
-                            <button onClick={confirmPurchase} disabled={processing} className="btn-neon" style={{flex: 1, fontSize: '14px'}}>
-                                {processing ? 'PROCESSING...' : 'CONFIRM'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Banco integrado */}
+            <StakingBank />
 
         </div>
     );
 };
+
+const PackCard: React.FC<PackCardProps> = ({ title, points, bonus, price, color, isBestValue, onClick }) => (
+    <div className="glass-card" style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        border: isBestValue ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.1)',
+        background: isBestValue ? `rgba(224, 64, 251, 0.08)` : undefined,
+        position: 'relative', overflow: 'visible'
+    }}>
+        {isBestValue && (
+            <div style={{
+                position:'absolute', top:-10, right:10, 
+                background: color, color:'white', fontSize:'9px', padding:'2px 8px', borderRadius:'4px', fontWeight:'bold',
+                boxShadow: `0 0 10px ${color}`
+            }}>
+                BEST VALUE
+            </div>
+        )}
+
+        <div>
+            <div style={{fontWeight:'900', fontSize: '16px', color: isBestValue ? color : 'white'}}>{title}</div>
+            <div style={{color: '#fff', fontSize:'14px', margin:'2px 0'}}>{points} Pts</div>
+            {bonus && <div style={{fontSize:'10px', color: '#4CAF50', fontWeight:'bold'}}>{bonus}</div>}
+        </div>
+        
+        <button className="btn-neon" style={{
+            padding: '10px 16px', fontSize:'12px', 
+            background: isBestValue ? `linear-gradient(45deg, ${color}, #00F2FE)` : undefined,
+            border: 'none', color: isBestValue ? 'white' : 'black'
+        }} onClick={onClick}>
+            {price}
+        </button>
+    </div>
+);
