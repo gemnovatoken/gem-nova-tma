@@ -1,8 +1,5 @@
-// src/components/Header.tsx
-import { TonConnectButton } from '@tonconnect/ui-react';
 import React from 'react';
-import { AddressDisplay } from './AddressDisplay';
-
+import { TonConnectButton } from '@tonconnect/ui-react';
 
 export const Header: React.FC = () => {
   return (
@@ -10,15 +7,23 @@ export const Header: React.FC = () => {
       display: 'flex', 
       justifyContent: 'space-between', 
       alignItems: 'center', 
-      padding: '10px 20px',
-      borderBottom: '1px solid #ccc' 
+      padding: '15px 20px',
+      // Fondo sutil para separar del contenido
+      background: 'rgba(11, 14, 20, 0.8)',
+      backdropFilter: 'blur(10px)',
+      position: 'sticky', top: 0, zIndex: 100
     }}>
-      <span>**Mi TMA Tap-to-Earn**</span>
+      
+      {/* Logo / Nombre Oficial */}
+      <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+          <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#00F2FE', boxShadow:'0 0 10px #00F2FE'}}></div>
+          <span style={{ fontWeight:'900', fontSize:'16px', letterSpacing:'0.5px' }}>
+            GNova<span style={{color:'#00F2FE'}}>Ecosystem</span>
+          </span>
+      </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}></div>
-          <AddressDisplay />
-          <TonConnectButton /> 
-      {/* El botón maneja toda la lógica de conexión */}
+      {/* Botón de Conexión (Sin texto extra) */}
+      <TonConnectButton /> 
     </header>
   );
 };
