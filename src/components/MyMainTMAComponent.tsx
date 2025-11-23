@@ -3,11 +3,11 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
-import { BoostModal } from './BoostModal';
+// 👇 AQUÍ ESTABA EL ERROR: Faltaba importar esto
+import { BoostModal } from './BoostModal'; 
 import { Trophy, Zap, Video, Gamepad2, Rocket } from 'lucide-react';
 import type { SetStateAction, Dispatch } from 'react';
 
-// Definimos la interfaz para las props principales
 interface GameProps {
     score: number; setScore: Dispatch<SetStateAction<number>>;
     energy: number; setEnergy: Dispatch<SetStateAction<number>>;
@@ -16,14 +16,13 @@ interface GameProps {
     maxEnergy: number; regenRate: number;
 }
 
-// Definimos la interfaz para el ActionButton (SOLUCIÓN AL ERROR)
 interface ActionButtonProps {
-    icon: React.ReactNode; // ReactNode permite pasar componentes como <Zap />
+    icon: React.ReactNode;
     title: string;
     onClick: () => void;
 }
 
-// Configuración del Juego
+// Configuración
 const GAME_CONFIG = {
     multitap: { costs: [5000, 25000, 100000, 500000, 1500000, 3500000, 8000000], values: [1, 2, 3, 4, 6, 8, 10, 15] },
     limit:    { costs: [5000, 25000, 100000, 500000, 1500000, 3500000, 8000000], values: [500, 1000, 1500, 2000, 4000, 6000, 8500, 12000] },
@@ -34,7 +33,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const { user } = useAuth();
     const [showRanking, setShowRanking] = useState(false);
     const [showLucky, setShowLucky] = useState(false);
-    const [showBoosts, setShowBoosts] = useState(false);
+    const [showBoosts, setShowBoosts] = useState(false); 
     const [multiplier, setMultiplier] = useState(1);
     const [turboActive, setTurboActive] = useState(false);
     const [message, setMessage] = useState('');
@@ -42,15 +41,17 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
     const { score, setScore, energy, setEnergy, levels, setLevels, maxEnergy, regenRate } = props;
     
-    // Corrección de seguridad: Aseguramos que el índice exista
-    const tapLevelIndex = Math.min(levels.multitap - 1, GAME_CONFIG.multitap.values.length - 1);
-    const baseTap = GAME_CONFIG.multitap.values[Math.max(0, tapLevelIndex)] || 1;
+    // Ajuste seguro de índice
+    const safeMultiLvl = Math.max(1, levels.multitap);
+    const baseTap = GAME_CONFIG.multitap.values[Math.min(safeMultiLvl - 1, 7)] || 1;
     const finalTap = baseTap * multiplier;
 
     const handleTap = async () => {
         if (!user || energy < finalTap) {
-            if(energy < finalTap) setMessage("Low Energy!");
-            setTimeout(() => setMessage(''), 1000);
+            if(energy < finalTap) {
+                setMessage("Low Energy!");
+                setTimeout(() => setMessage(''), 1000);
+            }
             return;
         }
         setScore(s => s + finalTap);
@@ -81,11 +82,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
         if (loading) return;
         setLoading(true);
-        
-        // Nota: user!.id asume que el usuario existe. Es mejor protegerlo con if (!user) return;
-        if (!user) { setLoading(false); return; }
-
-        const { data, error } = await supabase.rpc('buy_boost', { user_id_in: user.id, boost_type: type });
+        const { data, error } = await supabase.rpc('buy_boost', { user_id_in: user!.id, boost_type: type });
         if (!error && data && data[0].success) {
             setScore(data[0].new_score);
             setLevels(p => ({ ...p, [type]: data[0].new_level }));
@@ -103,7 +100,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             padding: '10px 20px', maxWidth: '500px', margin: '0 auto' 
         }}>
             
-            {/* 1. TOP SECTION: Ranking & Score */}
+            {/* 1. TOP SECTION */}
             <div>
                 <div onClick={() => setShowRanking(true)} className="glass-card" 
                     style={{ padding: '8px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap:'10px', cursor: 'pointer', border: '1px solid rgba(255,215,0,0.3)', background:'rgba(255,215,0,0.05)', marginBottom:'10px' }}>
@@ -143,7 +140,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
             {/* 3. BOTTOM: Energy & Tools */}
             <div>
-                {/* Energy Bar */}
                 <div style={{ marginBottom:'15px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#aaa', marginBottom:'5px' }}>
                         <span>⚡ {Math.floor(energy)} / {maxEnergy}</span>
@@ -154,9 +150,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     </div>
                 </div>
 
-                {/* Tool Bar */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
-                    {/* Boost Store Button */}
                     <button onClick={() => setShowBoosts(true)} className="glass-card" style={{ padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', border: '1px solid #00F2FE', margin:0, borderRadius:'12px' }}>
                         <Rocket color="#00F2FE" size={20} />
                         <span style={{ fontSize: '9px', fontWeight: 'bold' }}>BOOST</span>
@@ -171,22 +165,11 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             {/* MODALES */}
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
             {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} onUpdateScore={setScore} />}
-            
-            {showBoosts && (
-                <BoostModal 
-                    onClose={() => setShowBoosts(false)} 
-                    levels={levels} 
-                    score={score} 
-                    onBuy={buyBoost} 
-                    configs={GAME_CONFIG} 
-                />
-            )}
+            {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} configs={GAME_CONFIG} />}
         </div>
     );
 };
 
-// --- CORRECCIÓN APLICADA AQUÍ ---
-// Usamos React.FC<ActionButtonProps> para que TypeScript sepa qué props recibe
 const ActionButton: React.FC<ActionButtonProps> = ({icon, title, onClick}) => (
     <button onClick={onClick} className="glass-card" style={{ padding: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', margin:0, borderRadius:'12px', cursor:'pointer' }}>
         {icon}
