@@ -4,6 +4,9 @@ import { X, FileText, Zap, Coins, Shield } from 'lucide-react'; // CheckCircle e
 // Definimos la interfaz para las props (Tipado estricto)
 interface WhitepaperModalProps {
     onClose: () => void;
+    onClaim: () => void; // Asegúrate que esto sea void
+    canClaim: boolean;
+    isClaiming: boolean;
 }
 
 export const WhitepaperModal: React.FC<WhitepaperModalProps> = ({ onClose }) => {
