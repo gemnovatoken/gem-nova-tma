@@ -9,6 +9,7 @@ import { SquadZone } from './components/SquadZone';
 import { WalletRoadmap } from './components/WalletRoadmap';
 import { supabase } from './services/supabase';
 import { useAuth } from './hooks/useAuth';
+import { DebugScreen } from './components/DebugScreen';
 
 // Configuración High Stakes
 const GAME_CONFIG = {
@@ -66,6 +67,7 @@ export default function App() {
                 
                 <Header />
 
+                <DebugScreen />
                 {/* PESTAÑA MINAR */}
                 {currentTab === 'mine' && (
                     <div style={{ paddingTop: '10px', animation: 'fadeIn 0.5s' }}>
