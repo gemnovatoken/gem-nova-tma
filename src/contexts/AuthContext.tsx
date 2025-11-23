@@ -9,7 +9,7 @@ import { AuthContext } from '../hooks/useAuth';
 
 const SUPABASE_URL_RAW = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY; 
-const SUPABASE_URL = SUPABASE_URL_RAW.replace(/\/$/, ''); 
+const SUPABASE_URL = SUPABASE_URL_RAW.replace(/\/$/, '')  ; 
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
