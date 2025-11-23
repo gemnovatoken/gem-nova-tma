@@ -1,28 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-// Importamos solo lo que vamos a usar
-import { Users, Copy, Lock, Share2, Flame } from 'lucide-react';
+import { Users, Share2, Gift, Crown, Copy } from 'lucide-react'; // Flame no se usaba, lo quité. Copy lo añadí al botón.
+
+// 1. Interfaz para las filas de recompensas (Soluciona los errores de 'any')
+interface RewardRowProps {
+    title: string;
+    reward: string;
+    isPremium?: boolean; // El símbolo ? indica que es opcional
+    isGold?: boolean;    // El símbolo ? indica que es opcional
+}
 
 export const SquadZone: React.FC = () => {
     const { user } = useAuth();
-    const [userCount, setUserCount] = useState(0);
     const [referrals, setReferrals] = useState(0);
-    const targetUsers = 1000; // Meta para desbloquear
     
     const BOT_USERNAME = "GemNova_GameBot"; 
     const inviteLink = `https://t.me/${BOT_USERNAME}?start=ref_${user?.id}`;
 
     useEffect(() => {
-        const fetchGlobal = async () => {
-            const { count } = await supabase.from('user_score').select('*', { count: 'exact', head: true });
-            if (count !== null) setUserCount(count);
-        };
-        fetchGlobal();
-
         if(user) {
-            supabase.from('user_score').select('referral_count').eq('user_id', user.id).single()
-                .then(({data}) => { if(data) setReferrals(data.referral_count) });
+            // Tipamos la respuesta para evitar errores implícitos
+            supabase.from('user_score')
+                .select('referral_count')
+                .eq('user_id', user.id)
+                .single()
+                .then(({ data }) => { 
+                    if(data) setReferrals(data.referral_count); 
+                });
         }
     }, [user]);
 
@@ -31,81 +36,84 @@ export const SquadZone: React.FC = () => {
         alert("Link Copied!");
     };
 
-    const progress = Math.min(100, (userCount / targetUsers) * 100);
+    const progressTo3 = Math.min(100, (referrals / 3) * 100);
 
     return (
         <div style={{ 
-            height: '75vh', width: '100%', position: 'relative', overflow: 'hidden', 
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            border: '1px solid #FF512F', borderRadius: '20px', background: '#000'
+            minHeight: '75vh', width: '100%', position: 'relative', overflow: 'hidden', 
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
+            paddingTop: '40px',
+            borderRadius: '20px', border: '1px solid #FF512F', background: '#000'
         }}>
             
-            {/* --- FONDO: EL JUEGO DEL SOL (VISUAL) --- */}
-            <div style={{ position: 'absolute', inset: 0, display:'flex', alignItems:'center', justifyContent:'center', zIndex: 0, opacity: 0.4 }}>
+            {/* FONDO */}
+            <div style={{ position: 'absolute', inset: 0, display:'flex', alignItems:'center', justifyContent:'center', zIndex: 0, opacity: 0.3 }}>
                 <div style={{
-                    width: '280px', height: '280px', borderRadius: '50%', 
+                    width: '300px', height: '300px', borderRadius: '50%', 
                     background: 'radial-gradient(circle, #F09819 0%, #FF512F 100%)',
-                    boxShadow: '0 0 60px #FF512F',
-                    animation: 'pulse 3s infinite ease-in-out'
+                    boxShadow: '0 0 80px #FF512F',
+                    animation: 'pulse 4s infinite ease-in-out'
                 }}></div>
             </div>
 
-            {/* --- CAPA DE BLOQUEO --- */}
-            <div className="glass-card" style={{ 
-                zIndex: 10, width: '85%', padding: '20px', textAlign: 'center', 
-                background: 'rgba(0, 0, 0, 0.85)', border: '1px solid #FF512F', backdropFilter: 'blur(8px)'
-            }}>
+            {/* CONTENIDO */}
+            <div style={{ zIndex: 10, width: '90%' }}>
                 
-                <div style={{ display: 'inline-block', padding: '15px', background: 'rgba(255, 81, 47, 0.1)', borderRadius: '50%', marginBottom: '10px' }}>
-                    <Lock size={32} color="#FF512F" />
+                <div style={{ textAlign:'center', marginBottom:'30px' }}>
+                    <h2 style={{ margin: 0, fontSize:'28px', color:'#fff', textShadow:'0 0 10px #FF512F' }}>SQUAD ZONE</h2>
+                    <p style={{ color:'#FF512F', fontSize:'12px' }}>Build your army for the Raid</p>
                 </div>
 
-                <h2 style={{ margin: '0 0 5px 0', color: '#fff', fontSize: '20px', display:'flex', alignItems:'center', justifyContent:'center', gap:'8px' }}>
-                    <Flame size={20} fill="#FF512F" color="#FF512F"/> RAID LOCKED
-                </h2>
-                
-                <p style={{ color: '#ccc', fontSize: '12px', marginBottom: '15px' }}>
-                    Global Raid unlocks at <strong>1,000 Miners</strong>.
-                </p>
+                <div className="glass-card" style={{ border: '1px solid #FF512F', textAlign:'center' }}>
+                    <div style={{ fontSize:'42px', fontWeight:'900', color:'#fff' }}>{referrals}</div>
+                    <div style={{ fontSize:'12px', color:'#aaa', marginBottom:'15px' }}>Cadets Recruited</div>
 
-                {/* Barra de Progreso Global */}
-                <div style={{ marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#aaa', marginBottom: '5px' }}>
-                        <span>Community Progress</span>
-                        <span>{userCount} / {targetUsers}</span>
+                    {/* Barra de Progreso */}
+                    <div style={{ background:'rgba(0,0,0,0.3)', padding:'10px', borderRadius:'8px', marginBottom:'15px' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:'10px', marginBottom:'5px', color:'#ccc' }}>
+                            <span>Next Goal: 3 Friends</span>
+                            <span style={{color:'#FFD700'}}>+100k Pts</span>
+                        </div>
+                        <div style={{ width: '100%', height: '8px', background: '#333', borderRadius: '4px', overflow: 'hidden' }}>
+                            <div style={{ width: `${progressTo3}%`, height: '100%', background: '#FF512F' }} />
+                        </div>
                     </div>
-                    <div style={{ width: '100%', height: '8px', background: '#333', borderRadius: '4px', overflow: 'hidden' }}>
-                        <div style={{ width: `${progress}%`, height: '100%', background: '#FF512F' }} />
-                    </div>
-                </div>
 
-                {/* SECCIÓN DE INVITACIÓN */}
-                <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '15px' }}>
+                    {/* Botones */}
+                    <button className="btn-neon" onClick={() => window.open(`https://t.me/share/url?url=${inviteLink}&text=🔥 Join Gem Nova! Get 50k Points Bonus!`, '_blank')}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#fff', color: '#000', marginBottom:'10px' }}>
+                        <Share2 size={18} /> INVITE FRIEND
+                    </button>
                     
-                    {/* Botón Invitar Principal */}
-                    <button className="btn-neon" onClick={() => window.open(`https://t.me/share/url?url=${inviteLink}&text=🔥 Join Gem Nova! Get 50k Points Bonus before halving!`, '_blank')}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: '#fff', color: '#000', fontSize:'14px', marginBottom:'10px' }}>
-                        <Share2 size={16} /> INVITE FRIENDS
+                    {/* He añadido el icono Copy que importaste pero no usabas */}
+                    <button onClick={handleCopy} style={{ background:'none', border:'1px solid #555', color:'#aaa', width:'100%', padding:'8px', borderRadius:'8px', fontSize:'12px', cursor:'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <Copy size={14} /> Copy Link
                     </button>
+                </div>
 
-                    {/* Botón Copiar Link (Aquí usamos el icono Copy) */}
-                    <button onClick={handleCopy} style={{
-                        background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'8px',
-                        color:'#fff', padding:'8px', width:'100%', fontSize:'12px', cursor:'pointer',
-                        display:'flex', alignItems:'center', justifyContent:'center', gap:'8px'
-                    }}>
-                        <Copy size={14}/> Copy My Link
-                    </button>
-
-                    {/* Contador de Referidos (Aquí usamos el icono Users) */}
-                    <div style={{ marginTop: '15px', fontSize: '12px', color: '#888', display:'flex', alignItems:'center', justifyContent:'center', gap:'6px' }}>
-                        <Users size={14} /> My Squad: <span style={{ color: '#fff', fontWeight: 'bold' }}>{referrals}</span>
-                    </div>
+                <div className="glass-card">
+                    <h3 style={{ fontSize:'16px', margin:'0 0 15px 0' }}>Rewards</h3>
+                    <RewardRow title="Standard User" reward="+5,000 Pts" />
+                    <RewardRow title="Premium User" reward="+25,000 Pts" isPremium />
+                    <RewardRow title="Shop Commission" reward="10% Bonus" isGold />
                 </div>
 
             </div>
             
-            <style>{`@keyframes pulse { 0% { transform: scale(0.95); opacity: 0.5; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(0.95); opacity: 0.5; } }`}</style>
+            <style>{`@keyframes pulse { 0% { transform: scale(0.95); opacity: 0.3; } 50% { transform: scale(1.05); opacity: 0.5; } 100% { transform: scale(0.95); opacity: 0.3; } }`}</style>
         </div>
     );
 };
+
+// 2. Componente corregido con tipos
+const RewardRow: React.FC<RewardRowProps> = ({ title, reward, isPremium, isGold }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize:'12px' }}>
+            {isPremium && <Crown size={14} color="#E040FB"/>}
+            {isGold && <Gift size={14} color="#FFD700"/>}
+            {!isPremium && !isGold && <Users size={14} color="#aaa"/>}
+            {title}
+        </span>
+        <span style={{ color: isPremium ? '#E040FB' : (isGold ? '#FFD700' : '#4CAF50'), fontWeight: 'bold', fontSize:'12px' }}>{reward}</span>
+    </div>
+);
