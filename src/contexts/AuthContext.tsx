@@ -1,15 +1,12 @@
-// src/contexts/AuthContext.tsx (CORREGIDO Y LISTO)
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect} from 'react';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
-
-// 🛑 Importamos el Contexto (AuthContext) desde el nuevo archivo
 import { AuthContext } from '../hooks/useAuth'; 
 
+// 👇 AQUÍ DEFINIMOS LA VARIABLE QUE TE FALTABA
 const SUPABASE_URL_RAW = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY; 
-const SUPABASE_URL = SUPABASE_URL_RAW.replace(/\/$/, '')  ; 
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY; // <--- ESTA ES LA DEFINICIÓN
+const SUPABASE_URL = SUPABASE_URL_RAW.replace(/\/$/, ''); // Limpieza de URL
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -22,6 +19,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const initData = window.Telegram?.WebApp?.initData;
 
             if (initData) {
+                // Ahora sí podemos usar SUPABASE_ANON_KEY porque está definida arriba
                 const response = await fetch(`${SUPABASE_URL}/functions/v1/tg-auth`, {
                     method: 'POST',
                     headers: { 
@@ -75,4 +73,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         </AuthContext.Provider>
     );
 };
-// 🛑 Ya no exportamos useAuth ni AuthContext desde aquí.
