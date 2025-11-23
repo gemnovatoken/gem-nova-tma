@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-// ❌ ELIMINAMOS 'AuthProvider' de aquí
+// ❌ ELIMINAMOS 'AuthProvider' de aquí, asumimos que está en index.tsx o main.tsx si usas useAuth
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -22,7 +22,7 @@ const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json';
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
-    // ESTADOS CENTRALES DEL JUEGO (La llamada a useAuth está bien aquí)
+    // ESTADOS CENTRALES DEL JUEGO
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
@@ -62,7 +62,6 @@ export default function App() {
 
 
     return (
-        // 🛑 ELIMINAMOS LA ETIQUETA <AuthProvider> AQUÍ
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
             <div className="app-container" style={{ minHeight: '100vh', paddingBottom: '100px', color: 'white' }}>
                 
@@ -81,13 +80,14 @@ export default function App() {
                     </div>
                 )}
                 
-                {/* ... Resto de Pestañas (igual) ... */}
+                {/* --- PESTAÑA 2: MARKET --- */}
                 {currentTab === 'market' && (
                     <div style={{ animation: 'fadeIn 0.5s' }}>
                         <BulkStore />
                     </div>
                 )}
 
+                {/* --- PESTAÑA 3: MISIÓN --- */}
                 {currentTab === 'mission' && (
                     <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.7, animation: 'fadeIn 0.5s' }}>
                         <div style={{ fontSize: '50px', marginBottom: '15px' }}>🗺️</div>
@@ -96,21 +96,26 @@ export default function App() {
                     </div>
                 )}
 
+                {/* --- PESTAÑA 4: SQUAD --- */}
                 {currentTab === 'squad' && (
                     <div style={{ padding: '20px', animation: 'fadeIn 0.5s' }}>
                         <SquadZone />
                     </div>
                 )}
 
+                {/* --- PESTAÑA 5: WALLET (Aquí estaba el error) --- */}
                 {currentTab === 'wallet' && (
                     <div style={{ animation: 'fadeIn 0.5s' }}>
-                        <WalletRoadmap />
+                        <WalletRoadmap 
+                            onClose={() => setCurrentTab('mine')} // Si cierra, vuelve a 'mine'
+                            walletAddress={null}                  // Temporalmente null
+                            onConnect={() => alert("Pronto: Conexión TON")} // Temporalmente un alert
+                        />
                     </div>
                 )}
 
                 <BottomNav activeTab={currentTab} setTab={setCurrentTab} />
             </div>
         </TonConnectUIProvider>
-        // 🛑 FIN DE LA ELIMINACIÓN DE LA ETIQUETA </AuthProvider>
     );
 }

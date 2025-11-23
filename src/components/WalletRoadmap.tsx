@@ -1,84 +1,127 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../services/supabase';
-import { useAuth } from '../hooks/useAuth';
-import { CheckCircle2, Circle, Wallet, Check } from 'lucide-react';
-import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
+import React from 'react';
+import { X, CheckCircle, Circle, Wallet, Map } from 'lucide-react';
 
-interface GlobalStats {
-    listing_progress_points: number;
-    listing_goal: number;
+// 1. Definimos la estructura de un paso del Roadmap
+interface RoadmapStep {
+    phase: string;
+    title: string;
+    status: 'done' | 'active' | 'upcoming';
 }
 
-// 👇 ESTA ES LA CLAVE: export const (Sin default)
-export const WalletRoadmap: React.FC = () => {
-    const { user } = useAuth();
-    const userFriendlyAddress = useTonAddress();
+// 2. Definimos las Props (Renombradas para coincidir con el componente)
+interface WalletRoadmapProps {
+    onClose: () => void;           // Función para cerrar el modal
+    walletAddress: string | null;  // Dirección de la wallet (texto o null)
+    onConnect: () => void;         // Función para conectar la wallet
+}
+
+// Datos del Roadmap
+const ROADMAP_STEPS: RoadmapStep[] = [
+    { phase: 'Q1 2024', title: 'Community Launch & Mining', status: 'done' },
+    { phase: 'Q2 2024', title: 'Boosters & Social Tasks', status: 'done' },
+    { phase: 'Q3 2024', title: 'Wallet Connect Integration', status: 'active' },
+    { phase: 'Q4 2024', title: 'Token Airdrop & Listing', status: 'upcoming' },
+];
+
+// 3. CAMBIO PRINCIPAL: Renombramos el componente a 'WalletRoadmap'
+export const WalletRoadmap: React.FC<WalletRoadmapProps> = ({ onClose, walletAddress, onConnect }) => {
     
-    const [stats, setStats] = useState<GlobalStats | null>(null);
-    const [bonusClaimed, setBonusClaimed] = useState(false);
-    const [loadingClaim, setLoadingClaim] = useState(false);
-
-    useEffect(() => {
-        supabase.from('global_stats').select('*').single().then(({data}) => {
-             if(data) setStats(data as GlobalStats); 
-        });
-
-        if (user) {
-            supabase.from('user_score').select('wallet_bonus_claimed').eq('user_id', user.id).single()
-                .then(({data}) => { if(data) setBonusClaimed(data.wallet_bonus_claimed); });
-        }
-    }, [user]);
-
-    const handleClaimBonus = async () => {
-        if (!user || !userFriendlyAddress) return;
-        setLoadingClaim(true);
-        const { error } = await supabase.rpc('claim_wallet_bonus', { user_id_in: user.id, wallet_address: userFriendlyAddress });
-        if (!error) {
-            setBonusClaimed(true);
-            alert("✅ +20,000 Points Received!");
-        } else alert("Error claiming bonus");
-        setLoadingClaim(false);
+    // Función auxiliar para renderizar el icono según estado
+    const renderStatusIcon = (status: string) => {
+        if (status === 'done') return <CheckCircle size={18} color="#4CAF50" />;
+        if (status === 'active') return <div className="pulse-dot" />;
+        return <Circle size={18} color="#666" />;
     };
 
-    const currentProgress = stats ? (stats.listing_progress_points / stats.listing_goal) * 100 : 0;
-
-    const phases = [
-        { id: 1, limit: 20, title: "Phase 1: Ignition", desc: "App Launch", done: true },
-        { id: 2, limit: 40, title: "Phase 2: Awakening", desc: "Referrals & Casino", done: currentProgress >= 20 },
-        { id: 3, limit: 60, title: "Phase 3: Momentum", desc: "Raid & Halving", done: currentProgress >= 40 },
-        { id: 4, limit: 100, title: "Phase 4: TGE", desc: "Listing & Airdrop", done: currentProgress >= 99 },
-    ];
-
     return (
-        <div style={{ padding: '20px', paddingBottom: '100px' }}>
-            <div className="glass-card" style={{ textAlign: 'center', marginBottom: '30px', border: bonusClaimed ? '1px solid #4CAF50' : '1px solid #00F2FE' }}>
-                <Wallet size={32} color={bonusClaimed ? '#4CAF50' : '#00F2FE'} style={{ marginBottom: '10px', margin:'0 auto' }} />
-                <h2 style={{ margin: '0 0 5px 0' }}>{bonusClaimed ? 'Wallet Connected' : 'Connect & Earn'}</h2>
-                {!bonusClaimed && <p style={{ fontSize: '12px', color: '#FFD700', marginBottom: '15px', fontWeight:'bold' }}>🎁 REWARD: +20,000 Points</p>}
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}><TonConnectButton /></div>
-                {!bonusClaimed && userFriendlyAddress && (
-                    <button onClick={handleClaimBonus} disabled={loadingClaim} className="btn-neon" style={{ width: '100%', background: '#4CAF50', color: 'white', marginTop:'10px' }}>
-                        {loadingClaim ? 'Claiming...' : 'CLAIM 20K POINTS'}
-                    </button>
-                )}
-                {bonusClaimed && <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', color:'#4CAF50', fontSize:'12px', marginTop:'10px'}}><Check size={14}/> Bonus Claimed</div>}
-            </div>
+        <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.8)', zIndex: 3000,
+            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end'
+        }}>
+            {/* Área transparente para cerrar */}
+            <div style={{flex: 1}} onClick={onClose} />
 
-            <h3 style={{ marginLeft: '5px', marginBottom: '15px' }}>🚀 Roadmap Status</h3>
-            <div style={{ padding: '10px' }}>
-                {phases.map((phase, index) => (
-                    <div key={phase.id} style={{ display: 'flex', gap: '15px', marginBottom: '25px', opacity: phase.done ? 1 : 0.4 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            {phase.done ? <CheckCircle2 color="#4CAF50" size={24} /> : <Circle color="#666" size={24} />}
-                            {index < phases.length - 1 && <div style={{ width: '2px', height: '100%', background: phase.done ? '#4CAF50' : '#333', marginTop: '5px', minHeight: '30px' }} />}
-                        </div>
-                        <div>
-                            <div style={{ fontWeight: 'bold', color: phase.done ? '#fff' : '#888', fontSize:'14px' }}>{phase.title}</div>
-                            <div style={{ fontSize: '12px', color: '#aaa' }}>{phase.desc}</div>
-                        </div>
+            <div className="glass-card" style={{ 
+                margin: 0, borderRadius: '24px 24px 0 0', padding: '24px', 
+                borderBottom: 'none', maxHeight: '80vh', overflowY: 'auto',
+                animation: 'slideUp 0.3s ease-out', background: '#1a1a1a', border: '1px solid #333'
+            }}>
+                {/* Header */}
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px'}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
+                        <Map size={24} color="#A020F0" />
+                        <h2 style={{margin: 0, fontSize: '20px'}}>Roadmap</h2>
                     </div>
-                ))}
+                    <button onClick={onClose} style={{background:'none', border:'none', color:'#fff', cursor:'pointer'}}><X /></button>
+                </div>
+
+                {/* Wallet Section */}
+                <div style={{ 
+                    background: 'linear-gradient(135deg, #2c3e50 0%, #000000 100%)', 
+                    borderRadius: '16px', padding: '16px', marginBottom: '24px',
+                    border: '1px solid rgba(255,255,255,0.1)', textAlign: 'center'
+                }}>
+                    <Wallet size={32} color="#0088CC" style={{marginBottom: '10px'}}/>
+                    <h3 style={{margin: '0 0 10px 0', fontSize: '16px'}}>TON Wallet</h3>
+                    
+                    {!walletAddress ? (
+                        <button onClick={onConnect} className="btn-neon" style={{width: '100%', background: '#0088CC', color: 'white'}}>
+                            Connect Wallet
+                        </button>
+                    ) : (
+                        <div style={{
+                            background: 'rgba(0, 136, 204, 0.2)', color: '#0088CC', 
+                            padding: '10px', borderRadius: '8px', fontSize: '14px', fontFamily: 'monospace'
+                        }}>
+                            {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                        </div>
+                    )}
+                </div>
+
+                {/* Timeline */}
+                <div style={{position: 'relative', paddingLeft: '10px'}}>
+                    {/* Línea vertical conectora */}
+                    <div style={{
+                        position: 'absolute', left: '19px', top: '10px', bottom: '30px', 
+                        width: '2px', background: '#333'
+                    }} />
+
+                    {ROADMAP_STEPS.map((step, idx) => (
+                        <div key={idx} style={{
+                            display: 'flex', alignItems: 'flex-start', gap: '15px', marginBottom: '20px', position: 'relative'
+                        }}>
+                            {/* Icono de estado */}
+                            <div style={{
+                                background: '#1a1a1a', zIndex: 2, padding: '2px 0' // Fondo para tapar la línea
+                            }}>
+                                {renderStatusIcon(step.status)}
+                            </div>
+                            
+                            {/* Texto */}
+                            <div style={{opacity: step.status === 'upcoming' ? 0.5 : 1}}>
+                                <div style={{fontSize: '12px', color: '#00F2FE', marginBottom: '2px'}}>{step.phase}</div>
+                                <div style={{fontWeight: 'bold', fontSize: '15px'}}>{step.title}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
             </div>
+            
+            <style>{`
+                @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+                .pulse-dot {
+                    width: 14px; height: 14px; background: #00F2FE; border-radius: 50%;
+                    box-shadow: 0 0 0 0 rgba(0, 242, 254, 0.7);
+                    animation: pulse-cyan 2s infinite;
+                }
+                @keyframes pulse-cyan {
+                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 254, 0.7); }
+                    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 242, 254, 0); }
+                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 242, 254, 0); }
+                }
+            `}</style>
         </div>
     );
 };
