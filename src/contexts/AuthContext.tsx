@@ -16,15 +16,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setLoading(true);
             
             // 1. Intentar obtener datos reales
-            let initData = window.Telegram?.WebApp?.initData;
-
-            // 🚨 MODO DE RESCATE: Si no hay datos (Navegador/Error), usamos datos falsos para que puedas jugar
-            if (!initData) {
-                console.log("⚠️ Usando Datos de Prueba (Mock Mode)");
-                // Este string simula un usuario válido para que el servidor no de error 400
-                // User ID: 999999
-                initData = "query_id=AA...&user=%7B%22id%22%3A999999%2C%22first_name%22%3A%22Test%22%2C%22last_name%22%3A%22User%22%2C%22username%22%3A%22test_user%22%2C%22language_code%22%3A%22en%22%7D&auth_date=1710000000&hash=fake_hash";
-            }
+            const initData = window.Telegram?.WebApp?.initData;
 
             if (initData) {
                 try {
