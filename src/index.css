@@ -1,70 +1,82 @@
-:root {
-  font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-  color-scheme: dark;
+/* --- FONDO CYBERPUNK --- */
+.cyber-bg {
+  background-color: #050510;
+  background-image: 
+    linear-gradient(rgba(0, 242, 254, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 242, 254, 0.1) 1px, transparent 1px);
+  background-size: 40px 40px;
+  position: relative;
+  overflow: hidden;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  min-width: 320px;
-  min-height: 100vh;
-  background-color: #0B0E14;
-  color: #ffffff;
-  background-image: radial-gradient(circle at 50% 0%, #1a2e44 0%, #0B0E14 60%);
+/* Efecto de "Flujo de Datos" (Línea brillante vertical) */
+.data-stream {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(-50%);
+  z-index: 0;
 }
 
-/* Efecto Vidrio */
-.glass-card {
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px); /* Soporte para Safari */
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+.data-stream::after {
+  content: '';
+  position: absolute;
+  top: -100px;
+  left: 0;
+  width: 100%;
+  height: 100px;
+  background: linear-gradient(180deg, transparent, #00F2FE, transparent);
+  animation: streamFlow 3s infinite linear;
 }
 
-/* Botones Neón */
-.btn-neon {
-  background: linear-gradient(135deg, #00F2FE 0%, #4FACFE 100%);
-  border: none;
-  border-radius: 12px;
-  color: #000;
-  font-weight: 800;
-  padding: 10px 20px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+@keyframes streamFlow {
+  0% { top: -100px; }
+  100% { top: 100%; }
+}
+
+/* Tarjeta Cyber */
+.cyber-card {
+  background: rgba(10, 10, 20, 0.8);
+  border: 1px solid #333;
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.8);
+  position: relative;
+  z-index: 1;
+  backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+}
+
+.cyber-card:hover {
+  border-color: #00F2FE;
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
+  transform: scale(1.02);
+}
+
+/* Bóveda de Circuito */
+.circuit-vault {
+  background-color: #000;
+  background-image: radial-gradient(#111 15%, transparent 16%), radial-gradient(#111 15%, transparent 16%);
+  background-size: 10px 10px;
+  border: 2px solid #E040FB;
+  box-shadow: 0 0 15px #E040FB, inset 0 0 30px #E040FB;
+  position: relative;
+}
+
+/* Botón Glitch */
+.btn-cyber {
+  background: #000;
+  color: #00F2FE;
+  border: 1px solid #00F2FE;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
+  font-family: 'Courier New', Courier, monospace;
+  font-weight: bold;
+  transition: all 0.2s;
 }
-
-.btn-neon:active {
-  transform: scale(0.95);
-  box-shadow: 0 0 5px rgba(0, 242, 254, 0.5);
-}
-
-.btn-neon:disabled {
-  background: #333;
-  color: #666;
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-/* Texto con degradado (AQUÍ ESTABA EL ERROR) */
-.text-gradient {
-  background: linear-gradient(to right, #00F2FE, #4FACFE);
-  
-  /* Propiedad estándar (Solución al error) */
-  background-clip: text; 
-  
-  /* Propiedad para navegadores Webkit (Chrome/Safari) */
-  -webkit-background-clip: text;
-  
-  /* Relleno transparente para que se vea el fondo */
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+.btn-cyber:active {
+  background: #00F2FE;
+  color: #000;
+  box-shadow: 0 0 20px #00F2FE;
 }
