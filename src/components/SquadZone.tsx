@@ -1,15 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Users, Share2, Gift, Crown, Copy } from 'lucide-react';
-import { SolarRaid } from './SolarRaid'; // ✅ Asegúrate de que este import coincida con el nombre del archivo
-
-interface RewardRowProps {
-    title: string;
-    reward: string;
-    isPremium?: boolean;
-    isGold?: boolean;
-}
+import { Users, Copy, Share2, Gift, Crown, Percent, CheckCircle2 } from 'lucide-react';
 
 export const SquadZone: React.FC = () => {
     const { user } = useAuth();
@@ -20,14 +12,8 @@ export const SquadZone: React.FC = () => {
 
     useEffect(() => {
         if(user) {
-            const fetchReferrals = async () => {
-                const { data } = await supabase.from('user_score')
-                    .select('referral_count')
-                    .eq('user_id', user.id)
-                    .single();
-                if(data) setReferrals(data.referral_count); 
-            };
-            fetchReferrals();
+            supabase.from('user_score').select('referral_count').eq('user_id', user.id).single()
+                .then(({data}) => { if(data) setReferrals(data.referral_count) });
         }
     }, [user]);
 
@@ -36,92 +22,135 @@ export const SquadZone: React.FC = () => {
         alert("Link Copied!");
     };
 
-    const progressTo3 = Math.min(100, (referrals / 3) * 100);
+    const milestones = [
+        { count: 5, reward: "2.5k", done: referrals >= 5 },
+        { count: 10, reward: "10k", done: referrals >= 10 },
+        { count: 25, reward: "50k", done: referrals >= 25 },
+        { count: 50, reward: "200k 🔥", done: referrals >= 50 },
+    ];
+
+    const nextMilestone = milestones.find(m => !m.done) || milestones[milestones.length - 1];
+    const prevMilestoneCount = milestones[milestones.indexOf(nextMilestone) - 1]?.count || 0;
+    const progressPercent = Math.min(100, ((referrals - prevMilestoneCount) / (nextMilestone.count - prevMilestoneCount)) * 100);
 
     return (
-        <div style={{ 
-            minHeight: '75vh', width: '100%', position: 'relative', overflow: 'hidden', 
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
-            paddingTop: '20px', paddingBottom: '100px',
-            background: '#000'
-        }}>
+        <div style={{ padding: '20px', paddingBottom: '100px' }}>
             
-            {/* FONDO AMBIENTAL */}
-            <div style={{ position: 'absolute', inset: 0, display:'flex', alignItems:'center', justifyContent:'center', zIndex: 0, opacity: 0.3 }}>
-                <div style={{
-                    width: '300px', height: '300px', borderRadius: '50%', 
-                    background: 'radial-gradient(circle, #F09819 0%, #FF512F 100%)',
-                    boxShadow: '0 0 80px #FF512F',
-                    animation: 'pulse 4s infinite ease-in-out'
-                }}></div>
+            <div style={{ textAlign:'center', marginBottom:'30px' }}>
+                <h2 style={{ margin: 0, fontSize:'28px', color:'#fff', textShadow:'0 0 10px #00F2FE' }}>SQUAD OPS</h2>
+                <p style={{ color:'#00F2FE', fontSize:'12px' }}>Recruit agents. Unlock milestones.</p>
             </div>
 
-            {/* CONTENIDO */}
-            <div style={{ zIndex: 10, width: '100%', maxWidth: '500px', padding: '0 15px' }}>
+            {/* Tarjeta Principal */}
+            <div className="glass-card" style={{ textAlign:'center', border: '1px solid #00F2FE', position:'relative', overflow:'hidden' }}>
+                <div style={{position:'absolute', top:-20, left:-20, width:100, height:100, background:'rgba(0, 242, 254, 0.2)', borderRadius:'50%', filter:'blur(30px)'}}></div>
                 
-                <div style={{ textAlign:'center', marginBottom:'20px' }}>
-                    <h2 style={{ margin: 0, fontSize:'28px', color:'#fff', textShadow:'0 0 10px #FF512F' }}>SQUAD ZONE</h2>
-                    <p style={{ color:'#FF512F', fontSize:'12px', margin: '5px 0' }}>Team up & Destroy</p>
+                <div style={{ fontSize:'48px', fontWeight:'900', color:'#fff', lineHeight:1 }}>{referrals}</div>
+                
+                {/* ✅ SOLUCIÓN: Usamos el icono Users aquí */}
+                <div style={{ fontSize:'12px', color:'#aaa', marginBottom:'20px', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px' }}>
+                    <Users size={14}/> Active Recruits
                 </div>
 
-                {/* ✅ 2. AQUÍ INSERTAMOS EL SOLAR RAID */}
-                <div style={{ marginBottom: '30px' }}>
-                    <SolarRaid />
+                {/* Barra de Progreso */}
+                <div style={{ marginBottom:'20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#ccc', marginBottom: '5px' }}>
+                        <span>Next Goal: {nextMilestone.count} Recruits</span>
+                        <span style={{color:'#FFD700', fontWeight:'bold'}}>Bonus: +{nextMilestone.reward}</span>
+                    </div>
+                    <div style={{ width: '100%', height: '10px', background: '#333', borderRadius: '5px', overflow: 'hidden' }}>
+                        <div style={{ width: `${progressPercent}%`, height: '100%', background: 'linear-gradient(90deg, #00F2FE, #4FACFE)' }} />
+                    </div>
                 </div>
 
-                {/* SECCIÓN DE REFERIDOS */}
-                <div className="glass-card" style={{ border: '1px solid #333', textAlign:'center', marginBottom: '20px' }}>
-                    <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#fff' }}>Invite Friends</h3>
-                    
-                    <div style={{ fontSize:'42px', fontWeight:'900', color:'#fff' }}>{referrals}</div>
-                    <div style={{ fontSize:'12px', color:'#aaa', marginBottom:'15px' }}>Cadets Recruited</div>
+                <button className="btn-neon" onClick={() => window.open(`https://t.me/share/url?url=${inviteLink}&text=🔥 Join Gem Nova! Get a Starter Bonus!`, '_blank')}
+                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', fontSize:'14px' }}>
+                    <Share2 size={18} /> INVITE NOW
+                </button>
+                
+                <button onClick={handleCopy} style={{ marginTop:'15px', background:'none', border:'none', color:'#00F2FE', fontSize:'12px', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', width:'100%' }}>
+                    <Copy size={14} /> Copy Link
+                </button>
+            </div>
 
-                    {/* Barra de Progreso */}
-                    <div style={{ background:'rgba(0,0,0,0.3)', padding:'10px', borderRadius:'8px', marginBottom:'15px' }}>
-                        <div style={{ display:'flex', justifyContent:'space-between', fontSize:'10px', marginBottom:'5px', color:'#ccc' }}>
-                            <span>Next Goal: 3 Friends</span>
-                            <span style={{color:'#FFD700'}}>+100k Pts</span>
+            {/* Mapa de Hitos */}
+            <h3 style={{ fontSize:'16px', margin:'0 0 15px 0' }}>Mission Milestones</h3>
+            <div style={{ display:'flex', flexDirection:'column', gap:'10px' }}>
+                {milestones.map((m, i) => (
+                    <div key={i} className="glass-card" style={{ 
+                        margin:0, padding:'15px', display:'flex', alignItems:'center', justifyContent:'space-between',
+                        border: m.done ? '1px solid #4CAF50' : (m === nextMilestone ? '1px solid #FFD700' : '1px solid #333'),
+                        background: m.done ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255,255,255,0.02)'
+                    }}>
+                        <div style={{display:'flex', alignItems:'center', gap:'15px'}}>
+                            <div style={{
+                                width:'30px', height:'30px', borderRadius:'8px', 
+                                background: m.done ? '#4CAF50' : '#222', color: m.done ? '#fff' : '#555',
+                                display:'flex', alignItems:'center', justifyContent:'center', fontWeight:'bold', fontSize:'12px'
+                            }}>
+                                {m.done ? <CheckCircle2 size={16}/> : (i+1)}
+                            </div>
+                            <div>
+                                <div style={{fontWeight:'bold', color: m.done ? '#fff' : '#888', fontSize:'13px'}}>
+                                    Recruit {m.count} Agents
+                                </div>
+                            </div>
                         </div>
-                        <div style={{ width: '100%', height: '8px', background: '#333', borderRadius: '4px', overflow: 'hidden' }}>
-                            <div style={{ width: `${progressTo3}%`, height: '100%', background: '#FF512F' }} />
+                        <div style={{textAlign:'right'}}>
+                            <div style={{fontWeight:'bold', color: m.done ? '#4CAF50' : '#FFD700', fontSize:'13px'}}>
+                                +{m.reward}
+                            </div>
                         </div>
                     </div>
-
-                    {/* Botones */}
-                    <button className="btn-neon" onClick={() => window.open(`https://t.me/share/url?url=${inviteLink}&text=🔥 Join Gem Nova! Help us destroy the Sun!`, '_blank')}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#fff', color: '#000', marginBottom:'10px' }}>
-                        <Share2 size={18} /> INVITE FRIEND
-                    </button>
-                    
-                    <button onClick={handleCopy} style={{ background:'none', border:'1px solid #555', color:'#aaa', width:'100%', padding:'8px', borderRadius:'8px', fontSize:'12px', cursor:'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                        <Copy size={14} /> Copy Link
-                    </button>
-                </div>
-
-                {/* Tabla de Beneficios */}
-                <div className="glass-card">
-                    <h3 style={{ fontSize:'16px', margin:'0 0 15px 0' }}>Rewards</h3>
-                    <RewardRow title="Standard User" reward="+5,000 Pts" />
-                    <RewardRow title="Premium User" reward="+25,000 Pts" isPremium />
-                    <RewardRow title="Shop Commission" reward="10% Bonus" isGold />
-                </div>
-
+                ))}
             </div>
-            
-            <style>{`@keyframes pulse { 0% { transform: scale(0.95); opacity: 0.3; } 50% { transform: scale(1.05); opacity: 0.5; } 100% { transform: scale(0.95); opacity: 0.3; } }`}</style>
+
+            {/* Tabla de Beneficios */}
+            <div className="glass-card" style={{ marginTop: '20px' }}>
+                <h3 style={{ fontSize:'14px', marginBottom:'10px' }}>Bounty Board</h3>
+                
+                <RewardRow 
+                    icon={<Gift size={14} color="#4CAF50"/>}
+                    title="Sign Up Bonus" 
+                    reward="+2,500 Pts" 
+                    desc="Instant reward"
+                />
+                <RewardRow 
+                    icon={<Crown size={14} color="#E040FB"/>}
+                    title="Active Miner" 
+                    reward="+5,000 Pts" 
+                    isHighlight 
+                    desc="When recruit hits Level 4"
+                />
+                <RewardRow 
+                    icon={<Percent size={14} color="#FFD700"/>}
+                    title="Commission" 
+                    reward="1% - 5%" 
+                    isGold 
+                    desc="On Token Purchases"
+                />
+            </div>
         </div>
     );
 };
 
-// Componente auxiliar
-const RewardRow: React.FC<RewardRowProps> = ({ title, reward, isPremium, isGold }) => (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize:'12px' }}>
-            {isPremium && <Crown size={14} color="#E040FB"/>}
-            {isGold && <Gift size={14} color="#FFD700"/>}
-            {!isPremium && !isGold && <Users size={14} color="#aaa"/>}
-            {title}
-        </span>
-        <span style={{ color: isPremium ? '#E040FB' : (isGold ? '#FFD700' : '#4CAF50'), fontWeight: 'bold', fontSize:'12px' }}>{reward}</span>
+interface RewardRowProps {
+    icon: React.ReactNode;
+    title: string;
+    reward: string;
+    isHighlight?: boolean;
+    isGold?: boolean;
+    desc?: string;
+}
+
+const RewardRow: React.FC<RewardRowProps> = ({ icon, title, reward, isHighlight, isGold, desc }) => (
+    <div style={{ padding: '12px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems:'center' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize:'13px', color:'#ddd' }}>
+                {icon} {title}
+            </span>
+            <span style={{ color: isGold ? '#FFD700' : (isHighlight ? '#E040FB' : '#4CAF50'), fontWeight: 'bold', fontSize:'13px' }}>{reward}</span>
+        </div>
+        {desc && <div style={{ fontSize:'10px', color:'#666', marginLeft:'22px', marginTop:'2px' }}>{desc}</div>}
     </div>
 );
