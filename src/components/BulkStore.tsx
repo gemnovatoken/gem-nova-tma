@@ -1,29 +1,125 @@
-import { useState } from 'react';
-import { StakingModal } from './StakingModal'; // Importamos el Modal
-// ... otros imports
+import React from 'react';
+import { supabase } from '../services/supabase';
+import { useAuth } from '../hooks/useAuth';
+import { StakingBank } from './StakingBank';
 
+interface PackCardProps {
+    title: string;
+    basePoints: string;
+    bonusText?: string;
+    price: string;
+    color: string;
+    isBestValue?: boolean;
+    onClick: () => void;
+}
+
+// Exportación corregida
 export const BulkStore: React.FC = () => {
-    // ... lógica de compra ...
-    const [showBank, setShowBank] = useState(false); // Estado para mostrar el modal
+    const { user } = useAuth();
+
+    const buyPack = async (pack: string) => {
+        if(!user) return;
+        
+        let confirmMessage = "";
+        if (pack === 'starter') confirmMessage = "Confirm Starter: 100k Pts for 0.15 TON";
+        else if (pack === 'pro') confirmMessage = "Confirm Pro: 525k Pts for 0.75 TON";
+        else if (pack === 'whale') confirmMessage = "Confirm Whale: 1.1M Pts for 1.50 TON";
+        else if (pack === 'tycoon') confirmMessage = "Confirm Tycoon: 6M Pts for 7.50 TON";
+
+        if (!window.confirm(confirmMessage)) return;
+        
+        const { error } = await supabase.rpc('buy_bulk_pack', { user_id_in: user.id, pack_type: pack });
+        if(!error) alert('✅ Purchase Successful!');
+        else alert('Error purchasing pack');
+    };
 
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
             
-            {/* ... tus tarjetas de paquetes ... */}
+            <div style={{textAlign:'center', marginBottom:'20px'}}>
+                <h2 style={{marginTop: 0, fontSize:'28px', marginBottom:'5px'}}>🏦 Treasury</h2>
+                <p style={{fontSize: '13px', color: '#aaa', margin:0}}>
+                    Instant Points & Liquidity
+                </p>
+            </div>
+            
+            {/* --- GRID DE PAQUETES (2x2) --- */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom:'30px' }}>
+                
+                <PackCard 
+                    title="Starter" 
+                    basePoints="100k" 
+                    price="0.15 TON" 
+                    color="#00F2FE" 
+                    onClick={() => buyPack('starter')} 
+                />
+                
+                <PackCard 
+                    title="Pro" 
+                    basePoints="500k" 
+                    bonusText="+5%" 
+                    price="0.75 TON" 
+                    color="#4CAF50" 
+                    onClick={() => buyPack('pro')} 
+                />
 
-            {/* BOTÓN PARA ABRIR EL BANCO (En lugar del componente incrustado) */}
-            <div style={{ marginTop: '30px' }}>
-                <button onClick={() => setShowBank(true)} className="glass-card" style={{ width:'100%', padding:'15px', display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', border:'1px solid #E040FB', background:'rgba(224, 64, 251, 0.1)' }}>
-                    <div style={{textAlign:'left'}}>
-                        <div style={{fontWeight:'bold', fontSize:'18px', color:'#fff'}}>🏦 Nova Bank</div>
-                        <div style={{fontSize:'12px', color:'#E040FB'}}>Staking & Passive Income</div>
-                    </div>
-                    <div style={{fontSize:'24px', color:'#fff'}}>&gt;</div>
-                </button>
+                <PackCard 
+                    title="Whale" 
+                    basePoints="1M" 
+                    bonusText="+10%" 
+                    price="1.50 TON" 
+                    color="#FFD700" 
+                    onClick={() => buyPack('whale')} 
+                />
+                
+                <PackCard 
+                    title="TYCOON" 
+                    basePoints="5M" 
+                    bonusText="+20%" 
+                    price="7.50 TON" 
+                    color="#E040FB" 
+                    isBestValue={true}
+                    onClick={() => buyPack('tycoon')} 
+                />
             </div>
 
-            {/* EL MODAL */}
-            {showBank && <StakingModal onClose={() => setShowBank(false)} />}
+            {/* Banco integrado abajo */}
+            <StakingBank />
+
         </div>
     );
 };
+
+// Tarjeta Compacta
+const PackCard: React.FC<PackCardProps> = ({ title, basePoints, bonusText, price, color, isBestValue, onClick }) => (
+    <div className="glass-card" style={{
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center',
+        border: isBestValue ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.1)',
+        background: isBestValue ? `rgba(224, 64, 251, 0.08)` : undefined,
+        margin: 0, padding: '15px', textAlign: 'center', position: 'relative',
+        height: '100%'
+    }}>
+        {isBestValue && (
+            <div style={{
+                position:'absolute', top:0, right:0, 
+                background: color, color:'white', fontSize:'8px', padding:'2px 6px', borderRadius:'0 0 0 8px', fontWeight:'bold'
+            }}>
+                BEST
+            </div>
+        )}
+
+        <div style={{marginBottom:'10px'}}>
+            <div style={{fontWeight:'900', fontSize: '14px', color: isBestValue ? color : 'white'}}>{title}</div>
+            <div style={{color: '#fff', fontSize:'18px', fontWeight:'bold', margin:'5px 0'}}>{basePoints}</div>
+            {bonusText && <div style={{fontSize:'10px', color: '#4CAF50', fontWeight:'bold'}}>{bonusText}</div>}
+        </div>
+        
+        <button className="btn-neon" style={{
+            width:'100%', padding: '8px', fontSize:'12px', 
+            background: isBestValue ? `linear-gradient(45deg, ${color}, #00F2FE)` : undefined,
+            border: 'none', color: isBestValue ? 'white' : 'black'
+        }} onClick={onClick}>
+            {price}
+        </button>
+    </div>
+);
