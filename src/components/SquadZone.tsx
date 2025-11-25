@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Users, Share2, Gift, Crown, Copy } from 'lucide-react'; // Flame no se usaba, lo quité. Copy lo añadí al botón.
+import { Users, Share2, Gift, Crown, Copy } from 'lucide-react';
+import { SolarRaid } from './Solarraid'; // ✅ 1. IMPORTAMOS EL COMPONENTE
 
-// 1. Interfaz para las filas de recompensas (Soluciona los errores de 'any')
 interface RewardRowProps {
     title: string;
     reward: string;
-    isPremium?: boolean; // El símbolo ? indica que es opcional
-    isGold?: boolean;    // El símbolo ? indica que es opcional
+    isPremium?: boolean;
+    isGold?: boolean;
 }
 
 export const SquadZone: React.FC = () => {
@@ -20,14 +20,14 @@ export const SquadZone: React.FC = () => {
 
     useEffect(() => {
         if(user) {
-            // Tipamos la respuesta para evitar errores implícitos
-            supabase.from('user_score')
-                .select('referral_count')
-                .eq('user_id', user.id)
-                .single()
-                .then(({ data }) => { 
-                    if(data) setReferrals(data.referral_count); 
-                });
+            const fetchReferrals = async () => {
+                const { data } = await supabase.from('user_score')
+                    .select('referral_count')
+                    .eq('user_id', user.id)
+                    .single();
+                if(data) setReferrals(data.referral_count); 
+            };
+            fetchReferrals();
         }
     }, [user]);
 
@@ -42,11 +42,11 @@ export const SquadZone: React.FC = () => {
         <div style={{ 
             minHeight: '75vh', width: '100%', position: 'relative', overflow: 'hidden', 
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start',
-            paddingTop: '40px',
-            borderRadius: '20px', border: '1px solid #FF512F', background: '#000'
+            paddingTop: '20px', paddingBottom: '100px',
+            background: '#000'
         }}>
             
-            {/* FONDO */}
+            {/* FONDO AMBIENTAL */}
             <div style={{ position: 'absolute', inset: 0, display:'flex', alignItems:'center', justifyContent:'center', zIndex: 0, opacity: 0.3 }}>
                 <div style={{
                     width: '300px', height: '300px', borderRadius: '50%', 
@@ -57,14 +57,22 @@ export const SquadZone: React.FC = () => {
             </div>
 
             {/* CONTENIDO */}
-            <div style={{ zIndex: 10, width: '90%' }}>
+            <div style={{ zIndex: 10, width: '100%', maxWidth: '500px', padding: '0 15px' }}>
                 
-                <div style={{ textAlign:'center', marginBottom:'30px' }}>
+                <div style={{ textAlign:'center', marginBottom:'20px' }}>
                     <h2 style={{ margin: 0, fontSize:'28px', color:'#fff', textShadow:'0 0 10px #FF512F' }}>SQUAD ZONE</h2>
-                    <p style={{ color:'#FF512F', fontSize:'12px' }}>Build your army for the Raid</p>
+                    <p style={{ color:'#FF512F', fontSize:'12px', margin: '5px 0' }}>Team up & Destroy</p>
                 </div>
 
-                <div className="glass-card" style={{ border: '1px solid #FF512F', textAlign:'center' }}>
+                {/* ✅ 2. AQUÍ INSERTAMOS EL SOLAR RAID */}
+                <div style={{ marginBottom: '30px' }}>
+                    <SolarRaid />
+                </div>
+
+                {/* SECCIÓN DE REFERIDOS */}
+                <div className="glass-card" style={{ border: '1px solid #333', textAlign:'center', marginBottom: '20px' }}>
+                    <h3 style={{ margin: '0 0 15px 0', fontSize: '16px', color: '#fff' }}>Invite Friends</h3>
+                    
                     <div style={{ fontSize:'42px', fontWeight:'900', color:'#fff' }}>{referrals}</div>
                     <div style={{ fontSize:'12px', color:'#aaa', marginBottom:'15px' }}>Cadets Recruited</div>
 
@@ -80,17 +88,17 @@ export const SquadZone: React.FC = () => {
                     </div>
 
                     {/* Botones */}
-                    <button className="btn-neon" onClick={() => window.open(`https://t.me/share/url?url=${inviteLink}&text=🔥 Join Gem Nova! Get 50k Points Bonus!`, '_blank')}
+                    <button className="btn-neon" onClick={() => window.open(`https://t.me/share/url?url=${inviteLink}&text=🔥 Join Gem Nova! Help us destroy the Sun!`, '_blank')}
                         style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', background: '#fff', color: '#000', marginBottom:'10px' }}>
                         <Share2 size={18} /> INVITE FRIEND
                     </button>
                     
-                    {/* He añadido el icono Copy que importaste pero no usabas */}
                     <button onClick={handleCopy} style={{ background:'none', border:'1px solid #555', color:'#aaa', width:'100%', padding:'8px', borderRadius:'8px', fontSize:'12px', cursor:'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                         <Copy size={14} /> Copy Link
                     </button>
                 </div>
 
+                {/* Tabla de Beneficios */}
                 <div className="glass-card">
                     <h3 style={{ fontSize:'16px', margin:'0 0 15px 0' }}>Rewards</h3>
                     <RewardRow title="Standard User" reward="+5,000 Pts" />
@@ -105,7 +113,7 @@ export const SquadZone: React.FC = () => {
     );
 };
 
-// 2. Componente corregido con tipos
+// Componente auxiliar
 const RewardRow: React.FC<RewardRowProps> = ({ title, reward, isPremium, isGold }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize:'12px' }}>
