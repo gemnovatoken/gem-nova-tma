@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { Users, Share2, Gift, Crown, Copy } from 'lucide-react';
-import { SolarRaid } from './Solarraid'; // ✅ 1. IMPORTAMOS EL COMPONENTE
+import { SolarRaid } from './Solarraid'; // ✅ Asegúrate de que este import coincida con el nombre del archivo
 
 interface RewardRowProps {
     title: string;
