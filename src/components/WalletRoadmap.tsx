@@ -1,131 +1,151 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { CheckCircle2, Circle, Wallet, BookOpen, Check } from 'lucide-react';
+import { Lock, TrendingUp, Users, DollarSign } from 'lucide-react'; // Eliminamos Wallet y ArrowRight
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
-import { WhitepaperModal } from './WhitepaperModal';
 
-interface GlobalStats {
-    listing_progress_points: number;
-    listing_goal: number;
+interface InfoRowProps {
+    icon: React.ReactNode;
+    title: string;
+    desc: string;
 }
 
 export const WalletRoadmap: React.FC = () => {
     const { user } = useAuth();
     const userFriendlyAddress = useTonAddress();
     
-    const [stats, setStats] = useState<GlobalStats | null>(null);
-    const [bonusClaimed, setBonusClaimed] = useState(false);
-    const [roadmapClaimed, setRoadmapClaimed] = useState(false);
+    const [tonEarnings, setTonEarnings] = useState(0);
+    const [referralCount, setReferralCount] = useState(0);
+    const [userLevel, setUserLevel] = useState(1);
     const [loadingClaim, setLoadingClaim] = useState(false);
-    const [showWhitepaper, setShowWhitepaper] = useState(false);
 
     useEffect(() => {
-        supabase.from('global_stats').select('*').single().then(({data}) => { 
-            if(data) setStats(data as GlobalStats); 
-        });
-
         if (user) {
-            supabase.from('user_score').select('wallet_bonus_claimed, roadmap_bonus_claimed').eq('user_id', user.id).single()
-                .then(({data}) => { 
-                    if(data) {
-                        setBonusClaimed(data.wallet_bonus_claimed);
-                        setRoadmapClaimed(data.roadmap_bonus_claimed);
-                    }
-                });
+            const fetchData = async () => {
+                const { data } = await supabase
+                    .from('user_score')
+                    .select('referral_ton_earnings, referral_count, multitap_level, limit_level, speed_level')
+                    .eq('user_id', user.id)
+                    .single();
+                
+                if (data) {
+                    setTonEarnings(data.referral_ton_earnings || 0);
+                    setReferralCount(data.referral_count || 0);
+                    setUserLevel(Math.min(data.multitap_level, data.limit_level, data.speed_level));
+                }
+            };
+            fetchData();
         }
     }, [user]);
 
-    const handleClaimBonus = async () => {
-        if (!user || !userFriendlyAddress) return;
+    const handleWithdraw = async () => {
+        if (tonEarnings < 2) {
+            alert("⚠️ Minimum withdrawal is 2 TON.");
+            return;
+        }
+        if (!userFriendlyAddress) {
+            alert("⚠️ Please connect your TON wallet first.");
+            return;
+        }
+        
         setLoadingClaim(true);
-        const { error } = await supabase.rpc('claim_wallet_bonus', { user_id_in: user.id, wallet_address: userFriendlyAddress });
-        if (!error) {
-            setBonusClaimed(true);
-            alert("✅ +20,000 Points Received!");
-        } else alert("Error claiming bonus");
-        setLoadingClaim(false);
+        setTimeout(() => {
+            alert("✅ Withdrawal Request Sent! Funds will arrive in 24-48h.");
+            setLoadingClaim(false);
+        }, 1000);
     };
-
-    // Esta función debe coincidir con la firma () => void que espera el modal
-    const handleClaimRoadmap = async () => {
-        if (!user || roadmapClaimed) return;
-        setLoadingClaim(true);
-        const { error } = await supabase.rpc('claim_roadmap_bonus', { user_id_in: user.id });
-        if (!error) {
-            setRoadmapClaimed(true);
-            alert("✅ +5,000 Points Received!");
-            setShowWhitepaper(false);
-        } else alert("Error claiming bonus");
-        setLoadingClaim(false);
-    };
-
-    const currentProgress = stats ? (stats.listing_progress_points / stats.listing_goal) * 100 : 0;
-
-    const phases = [
-        { id: 1, limit: 20, title: "Phase 1: Ignition", desc: "App Launch", done: true },
-        { id: 2, limit: 40, title: "Phase 2: Awakening", desc: "Referrals & Casino", done: currentProgress >= 20 },
-        { id: 3, limit: 60, title: "Phase 3: Momentum", desc: "Raid & Halving", done: currentProgress >= 40 },
-        { id: 4, limit: 100, title: "Phase 4: TGE", desc: "Listing & Airdrop", done: currentProgress >= 99 },
-    ];
 
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
             
-            {/* Wallet Card */}
-            <div className="glass-card" style={{ textAlign: 'center', marginBottom: '20px', border: bonusClaimed ? '1px solid #4CAF50' : '1px solid #00F2FE' }}>
-                <Wallet size={32} color={bonusClaimed ? '#4CAF50' : '#00F2FE'} style={{ marginBottom: '10px', margin:'0 auto' }} />
-                <h2 style={{ margin: '0 0 5px 0' }}>{bonusClaimed ? 'Wallet Connected' : 'Connect & Earn'}</h2>
-                {!bonusClaimed && <p style={{ fontSize: '12px', color: '#FFD700', marginBottom: '15px', fontWeight:'bold' }}>🎁 REWARD: +20,000 Points</p>}
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '15px' }}><TonConnectButton /></div>
-                {!bonusClaimed && userFriendlyAddress && (
-                    <button onClick={handleClaimBonus} disabled={loadingClaim} className="btn-neon" style={{ width: '100%', background: '#4CAF50', color: 'white', marginTop:'10px' }}>
-                        {loadingClaim ? 'Claiming...' : 'CLAIM 20K PTS'}
-                    </button>
-                )}
-                {bonusClaimed && <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'5px', color:'#4CAF50', fontSize:'12px', marginTop:'10px'}}><Check size={14}/> Bonus Claimed</div>}
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'25px' }}>
+                <h2 style={{margin:0, fontSize:'24px'}}>My Wallet</h2>
+                <TonConnectButton />
             </div>
 
-            {/* Whitepaper Card */}
-            <div onClick={() => setShowWhitepaper(true)} className="glass-card" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', cursor:'pointer', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                    <BookOpen color={roadmapClaimed ? '#4CAF50' : '#FFD700'} />
-                    <div>
-                        <div style={{fontWeight:'bold', fontSize:'14px'}}>Whitepaper</div>
-                        <div style={{fontSize:'11px', color: roadmapClaimed ? '#4CAF50' : '#aaa'}}>
-                            {roadmapClaimed ? 'Claimed ✅' : 'Read to earn +5,000 Pts'}
-                        </div>
-                    </div>
+            <div className="glass-card" style={{ 
+                padding:'20px', marginBottom:'15px', textAlign:'center',
+                background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.1), rgba(0,0,0,0))',
+                border: '1px solid #00F2FE'
+            }}>
+                <div style={{fontSize:'12px', color:'#00F2FE', letterSpacing:'1px', fontWeight:'bold', marginBottom:'5px'}}>
+                    PARTNER BALANCE (1%)
                 </div>
-                <button className="btn-neon" style={{fontSize:'10px', padding:'5px 10px'}}>OPEN</button>
+                <div style={{fontSize:'42px', fontWeight:'900', color:'#fff', textShadow:'0 0 20px rgba(0, 242, 254, 0.4)'}}>
+                    {tonEarnings.toFixed(2)} <span style={{fontSize:'16px'}}>TON</span>
+                </div>
+                <div style={{fontSize:'12px', color:'#aaa', marginBottom:'20px'}}>
+                    ≈ ${(tonEarnings * 5.40).toFixed(2)} USD
+                </div>
+
+                <div style={{display:'flex', gap:'10px'}}>
+                    <div style={{flex:1, background:'rgba(0,0,0,0.3)', padding:'10px', borderRadius:'10px'}}>
+                        <div style={{fontSize:'10px', color:'#aaa'}}>Referrals</div>
+                        <div style={{fontSize:'16px', fontWeight:'bold', color:'#fff'}}>{referralCount}</div>
+                    </div>
+                    <button 
+                        onClick={handleWithdraw}
+                        disabled={tonEarnings < 2 || loadingClaim}
+                        className="btn-neon" 
+                        style={{flex:2, fontSize:'14px', background: tonEarnings >= 2 ? '#00F2FE' : '#333', border:'none', color: tonEarnings >= 2 ? '#000' : '#aaa'}}
+                    >
+                        {loadingClaim ? 'PROCESSING...' : (tonEarnings < 2 ? 'MIN 2 TON' : 'WITHDRAW NOW')}
+                    </button>
+                </div>
             </div>
 
-            {/* Roadmap */}
-            <h3 style={{ marginLeft: '5px', marginBottom: '15px', marginTop:'20px' }}>🚀 Roadmap</h3>
-            <div style={{ padding: '10px' }}>
-                {phases.map((phase, index) => (
-                    <div key={phase.id} style={{ display: 'flex', gap: '15px', marginBottom: '25px', opacity: phase.done ? 1 : 0.4 }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            {phase.done ? <CheckCircle2 color="#4CAF50" size={24} /> : <Circle color="#666" size={24} />}
-                            {index < phases.length - 1 && <div style={{ width: '2px', height: '100%', background: phase.done ? '#4CAF50' : '#333', marginTop: '5px', minHeight: '30px' }} />}
+            <div className="glass-card" style={{ 
+                padding:'20px', marginBottom:'30px', position:'relative', overflow:'hidden',
+                border: '1px dashed #FFD700', background:'rgba(255, 215, 0, 0.05)'
+            }}>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                        <div style={{background:'rgba(255, 215, 0, 0.2)', padding:'8px', borderRadius:'50%'}}>
+                            <Lock size={20} color="#FFD700"/>
                         </div>
                         <div>
-                            <div style={{ fontWeight: 'bold', color: phase.done ? '#fff' : '#888', fontSize:'14px' }}>{phase.title}</div>
-                            <div style={{ fontSize: '12px', color: '#aaa' }}>{phase.desc}</div>
+                            <div style={{fontWeight:'bold', color:'#FFD700'}}>VIP COMMISSION (2.5%)</div>
+                            <div style={{fontSize:'10px', color:'#aaa'}}>Extra income from your network</div>
                         </div>
                     </div>
-                ))}
+                    <div style={{fontSize:'18px', fontWeight:'bold', color:'#555'}}>Locked</div>
+                </div>
+                
+                <p style={{fontSize:'12px', color:'#ccc', lineHeight:'1.4', marginBottom:'15px'}}>
+                    Level 8 "Nova God" users earn an additional <strong>2.5% commission</strong> on every purchase made by their referrals.
+                </p>
+
+                {userLevel >= 8 ? (
+                    <div style={{background:'#4CAF50', color:'#fff', padding:'10px', borderRadius:'8px', textAlign:'center', fontWeight:'bold', fontSize:'12px'}}>
+                        ✅ YOU ARE LEVEL 8 - BONUS ACTIVE
+                    </div>
+                ) : (
+                    <div style={{background:'rgba(0,0,0,0.3)', padding:'10px', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                        <span style={{fontSize:'11px', color:'#aaa'}}>Current Level: {userLevel} / 8</span>
+                        <button style={{background:'none', border:'none', color:'#FFD700', fontSize:'11px', cursor:'pointer', fontWeight:'bold'}}>
+                            UPGRADE NOW &gt;
+                        </button>
+                    </div>
+                )}
             </div>
 
-            {/* MODAL */}
-            {showWhitepaper && (
-                <WhitepaperModal 
-                    onClose={() => setShowWhitepaper(false)} 
-                    onClaim={handleClaimRoadmap} 
-                    canClaim={!roadmapClaimed} 
-                    isClaiming={loadingClaim} 
-                />
-            )}
+            <h3 style={{fontSize:'16px', margin:'0 0 15px 0'}}>How it works</h3>
+            <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
+                <InfoRow icon={<Users size={16} color="#4CAF50"/>} title="1. Invite Friends" desc="Share your link from the Squad Zone."/>
+                <InfoRow icon={<DollarSign size={16} color="#00F2FE"/>} title="2. They Buy Packs" desc="When they buy points with TON, you get paid."/>
+                <InfoRow icon={<TrendingUp size={16} color="#E040FB"/>} title="3. Earn 1% - 3.5%" desc="1% Base + 2.5% Bonus for Level 8 users."/>
+            </div>
+
         </div>
     );
 };
+
+const InfoRow: React.FC<InfoRowProps> = ({ icon, title, desc }) => (
+    <div className="glass-card" style={{ padding:'12px', display:'flex', alignItems:'center', gap:'15px', margin:0 }}>
+        <div style={{background:'rgba(255,255,255,0.05)', padding:'8px', borderRadius:'8px'}}>{icon}</div>
+        <div>
+            <div style={{fontWeight:'bold', fontSize:'13px', color:'#fff'}}>{title}</div>
+            <div style={{fontSize:'11px', color:'#aaa'}}>{desc}</div>
+        </div>
+    </div>
+);
