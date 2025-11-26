@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Calendar, CheckCircle2, Lock, Play, Brain, Rocket, Shield } from 'lucide-react';
+import { Calendar, CheckCircle2, Lock, Play, Brain, Rocket, Shield, Ticket, Video } from 'lucide-react';
 import { MemoryGame, AsteroidGame, HackerGame } from './ArcadeGames';
 
 interface GameCardProps {
@@ -17,38 +17,72 @@ export const MissionZone: React.FC = () => {
     const { user } = useAuth();
     const [streak, setStreak] = useState(0);
     const [checkedInToday, setCheckedInToday] = useState(false);
+    const [tickets, setTickets] = useState(3);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [activeGame, setActiveGame] = useState<string | null>(null);
 
-    useEffect(() => {
+    const loadData = useCallback(async () => {
         if(!user) return;
-        const fetchData = async () => {
-            const { data } = await supabase.from('user_score').select('current_streak, last_check_in_date').eq('user_id', user.id).single();
-            if (data) {
-                setStreak(data.current_streak);
-                const today = new Date().toISOString().split('T')[0];
-                if (data.last_check_in_date === today) setCheckedInToday(true);
-            }
-        };
-        fetchData();
+        const { data } = await supabase.from('user_score').select('current_streak, last_check_in_date, tickets, last_ticket_reset').eq('user_id', user.id).single();
+        if (data) {
+            setStreak(data.current_streak);
+            const today = new Date().toISOString().split('T')[0];
+            if (data.last_check_in_date === today) setCheckedInToday(true);
+            
+            if (data.last_ticket_reset !== today) setTickets(3);
+            else setTickets(data.tickets);
+        }
     }, [user]);
+
+    // ✅ CORRECCIÓN: Usamos setTimeout para evitar la actualización síncrona
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            loadData();
+        }, 0);
+        return () => clearTimeout(timer);
+    }, [loadData]);
 
     useEffect(() => {
         if (scrollRef.current) {
-            scrollRef.current.scrollLeft = (streak - 2) * 70;
+            // Pequeño delay para asegurar que el DOM está listo
+            setTimeout(() => {
+                if(scrollRef.current) scrollRef.current.scrollLeft = (streak - 2) * 70;
+            }, 100);
         }
     }, [streak]);
 
     const handleCheckIn = async () => {
         if (checkedInToday || !user) return;
         const { data, error } = await supabase.rpc('daily_check_in', { user_id_in: user.id });
-        
         if (!error && data && data[0].success) {
             alert(`✅ Check-in Complete! +${data[0].reward} Pts`);
-            setStreak(data[0].new_streak);
-            setCheckedInToday(true);
+            loadData();
         } else {
             alert(data?.[0]?.message || "Error");
+        }
+    };
+
+    const handlePlayGame = async (gameId: string) => {
+        if (!user) return;
+        
+        if (tickets <= 0) {
+            if(window.confirm("🎫 No tickets left!\n\nWatch Ad to get +2 Tickets?")) {
+                console.log("Watching Ad...");
+                setTimeout(async () => {
+                    await supabase.rpc('add_tickets', { user_id_in: user.id, amount: 2 });
+                    alert("✅ +2 Tickets Added!");
+                    loadData();
+                }, 2000);
+            }
+            return;
+        }
+
+        const { data } = await supabase.rpc('spend_ticket', { user_id_in: user.id });
+        if (data) {
+            setTickets(prev => prev - 1);
+            setActiveGame(gameId);
+        } else {
+            alert("Error: Could not use ticket.");
         }
     };
 
@@ -63,7 +97,7 @@ export const MissionZone: React.FC = () => {
     };
 
     const renderCalendarDays = () => {
-        const days = [];
+        const days: React.ReactNode[] = [];
         const maxDayToShow = Math.max(7, streak + 5); 
         
         for (let i = 1; i <= maxDayToShow; i++) {
@@ -91,10 +125,9 @@ export const MissionZone: React.FC = () => {
 
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
-            {/* 🛡️ SOLUCIÓN: Tipado explícito en los callbacks para evitar errores 'any' */}
-            {activeGame === 'memory' && <MemoryGame onClose={() => setActiveGame(null)} onFinish={(w: boolean, s: number) => handleGameFinish(w, s, 'Memory')} />}
-            {activeGame === 'asteroid' && <AsteroidGame onClose={() => setActiveGame(null)} onFinish={(w: boolean, s: number) => handleGameFinish(w, s, 'Asteroid')} />}
-            {activeGame === 'hacker' && <HackerGame onClose={() => setActiveGame(null)} onFinish={(w: boolean, s: number) => handleGameFinish(w, s, 'Hacker')} />}
+            {activeGame === 'memory' && <MemoryGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s, 'Memory')} />}
+            {activeGame === 'asteroid' && <AsteroidGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s, 'Asteroid')} />}
+            {activeGame === 'hacker' && <HackerGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s, 'Hacker')} />}
 
             <div style={{textAlign:'center', marginBottom:'20px'}}>
                 <h2 style={{marginTop: 0, fontSize:'28px', marginBottom:'5px', color:'#fff'}}>🗺️ Expedition</h2>
@@ -112,12 +145,23 @@ export const MissionZone: React.FC = () => {
                 )}
             </div>
 
-            <h3 style={{ fontSize:'16px', marginBottom:'15px', borderBottom:'1px solid #333', paddingBottom:'10px' }}>🕹️ Nova Arcade</h3>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px', borderBottom:'1px solid #333', paddingBottom:'10px' }}>
+                <h3 style={{ fontSize:'16px', margin:0 }}>🕹️ Nova Arcade</h3>
+                <div style={{ display:'flex', alignItems:'center', gap:'5px', background:'rgba(255,255,255,0.1)', padding:'5px 10px', borderRadius:'20px' }}>
+                    <Ticket size={14} color={tickets > 0 ? "#E040FB" : "#555"} />
+                    <span style={{fontSize:'12px', fontWeight:'bold', color: tickets > 0 ? "#fff" : "#555"}}>{tickets} Left</span>
+                    {tickets === 0 && (
+                        <button onClick={() => handlePlayGame('video_only')} style={{background:'none', border:'none', cursor:'pointer', display:'flex', marginLeft:'5px'}}>
+                            <Video size={14} color="#4CAF50"/>
+                        </button>
+                    )}
+                </div>
+            </div>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <GameCard title="Quantum Code" desc="Memory Challenge" reward="3,000" icon={<Brain color="#E040FB"/>} color="#E040FB" onPlay={() => setActiveGame('memory')} />
-                <GameCard title="Asteroid Defense" desc="Reaction Test" reward="500/hit" icon={<Shield color="#FF512F"/>} color="#FF512F" onPlay={() => setActiveGame('asteroid')} />
-                <GameCard title="Vault Hacker" desc="Precision Timing" reward="5,000" icon={<Rocket color="#00F2FE"/>} color="#00F2FE" onPlay={() => setActiveGame('hacker')} />
+                <GameCard title="Quantum Code" desc="Memory Challenge" reward="3,000" icon={<Brain color="#E040FB"/>} color="#E040FB" onPlay={() => handlePlayGame('memory')} />
+                <GameCard title="Asteroid Defense" desc="Reaction Test" reward="500/hit" icon={<Shield color="#FF512F"/>} color="#FF512F" onPlay={() => handlePlayGame('asteroid')} />
+                <GameCard title="Vault Hacker" desc="Precision Timing" reward="5,000" icon={<Rocket color="#00F2FE"/>} color="#00F2FE" onPlay={() => handlePlayGame('hacker')} />
             </div>
         </div>
     );

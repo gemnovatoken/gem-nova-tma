@@ -91,7 +91,7 @@ export default function App() {
 
                 {/* --- PESTAÑA 3: MISIÓN --- */}
                  {currentTab === 'mission' && (
-                    <div style={{ animation: 'fadeIn 0.5s' }}>
+                        <div style={{ animation: 'fadeIn 0.5s' }}>
                         <MissionZone />
                     </div>
                 )}
