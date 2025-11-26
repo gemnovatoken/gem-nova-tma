@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 
-// 1. Definimos la forma exacta de tus datos globales
 interface GlobalStats {
   id: number;
   total_taps: number;
@@ -12,19 +11,12 @@ interface GlobalStats {
 }
 
 export const MarketDashboard = () => {
-    // 2. Usamos la interfaz aquí
     const [stats, setStats] = useState<GlobalStats | null>(null);
     
     useEffect(() => {
         const fetchStats = async () => {
-            const { data } = await supabase
-              .from('global_stats')
-              .select('*')
-              .single();
-            
-            if (data) {
-              setStats(data as GlobalStats);
-            }
+            const { data } = await supabase.from('global_stats').select('*').single();
+            if (data) setStats(data as GlobalStats);
         };
         
         fetchStats();
@@ -32,37 +24,43 @@ export const MarketDashboard = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Pantalla de carga si no hay datos aún
-    if (!stats) return <div className="glass-card" style={{textAlign:'center'}}>Loading Market Data...</div>;
+    if (!stats) return <div className="glass-card" style={{textAlign:'center', padding:'10px', fontSize:'12px'}}>Loading System...</div>;
 
-    // 🛡️ CORRECCIÓN 1: Protección contra división por cero
     const progress = stats.listing_goal > 0 
         ? Math.min(100, (stats.listing_progress_points / stats.listing_goal) * 100) 
         : 0;
 
-    // 🛡️ CORRECCIÓN 2: Protección contra precio nulo (El error 'toFixed')
-    // Si current_token_price es null o undefined, usamos 0
-    const price = stats.current_token_price || 0;
-
     return (
-        <div className="glass-card" style={{ borderColor: '#00F2FE' }}>
-            <div style={{ textAlign: 'center', marginBottom: '10px' }}>
-                {/* CAMBIO LEGAL: "TARGET" en lugar de "ESTIMATED" */}
-                <div style={{ fontSize: '11px', color: '#aaa', letterSpacing: '1px' }}>TARGET PRICE GOAL</div>
-                
-                <div style={{ fontSize: '32px', fontWeight: 'bold', color: '#4CAF50', textShadow: '0 0 10px rgba(76, 175, 80, 0.4)' }}>
-                    {/* Usamos la variable segura 'price' */}
-                    {price.toFixed(6)} TON
-                </div>
-            </div>
+        <div className="glass-card" style={{ borderColor: '#00F2FE', padding: '15px', marginBottom:'10px' }}>
             
-            <div style={{ marginBottom: '5px', display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
-                <span style={{color: '#FFD700'}}>🚀 Launch Progress</span>
-                <span>{progress.toFixed(4)}%</span>
+            {/* Título y Porcentaje */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{display:'flex', flexDirection:'column'}}>
+                    <span style={{color: '#fff', fontWeight:'900', fontSize:'14px'}}>LAUNCH PROGRESS</span>
+                    <span style={{color: '#00F2FE', fontSize:'10px'}}>Community Driven TGE</span>
+                </div>
+                <span style={{fontSize:'20px', fontWeight:'bold', color:'#FFD700'}}>{progress.toFixed(4)}%</span>
             </div>
-            <div style={{ width: '100%', height: '10px', background: '#333', borderRadius: '5px', overflow: 'hidden' }}>
-                <div style={{ width: `${progress}%`, height: '100%', background: 'linear-gradient(90deg, #FF512F, #DD2476)' }} />
+
+            {/* Barra de Progreso */}
+            <div style={{ width: '100%', height: '12px', background: '#111', borderRadius: '6px', overflow: 'hidden', border:'1px solid #333', marginBottom:'8px' }}>
+                <div style={{ width: `${progress}%`, height: '100%', background: 'linear-gradient(90deg, #00F2FE, #E040FB, #FFD700)', boxShadow:'0 0 10px rgba(224, 64, 251, 0.5)' }} />
             </div>
+
+            {/* La Fórmula Matemática Visual */}
+            <div style={{ 
+                background:'rgba(0,0,0,0.3)', borderRadius:'6px', padding:'6px', 
+                fontSize:'9px', color:'#aaa', textAlign:'center', fontFamily:'monospace',
+                border: '1px dashed #333', display:'flex', justifyContent:'center', alignItems:'center', flexWrap:'wrap', gap:'4px'
+            }}>
+                <span style={{color:'#4CAF50'}}>Ads</span> + 
+                <span style={{color:'#4CAF50'}}>Upgrades</span> + 
+                <span style={{color:'#00F2FE'}}>BulkBuy</span> + 
+                <span style={{color:'#E040FB'}}>Refs</span> + 
+                <span style={{color:'#FF512F'}}>Burn</span> 
+                <span style={{color:'#fff', fontWeight:'bold'}}> = 🚀 LAUNCH</span>
+            </div>
+
         </div>
     );
 };
