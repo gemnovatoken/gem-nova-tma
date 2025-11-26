@@ -10,6 +10,7 @@ import { WalletRoadmap } from './components/WalletRoadmap';
 import { supabase } from './services/supabase';
 import { useAuth } from './hooks/useAuth';
 import { DebugScreen } from './components/DebugScreen';
+import { MissionZone } from './components/MissionZone';
 
 // Configuración High Stakes
 const GAME_CONFIG = {
@@ -88,12 +89,10 @@ export default function App() {
                     </div>
                 )}
 
-                {/* PESTAÑA MISIÓN */}
-                {currentTab === 'mission' && (
-                    <div style={{ padding: '60px 20px', textAlign: 'center', opacity: 0.7, animation: 'fadeIn 0.5s' }}>
-                        <div style={{ fontSize: '50px', marginBottom: '15px' }}>🗺️</div>
-                        <h2>Expedition</h2>
-                        <p style={{ color: '#aaa' }}>Daily Quests coming in Phase 1.5.</p>
+                {/* --- PESTAÑA 3: MISIÓN --- */}
+                 {currentTab === 'mission' && (
+                    <div style={{ animation: 'fadeIn 0.5s' }}>
+                        <MissionZone />
                     </div>
                 )}
 
