@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Lock, TrendingUp, Users, DollarSign } from 'lucide-react'; // Eliminamos Wallet y ArrowRight
+import { Lock, TrendingUp, Users, DollarSign } from 'lucide-react'; // ❌ Eliminamos Wallet
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
 
 interface InfoRowProps {
@@ -69,7 +69,7 @@ export const WalletRoadmap: React.FC = () => {
                 border: '1px solid #00F2FE'
             }}>
                 <div style={{fontSize:'12px', color:'#00F2FE', letterSpacing:'1px', fontWeight:'bold', marginBottom:'5px'}}>
-                    PARTNER BALANCE (1%)
+                    PARTNER BALANCE
                 </div>
                 <div style={{fontSize:'42px', fontWeight:'900', color:'#fff', textShadow:'0 0 20px rgba(0, 242, 254, 0.4)'}}>
                     {tonEarnings.toFixed(2)} <span style={{fontSize:'16px'}}>TON</span>
@@ -87,13 +87,25 @@ export const WalletRoadmap: React.FC = () => {
                         onClick={handleWithdraw}
                         disabled={tonEarnings < 2 || loadingClaim}
                         className="btn-neon" 
-                        style={{flex:2, fontSize:'14px', background: tonEarnings >= 2 ? '#00F2FE' : '#333', border:'none', color: tonEarnings >= 2 ? '#000' : '#aaa'}}
+                        style={{
+                            flex:2, fontSize:'14px', border:'none', 
+                            background: tonEarnings >= 2 ? '#00F2FE' : '#333', 
+                            color: tonEarnings >= 2 ? '#000' : '#aaa'
+                        }}
                     >
                         {loadingClaim ? 'PROCESSING...' : (tonEarnings < 2 ? 'MIN 2 TON' : 'WITHDRAW NOW')}
                     </button>
                 </div>
+                
+                {/* Aviso de Nivel 5 */}
+                {userLevel < 5 && (
+                    <div style={{marginTop:'10px', fontSize:'9px', color:'#E040FB'}}>
+                        🔒 Reach <strong>Level 5</strong> to unlock withdrawals without minimums.
+                    </div>
+                )}
             </div>
 
+            {/* TARJETA DE BONO NIVEL 8 (2.5%) */}
             <div className="glass-card" style={{ 
                 padding:'20px', marginBottom:'30px', position:'relative', overflow:'hidden',
                 border: '1px dashed #FFD700', background:'rgba(255, 215, 0, 0.05)'
@@ -104,20 +116,20 @@ export const WalletRoadmap: React.FC = () => {
                             <Lock size={20} color="#FFD700"/>
                         </div>
                         <div>
-                            <div style={{fontWeight:'bold', color:'#FFD700'}}>VIP COMMISSION (2.5%)</div>
-                            <div style={{fontSize:'10px', color:'#aaa'}}>Extra income from your network</div>
+                            <div style={{fontWeight:'bold', color:'#FFD700'}}>SUPER PARTNER (2.5%)</div>
+                            <div style={{fontSize:'10px', color:'#aaa'}}>Total commission rate</div>
                         </div>
                     </div>
                     <div style={{fontSize:'18px', fontWeight:'bold', color:'#555'}}>Locked</div>
                 </div>
                 
                 <p style={{fontSize:'12px', color:'#ccc', lineHeight:'1.4', marginBottom:'15px'}}>
-                    Level 8 "Nova God" users earn an additional <strong>2.5% commission</strong> on every purchase made by their referrals.
+                    Level 8 "Nova God" users earn a total of <strong>2.5% commission</strong> on every purchase made by their referrals. (Standard is 1%).
                 </p>
 
                 {userLevel >= 8 ? (
                     <div style={{background:'#4CAF50', color:'#fff', padding:'10px', borderRadius:'8px', textAlign:'center', fontWeight:'bold', fontSize:'12px'}}>
-                        ✅ YOU ARE LEVEL 8 - BONUS ACTIVE
+                        ✅ YOU ARE LEVEL 8 - 2.5% ACTIVE
                     </div>
                 ) : (
                     <div style={{background:'rgba(0,0,0,0.3)', padding:'10px', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
@@ -133,7 +145,7 @@ export const WalletRoadmap: React.FC = () => {
             <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
                 <InfoRow icon={<Users size={16} color="#4CAF50"/>} title="1. Invite Friends" desc="Share your link from the Squad Zone."/>
                 <InfoRow icon={<DollarSign size={16} color="#00F2FE"/>} title="2. They Buy Packs" desc="When they buy points with TON, you get paid."/>
-                <InfoRow icon={<TrendingUp size={16} color="#E040FB"/>} title="3. Earn 1% - 3.5%" desc="1% Base + 2.5% Bonus for Level 8 users."/>
+                <InfoRow icon={<TrendingUp size={16} color="#E040FB"/>} title="3. Withdrawals" desc="Min 1 TON (Or 0 TON if you are Level 5+)."/>
             </div>
 
         </div>
