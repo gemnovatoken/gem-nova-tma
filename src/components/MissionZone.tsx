@@ -34,17 +34,22 @@ export const MissionZone: React.FC = () => {
     }, [user]);
 
     useEffect(() => {
-        if (scrollRef.current) scrollRef.current.scrollLeft = (streak - 2) * 70;
+        if (scrollRef.current) {
+            scrollRef.current.scrollLeft = (streak - 2) * 70;
+        }
     }, [streak]);
 
     const handleCheckIn = async () => {
         if (checkedInToday || !user) return;
         const { data, error } = await supabase.rpc('daily_check_in', { user_id_in: user.id });
+        
         if (!error && data && data[0].success) {
             alert(`✅ Check-in Complete! +${data[0].reward} Pts`);
             setStreak(data[0].new_streak);
             setCheckedInToday(true);
-        } else alert(data?.[0]?.message || "Error");
+        } else {
+            alert(data?.[0]?.message || "Error");
+        }
     };
 
     const handleGameFinish = async (won: boolean, score: number, gameId: string) => {
@@ -62,9 +67,7 @@ export const MissionZone: React.FC = () => {
         const maxDayToShow = Math.max(7, streak + 5); 
         
         for (let i = 1; i <= maxDayToShow; i++) {
-            // ✅ CORRECCIÓN: Usamos 'const' porque el valor no cambia dentro de la iteración
             const reward = i <= 4 ? (i + 1) * 100 : (i <= 9 ? 500 + ((i - 4) * 50) : 1000);
-            
             const isPast = i < (checkedInToday ? streak : streak + 1);
             const isToday = i === (checkedInToday ? streak : streak + 1);
             const isLocked = i > (checkedInToday ? streak : streak + 1);
@@ -88,9 +91,10 @@ export const MissionZone: React.FC = () => {
 
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
-            {activeGame === 'memory' && <MemoryGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s, 'Memory')} />}
-            {activeGame === 'asteroid' && <AsteroidGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s, 'Asteroid')} />}
-            {activeGame === 'hacker' && <HackerGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s, 'Hacker')} />}
+            {/* 🛡️ SOLUCIÓN: Tipado explícito en los callbacks para evitar errores 'any' */}
+            {activeGame === 'memory' && <MemoryGame onClose={() => setActiveGame(null)} onFinish={(w: boolean, s: number) => handleGameFinish(w, s, 'Memory')} />}
+            {activeGame === 'asteroid' && <AsteroidGame onClose={() => setActiveGame(null)} onFinish={(w: boolean, s: number) => handleGameFinish(w, s, 'Asteroid')} />}
+            {activeGame === 'hacker' && <HackerGame onClose={() => setActiveGame(null)} onFinish={(w: boolean, s: number) => handleGameFinish(w, s, 'Hacker')} />}
 
             <div style={{textAlign:'center', marginBottom:'20px'}}>
                 <h2 style={{marginTop: 0, fontSize:'28px', marginBottom:'5px', color:'#fff'}}>🗺️ Expedition</h2>
