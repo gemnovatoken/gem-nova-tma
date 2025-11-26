@@ -1,109 +1,96 @@
-import React from 'react';
-import { X, FileText, Zap, Coins, Shield } from 'lucide-react'; // CheckCircle eliminado para corregir el error
+import React, { useState } from 'react';
+import { X, ChevronRight, BookOpen } from 'lucide-react';
 
-// Definimos la interfaz para las props (Tipado estricto)
 interface WhitepaperModalProps {
     onClose: () => void;
-    onClaim: () => void; // Asegúrate que esto sea void
+    onClaim: () => void;
     canClaim: boolean;
     isClaiming: boolean;
 }
 
-export const WhitepaperModal: React.FC<WhitepaperModalProps> = ({ onClose }) => {
+export const WhitepaperModal: React.FC<WhitepaperModalProps> = ({ onClose, onClaim, canClaim, isClaiming }) => {
+    const [page, setPage] = useState(0);
+
+    const pages = [
+        {
+            title: "1. The Hard Money Vision",
+            icon: "💎",
+            content: "We are tired of games printing trillions of worthless tokens. Gem Nova is built on SCARCITY. Points are hard to get. Energy is limited. This is a Deflationary Engine designed to protect value, not dilute it. We don't sell air; we mine digital gold."
+        },
+        {
+            title: "2. The 1% Partner Revolution",
+            icon: "🤝",
+            content: "Marketing agencies are expensive and useless. We fired them to pay YOU. Every user is a Partner. Invite a friend, and earn 1% of their TON purchases instantly. Real cash rewards for growing the tribe. No limits. The first Community-Driven Economy."
+        },
+        {
+            title: "3. Reverse Tokenomics",
+            icon: "📉",
+            content: "Most projects dump on retail. We flip the script with a 'Merit-Based Swap'. Active players (Level 8) unlock the prime 80:1 rate, while passive users get 500:1. 70% of revenue goes back into Liquidity and Buybacks. We burn points daily via Raids & Arcade."
+        },
+        {
+            title: "4. The Ecosystem Future",
+            icon: "🪐",
+            content: "Phase 1 is just the spark. Coming next: 'Nova Bank' (High Yield Staking), 'Operation Eclipse' (Raid Events with TON prizes), and the P2P Marketplace. Our goal: Listing on Ston.fi with a liquidity pool funded by the community, owned by the community."
+        }
+    ];
+
+    const isLastPage = page === pages.length - 1;
+
     return (
         <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.85)', zIndex: 3000,
-            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end'
+            background: 'rgba(0,0,0,0.95)', zIndex: 3000, padding: '20px',
+            display: 'flex', flexDirection: 'column', justifyContent: 'center'
         }}>
-            {/* Área para cerrar al tocar fuera */}
-            <div style={{flex: 1}} onClick={onClose} />
-
-            <div className="glass-card" style={{ 
-                margin: 0, borderRadius: '24px 24px 0 0', padding: '24px', 
-                borderBottom: 'none', maxHeight: '85vh', overflowY: 'auto',
-                animation: 'slideUp 0.3s ease-out', background: '#121212', border: '1px solid #333'
-            }}>
+            <div className="glass-card" style={{ position: 'relative', height: 'auto', minHeight: '450px', display: 'flex', flexDirection: 'column', border: '1px solid #00F2FE' }}>
+                
                 {/* Header */}
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', position: 'sticky', top: 0, background: '#121212', paddingBottom: '10px', zIndex: 10, borderBottom: '1px solid #333'}}>
-                    <div style={{display: 'flex', alignItems: 'center', gap: '10px'}}>
-                        <FileText size={24} color="#fff" />
-                        <h2 style={{margin: 0, fontSize: '20px', color: '#fff'}}>Whitepaper v1.0</h2>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
+                    <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
+                        <BookOpen color="#00F2FE" />
+                        <span style={{fontWeight:'bold', color:'#fff'}}>WHITEPAPER v2.0</span>
                     </div>
                     <button onClick={onClose} style={{background:'none', border:'none', color:'#fff', cursor:'pointer'}}><X /></button>
                 </div>
 
-                {/* Contenido del Whitepaper */}
-                <div style={{ color: '#ccc', lineHeight: '1.6', fontSize: '14px' }}>
-                    
-                    {/* Intro */}
-                    <div style={{ marginBottom: '25px' }}>
-                        <h3 style={{ color: '#00F2FE', fontSize: '16px', marginBottom: '10px' }}>🌌 Introduction</h3>
-                        <p>
-                            Gem Nova is a next-generation tap-to-earn game built on the TON blockchain. 
-                            Players mine Gems by tapping, upgrade their mining rigs, and complete missions to earn real rewards.
-                        </p>
-                    </div>
-
-                    {/* Mechanics Section */}
-                    <div style={{ marginBottom: '25px', background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '12px' }}>
-                        <h3 style={{ color: '#FFD700', fontSize: '16px', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Zap size={16} /> Core Mechanics
-                        </h3>
-                        <ul style={{ paddingLeft: '20px', margin: 0 }}>
-                            <li style={{ marginBottom: '8px' }}><strong>Tap & Earn:</strong> Convert energy into Gems directly.</li>
-                            <li style={{ marginBottom: '8px' }}><strong>Energy System:</strong> Energy regenerates over time based on your Recharge Speed level.</li>
-                            <li><strong>Leagues:</strong> Climb from Bronze to Diamond to unlock higher earning multipliers.</li>
-                        </ul>
-                    </div>
-
-                    {/* Tokenomics Section */}
-                    <div style={{ marginBottom: '25px' }}>
-                        <h3 style={{ color: '#E040FB', fontSize: '16px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Coins size={16} /> Tokenomics ($NOVA)
-                        </h3>
-                        <p style={{ marginBottom: '10px' }}>
-                            The $NOVA token is the utility token of the ecosystem. It will be launched on major DEXs in Q4 2024.
-                        </p>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginTop: '15px' }}>
-                            <div style={{ background: '#222', padding: '10px', borderRadius: '8px', textAlign: 'center', border: '1px solid #333' }}>
-                                <div style={{ color: '#4CAF50', fontWeight: 'bold' }}>55%</div>
-                                <div style={{ fontSize: '10px', color: '#888' }}>Community Mining</div>
-                            </div>
-                            <div style={{ background: '#222', padding: '10px', borderRadius: '8px', textAlign: 'center', border: '1px solid #333' }}>
-                                <div style={{ color: '#2196F3', fontWeight: 'bold' }}>15%</div>
-                                <div style={{ fontSize: '10px', color: '#888' }}>Liquidity & Listings</div>
-                            </div>
-                            <div style={{ background: '#222', padding: '10px', borderRadius: '8px', textAlign: 'center', border: '1px solid #333' }}>
-                                <div style={{ color: '#FF9800', fontWeight: 'bold' }}>20%</div>
-                                <div style={{ fontSize: '10px', color: '#888' }}>Marketing & Airdrops</div>
-                            </div>
-                            <div style={{ background: '#222', padding: '10px', borderRadius: '8px', textAlign: 'center', border: '1px solid #333' }}>
-                                <div style={{ color: '#9C27B0', fontWeight: 'bold' }}>10%</div>
-                                <div style={{ fontSize: '10px', color: '#888' }}>Team (Vested)</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Security */}
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', padding: '15px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: '12px', border: '1px solid rgba(76, 175, 80, 0.3)' }}>
-                        <Shield color="#4CAF50" size={24} />
-                        <div style={{ fontSize: '12px' }}>
-                            <strong style={{ color: '#4CAF50', display: 'block', marginBottom: '2px' }}>Secure & Verified</strong>
-                            Smart contracts audited by leading security firms. Fair launch guaranteed.
-                        </div>
-                    </div>
-
-                    <div style={{ marginTop: '30px', textAlign: 'center', fontSize: '10px', color: '#555' }}>
-                        © 2024 Gem Nova Foundation. All rights reserved.
-                    </div>
-
+                {/* Contenido */}
+                <div style={{ flex: 1, textAlign: 'center', padding: '10px' }}>
+                    <div style={{ fontSize: '60px', marginBottom: '20px' }}>{pages[page].icon}</div>
+                    <h2 style={{ color: '#00F2FE', marginBottom: '15px', fontSize:'22px' }}>{pages[page].title}</h2>
+                    <p style={{ lineHeight: '1.6', color: '#ddd', fontSize: '14px' }}>
+                        {pages[page].content}
+                    </p>
                 </div>
+
+                {/* Indicador */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
+                    {pages.map((_, i) => (
+                        <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i === page ? '#00F2FE' : '#333', transition:'all 0.3s' }} />
+                    ))}
+                </div>
+
+                {/* Botón */}
+                <button 
+                    className="btn-neon"
+                    onClick={() => {
+                        if (isLastPage) {
+                            if (canClaim) onClaim();
+                            else onClose();
+                        } else {
+                            setPage(p => p + 1);
+                        }
+                    }}
+                    disabled={isClaiming}
+                    style={{ width: '100%', padding: '15px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                >
+                    {isLastPage ? (
+                        canClaim ? (isClaiming ? 'Claiming...' : '✅ I UNDERSTAND & CLAIM 5,000 PTS') : 'CLOSE'
+                    ) : (
+                        <>NEXT PAGE <ChevronRight size={18}/></>
+                    )}
+                </button>
+
             </div>
-            
-            <style>{`
-                @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-            `}</style>
         </div>
     );
 };
