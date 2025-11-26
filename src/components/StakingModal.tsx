@@ -14,13 +14,13 @@ interface Deposit {
     unlock_date: string;
 }
 
-// 1. Nueva Interfaz para el StakeCard (Adiós 'any')
+// Interface for StakeCard props to fix 'any' error
 interface StakeCardProps {
     days: number;
     roi: number;
-    isHot?: boolean;     // Opcional
+    isHot?: boolean;
     onClick: () => void;
-    disabled?: boolean;  // Opcional
+    disabled: boolean;
 }
 
 export const StakingModal: React.FC<StakingModalProps> = ({ onClose }) => {
@@ -31,29 +31,31 @@ export const StakingModal: React.FC<StakingModalProps> = ({ onClose }) => {
     const [deposits, setDeposits] = useState<Deposit[]>([]);
     const [loading, setLoading] = useState(false);
 
-    // Lógica de Capacidad por Nivel
     const getCapPercent = (l: number) => {
         if(l>=8) return 75; if(l===7) return 50; if(l===6) return 35; if(l===5) return 20; if(l===4) return 10; return 0;
     };
     
     const capPercent = getCapPercent(level);
     const freePoints = Math.max(0, balance - purchased);
-    // Si es nivel bajo (<4), damos un teaser de 10k. Si es alto, aplicamos %.
     const stakableFree = level < 4 ? 10000 : Math.floor(freePoints * (capPercent / 100));
     const totalStakable = Math.min(balance, purchased + stakableFree);
 
     useEffect(() => {
         if(!user) return;
         const fetchData = async () => {
-            // 1. Cargar perfil
             const { data: u } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
             if(u) {
                 setBalance(u.score);
                 setPurchased(u.purchased_points);
                 setLevel(Math.min(u.multitap_level, u.limit_level, u.speed_level));
             }
-            // 2. Cargar depósitos
-            const { data: d } = await supabase.from('staking_deposits').select('*').eq('user_id', user.id).order('unlock_date', {ascending: true});
+            
+            const { data: d } = await supabase
+                .from('staking_deposits')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('unlock_date', {ascending: true});
+                
             if(d) setDeposits(d as Deposit[]);
         };
         fetchData();
@@ -80,7 +82,6 @@ export const StakingModal: React.FC<StakingModalProps> = ({ onClose }) => {
             background: 'rgba(0,0,0,0.9)', zIndex: 3000,
             display: 'flex', flexDirection: 'column', justifyContent: 'flex-end'
         }}>
-            {/* Área transparente para cerrar al tocar fuera */}
             <div style={{flex: 1}} onClick={onClose} />
 
             <div className="glass-card" style={{ 
@@ -147,14 +148,15 @@ export const StakingModal: React.FC<StakingModalProps> = ({ onClose }) => {
     );
 };
 
-// 2. Componente StakeCard Corregido (Usando la nueva interfaz)
+// Corrected StakeCard with interface
 const StakeCard: React.FC<StakeCardProps> = ({ days, roi, isHot, onClick, disabled }) => (
     <button onClick={onClick} disabled={disabled}
         className="glass-card" 
         style={{ 
             margin:0, padding:'15px 10px', cursor: disabled?'not-allowed':'pointer',
             border: isHot ? '1px solid #FFD700' : '1px solid rgba(255,255,255,0.1)',
-            background: isHot ? 'rgba(255, 215, 0, 0.1)' : undefined,
+            background: isHot ? 'rgba(255, 215, 0, 0.1)' : 'rgba(255,255,255,0.05)',
+            borderRadius: '12px', color:'white',
             opacity: disabled ? 0.5 : 1, textAlign:'left', width:'100%', position:'relative'
         }}>
         {isHot && <div style={{position:'absolute', top:-8, right:-5, background:'#FFD700', color:'black', fontSize:'8px', padding:'2px 6px', borderRadius:'4px', fontWeight:'bold'}}>BEST</div>}
