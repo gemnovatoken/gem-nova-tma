@@ -6,8 +6,8 @@ import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
 import { Trophy, Zap, Gamepad2, Rocket, Bot, Video } from 'lucide-react';
 
-// 🛡️ SOLUCIÓN: Importamos los tipos de forma explícita con 'type'
-import type { ReactElement, Dispatch, SetStateAction } from 'react';
+// ✅ CORRECCIÓN 1: Importamos los tipos con 'import type'
+import type { SetStateAction, Dispatch, ReactElement } from 'react';
 
 interface GameProps {
     score: number; setScore: Dispatch<SetStateAction<number>>;
@@ -44,7 +44,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const [turboActive, setTurboActive] = useState(false);
     const [botTime, setBotTime] = useState(0); 
 
-    // Props (regenRate removed from destructuring to fix unused error if needed, but keeping it for display)
     const { score, setScore, energy, setEnergy, levels, setLevels, maxEnergy, regenRate } = props;
 
     const globalLevel = Math.min(levels.multitap, levels.limit, levels.speed);
@@ -120,7 +119,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         setLoading(false);
     }, [user, loading, setScore, setLevels]);
 
-    // Cálculos visuales
     const radius = 120;
     const circumference = 2 * Math.PI * radius;
     const energyPercent = Math.min(100, Math.max(0, (energy / maxEnergy) * 100));
@@ -133,7 +131,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             position: 'relative', overflow: 'hidden'
         }}>
             
-            {/* 1. TOP SECTION */}
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10 }}>
                 <div onClick={() => setShowRanking(true)} className="glass-card" style={{ 
                     padding: '5px 15px', borderRadius:'20px', display:'flex', gap:'8px', alignItems:'center', 
@@ -150,9 +147,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 <div style={{fontSize:'10px', color:'#aaa'}}>+ {finalTap} per tap</div>
             </div>
 
-            {/* 2. CENTER: RING + BUTTON */}
             <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
-                {/* Anillo */}
                 <div style={{ position: 'absolute', width: '320px', height: '320px', zIndex: 0, transform: 'rotate(-90deg)' }}>
                     <svg width="320" height="320">
                         <circle cx="160" cy="160" r={radius} stroke="#333" strokeWidth="12" fill="transparent" />
@@ -162,12 +157,11 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                         />
                     </svg>
                 </div>
-                {/* Botón */}
                 <button onClick={handleTap} disabled={!user}
                     style={{
                         width: '220px', height: '220px', borderRadius: '50%', zIndex: 2, border: 'none',
                         background: turboActive ? 'radial-gradient(circle, #FF0055 0%, #550000 100%)' : 'radial-gradient(circle at 30% 30%, #00F2FE, #0072FF)',
-                        boxShadow: turboActive ? '0 0 60px #FF0055' : `0 0 ${energyPercent > 20 ? '40px' : '10px'} rgba(0,242,254,0.5)`, 
+                        boxShadow: turboActive ? '0 0 60px #FF0055' : `0 0 ${energyPercent > 20 ? '40px' : '10px'} rgba(0,242,254,0.4)`, 
                         cursor: 'pointer', transform: 'scale(1)', transition: 'transform 0.05s'
                     }}
                     onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
@@ -180,37 +174,24 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 </div>
             </div>
 
-            {/* 3. BOTTOM: DOCK DE HERRAMIENTAS */}
             <div style={{ padding: '0 20px', zIndex: 10 }}>
-                
                 <div style={{ marginBottom:'10px', display:'flex', justifyContent:'center', fontSize:'10px', color:'#aaa' }}>
-                    <span>Regeneration: +{regenRate}/s</span>
+                    <span>Energy Regeneration: +{regenRate}/s</span>
                 </div>
 
-                {/* GRID DE BOTONES */}
-                <div className="glass-card" style={{ padding: '10px', borderRadius: '20px', background: 'rgba(20, 20, 30, 0.9)', border: '1px solid rgba(255,255,255,0.1)', display:'flex', flexDirection:'column', gap:'8px' }}>
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
-                        <DockButton icon={<Rocket/>} label="BOOST" color="#00F2FE" onClick={() => setShowBoosts(true)} />
-                        <DockButton icon={<Bot/>} label={botTime>0 ? `${Math.ceil(botTime/60)}m` : "AUTO"} sub={isPremiumBot?"PRO":"AD"} color={botTime>0?"#4CAF50":"#fff"} onClick={handleBotClick} />
-                        <DockButton icon={<Zap/>} label="TURBO" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
-                        <DockButton icon={<Video/>} label="REFILL" sub="AD" color="#4CAF50" onClick={() => watchVideo('refill')} />
-                    </div>
-
-                    {/* Fila 2: Casino */}
-                    <button onClick={() => setShowLucky(true)} style={{
-                        width:'100%', padding:'8px', borderRadius:'10px', border:'1px solid #E040FB', 
-                        background:'rgba(224, 64, 251, 0.1)', color:'#fff', cursor:'pointer',
-                        display:'flex', justifyContent:'center', alignItems:'center', gap:'8px'
-                    }}>
-                        <Gamepad2 size={16} color="#E040FB"/> 
-                        <span style={{fontSize:'10px', fontWeight:'bold'}}>PLAY LUCKY SPIN</span>
-                    </button>
-
+                <div className="glass-card" style={{ 
+                    padding: '10px', borderRadius: '20px', background: 'rgba(20, 20, 30, 0.9)', 
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    display: 'flex', justifyContent: 'space-between', gap: '5px'
+                }}>
+                    <DockButton icon={<Rocket/>} label="BOOST" color="#00F2FE" onClick={() => setShowBoosts(true)} />
+                    <DockButton icon={<Bot/>} label={botTime>0 ? `${Math.ceil(botTime/60)}m` : "AUTO"} sub={isPremiumBot?"PRO":"AD"} color={botTime>0?"#4CAF50":"#fff"} onClick={handleBotClick} />
+                    <DockButton icon={<Zap/>} label="TURBO" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
+                    <DockButton icon={<Video/>} label="REFILL" sub="AD" color="#4CAF50" onClick={() => watchVideo('refill')} />
+                    <DockButton icon={<Gamepad2/>} label="LUCKY" color="#E040FB" onClick={() => setShowLucky(true)} />
                 </div>
             </div>
 
-            {/* Modales */}
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
             {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} onUpdateScore={setScore} />}
             {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} configs={GAME_CONFIG} />}
@@ -218,14 +199,15 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     );
 };
 
-// Componente DockButton Tipado y Corregido
+// ✅ CORRECCIÓN 2: Casting Seguro sin 'any'
 const DockButton: React.FC<DockButtonProps> = ({ icon, label, sub, color, onClick }) => (
     <button onClick={onClick} style={{ 
         background: 'transparent', border: 'none', flex: 1, display: 'flex', flexDirection: 'column', 
         alignItems: 'center', justifyContent: 'center', gap: '2px', cursor: 'pointer', color: color || '#fff'
     }}>
-        {React.isValidElement(icon) ? React.cloneElement(icon as ReactElement<{ size?: number | string }>, { size: 20 }) : icon}
-        <span style={{ fontSize: '9px', fontWeight: 'bold', marginTop:'2px' }}>{label}</span>
+        {/* Usamos un tipo genérico seguro para ReactElement */}
+        {React.isValidElement(icon) ? React.cloneElement(icon as ReactElement<{ size?: number | string }>, { size: 18 }) : icon}
+        <span style={{ fontSize: '8px', fontWeight: 'bold', marginTop:'2px' }}>{label}</span>
         {sub && <span style={{ fontSize: '7px', background: '#333', padding: '1px 3px', borderRadius: '3px', color: '#aaa' }}>{sub}</span>}
     </button>
 );
