@@ -19,7 +19,6 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
-// 👇 ESTA LÍNEA ES LA SOLUCIÓN: "export default"
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
@@ -63,14 +62,16 @@ export default function App() {
 
     return (
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
-            <div className="app-container" style={{ minHeight: '100vh', paddingBottom: '100px', color: 'white' }}>
+            {/* 🛡️ CORRECCIÓN: Padding reducido de 100px a 80px solo para compensar el menú flotante */}
+            <div className="app-container" style={{ minHeight: '100vh', paddingBottom: '80px', color: 'white', overflow: 'hidden' }}>
                 
                 <Header />
 
                 {/* PESTAÑA MINAR */}
                 {currentTab === 'mine' && (
-                    <div style={{ paddingTop: '10px', animation: 'fadeIn 0.5s' }}>
-                        <div style={{ padding: '0 20px' }}><MarketDashboard /></div>
+                    <div style={{ paddingTop: '5px', animation: 'fadeIn 0.5s' }}>
+                        {/* Margen negativo para pegar el Dashboard al Header */}
+                        <div style={{ padding: '0 15px', marginBottom: '-5px' }}><MarketDashboard /></div>
                         <MyMainTMAComponent 
                             score={score} setScore={setScore} 
                             energy={energy} setEnergy={setEnergy} 
@@ -87,7 +88,7 @@ export default function App() {
                     </div>
                 )}
 
-                {/* --- PESTAÑA 3: MISIÓN --- */}
+                {/* PESTAÑA MISIÓN */}
                  {currentTab === 'mission' && (
                         <div style={{ animation: 'fadeIn 0.5s' }}>
                         <MissionZone />
