@@ -11,7 +11,6 @@ import { supabase } from './services/supabase';
 import { useAuth } from './hooks/useAuth';
 import { MissionZone } from './components/MissionZone';
 
-// Configuración High Stakes
 const GAME_CONFIG = {
     limit: { values: [500, 1000, 1500, 2000, 4000, 6000, 8500, 12000] },
     speed: { values: [1, 2, 3, 4, 5, 6, 8, 10] }
@@ -21,20 +20,16 @@ const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json';
 
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
-    
-    // ESTADOS CENTRALES
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     const { user, loading: authLoading } = useAuth();
     
-    // Cálculos
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
     const speedIdx = Math.min(Math.max(0, levels.speed - 1), 7);
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // Carga Inicial
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -49,7 +44,6 @@ export default function App() {
         }
     }, [user, authLoading]);
 
-    // Regeneración
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -62,52 +56,40 @@ export default function App() {
 
     return (
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
-            {/* 🛡️ CORRECCIÓN: Padding reducido de 100px a 80px solo para compensar el menú flotante */}
-            <div className="app-container" style={{ minHeight: '100vh', paddingBottom: '80px', color: 'white', overflow: 'hidden' }}>
+            {/* 🛡️ CORRECCIÓN 1: Cambiamos minHeight por height: 100dvh (Altura fija real) */}
+            {/* Quitamos el paddingBottom: 100px que causaba el espacio vacío */}
+            <div className="app-container" style={{ height: '100dvh', overflow: 'hidden', background: '#000', color: 'white', position: 'relative' }}>
                 
                 <Header />
 
-                {/* PESTAÑA MINAR */}
-                {currentTab === 'mine' && (
-                    <div style={{ paddingTop: '5px', animation: 'fadeIn 0.5s' }}>
-                        {/* Margen negativo para pegar el Dashboard al Header */}
-                        <div style={{ padding: '0 15px', marginBottom: '-5px' }}><MarketDashboard /></div>
-                        <MyMainTMAComponent 
-                            score={score} setScore={setScore} 
-                            energy={energy} setEnergy={setEnergy} 
-                            levels={levels} setLevels={setLevels}
-                            maxEnergy={maxEnergy} regenRate={regenRate}
-                        />
-                    </div>
-                )}
-                
-                {/* PESTAÑA MERCADO */}
-                {currentTab === 'market' && (
-                    <div style={{ animation: 'fadeIn 0.5s' }}>
-                        <BulkStore />
-                    </div>
-                )}
-
-                {/* PESTAÑA MISIÓN */}
-                 {currentTab === 'mission' && (
-                        <div style={{ animation: 'fadeIn 0.5s' }}>
-                        <MissionZone />
-                    </div>
-                )}
-
-                {/* PESTAÑA SQUAD */}
-                {currentTab === 'squad' && (
-                    <div style={{ padding: '20px', animation: 'fadeIn 0.5s' }}>
-                        <SquadZone />
-                    </div>
-                )}
-
-                {/* PESTAÑA WALLET */}
-                {currentTab === 'wallet' && (
-                    <div style={{ animation: 'fadeIn 0.5s' }}>
-                        <WalletRoadmap />
-                    </div>
-                )}
+                {/* Contenedor de contenido con scroll interno solo si es necesario */}
+                <div style={{ 
+                    height: 'calc(100dvh - 140px)', // Espacio restante exacto
+                    overflowY: 'auto', // Scroll solo aquí dentro
+                    paddingBottom: '0px' // Sin espacio extra
+                }}>
+                    {currentTab === 'mine' && (
+                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                            {/* 🛡️ CORRECCIÓN 2: Quitamos paddingTop extra y márgenes */}
+                            <div style={{ padding: '0 15px', marginBottom: '0' }}><MarketDashboard /></div>
+                            
+                            {/* El componente principal se encargará de llenar el resto */}
+                            <div style={{ flex: 1 }}>
+                                <MyMainTMAComponent 
+                                    score={score} setScore={setScore} 
+                                    energy={energy} setEnergy={setEnergy} 
+                                    levels={levels} setLevels={setLevels}
+                                    maxEnergy={maxEnergy} regenRate={regenRate}
+                                />
+                            </div>
+                        </div>
+                    )}
+                    
+                    {currentTab === 'market' && <div style={{ animation: 'fadeIn 0.3s' }}><BulkStore /></div>}
+                    {currentTab === 'mission' && <div style={{ animation: 'fadeIn 0.3s' }}><MissionZone /></div>}
+                    {currentTab === 'squad' && <div style={{ padding: '20px', animation: 'fadeIn 0.3s' }}><SquadZone /></div>}
+                    {currentTab === 'wallet' && <div style={{ animation: 'fadeIn 0.3s' }}><WalletRoadmap /></div>}
+                </div>
 
                 <BottomNav activeTab={currentTab} setTab={setCurrentTab} />
             </div>
