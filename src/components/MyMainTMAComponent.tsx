@@ -109,8 +109,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         setLoading(false);
     }, [user, loading, setScore, setLevels]);
 
-    // 📉 AJUSTE FINAL: Radio de 105 a 95 (Más pequeño para juntar todo)
-    const radius = 95; 
+    const radius = 100; // Aún más pequeño
     const circumference = 2 * Math.PI * radius;
     const energyPercent = Math.min(100, Math.max(0, (energy / maxEnergy) * 100));
     const strokeDashoffset = circumference - (energyPercent / 100) * circumference;
@@ -118,20 +117,21 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     return (
         <div style={{ 
             display: 'flex', flexDirection: 'column', 
-            // 📉 GAP MÍNIMO: De 10px a 2px para pegar todo
-            justifyContent: 'center', alignItems: 'center', gap: '2px',
-            // 📉 Altura ajustada
-            height: 'calc(100dvh - 130px)', 
+            // 🛡️ TRUCO DE COMPACTACIÓN:
+            // justifyContent: 'flex-start' (Todo empieza arriba)
+            // gap: '0' (Sin espacios automáticos)
+            justifyContent: 'flex-start', alignItems: 'center', gap: '0px',
+            height: 'calc(100dvh - 135px)', 
             padding: '0', maxWidth: '500px', margin: '0 auto',
             position: 'relative', overflow: 'hidden'
         }}>
             
-            {/* 1. TOP SECTION (Pegado arriba con margen negativo) */}
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-20px' }}>
+            {/* 1. TOP: Pegado al techo con margen negativo */}
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-10px', marginBottom: '10px' }}>
                 <div onClick={() => setShowRanking(true)} className="glass-card" style={{ 
-                    padding: '2px 10px', borderRadius:'15px', display:'flex', gap:'4px', alignItems:'center', 
+                    padding: '3px 10px', borderRadius:'15px', display:'flex', gap:'4px', alignItems:'center', 
                     background: 'rgba(0, 242, 254, 0.1)', border: '1px solid rgba(0, 242, 254, 0.3)', cursor:'pointer',
-                    marginBottom: '0px'
+                    marginBottom: '2px'
                 }}>
                     <Trophy size={10} color="#FFD700"/>
                     <span style={{fontSize:'8px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>
@@ -144,8 +144,8 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 <div style={{fontSize:'8px', color:'#aaa', marginTop:'0px'}}>+ {finalTap} per tap</div>
             </div>
 
-            {/* 2. CENTRO: Anillo Reducido */}
-            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '240px', height: '240px' }}>
+            {/* 2. CENTRO: Ajustado con margen negativo */}
+            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '240px', height: '240px', marginTop: '-10px', marginBottom: '-10px' }}>
                 <div style={{ position: 'absolute', width: '240px', height: '240px', zIndex: 0, transform: 'rotate(-90deg)' }}>
                     <svg width="240" height="240">
                         <circle cx="120" cy="120" r={radius} stroke="#333" strokeWidth="8" fill="transparent" />
@@ -167,13 +167,13 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 >
                     <div style={{fontSize:'24px'}}>💎</div>
                 </button>
-                <div style={{ position: 'absolute', top: '75%', width: '100%', textAlign:'center', height: '20px', color: '#FFD700', fontWeight: 'bold', fontSize:'10px', textShadow: '0 2px 4px #000', zIndex:5 }}>
+                <div style={{ position: 'absolute', top: '70%', width: '100%', textAlign:'center', height: '20px', color: '#FFD700', fontWeight: 'bold', fontSize:'10px', textShadow: '0 2px 4px #000', zIndex:5 }}>
                     {message ? message : `${Math.floor(energy)} / ${maxEnergy}`}
                 </div>
             </div>
 
-            {/* 3. BOTTOM: DOCK (Sin padding extra) */}
-            <div style={{ width: '100%', padding: '0 15px', zIndex: 10, marginBottom: '0' }}>
+            {/* 3. BOTTOM: Pegado abajo */}
+            <div style={{ width: '100%', padding: '0 15px', zIndex: 10, marginTop: '10px' }}>
                 <div style={{ marginBottom:'2px', display:'flex', justifyContent:'center', fontSize:'8px', color:'#aaa' }}>
                     <span>+{regenRate}/s Regen</span>
                 </div>
