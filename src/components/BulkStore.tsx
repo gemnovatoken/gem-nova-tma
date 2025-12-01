@@ -2,7 +2,7 @@ import React from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { StakingBank } from './StakingBank';
-import { Zap, Cpu, Shield, Rocket, Lock, Play } from 'lucide-react';
+import { Zap, Cpu, Shield, Rocket, Lock, Play, Hexagon, Crown } from 'lucide-react';
 
 interface PackNodeProps {
     title: string;
@@ -10,9 +10,9 @@ interface PackNodeProps {
     price: string;
     color: string;
     icon: React.ReactNode;
-    isLocked?: boolean; // Lógica para bloquear con video
+    isLocked?: boolean;
     onClick: () => void;
-    side: 'left' | 'right'; // Para alternar lados en el camino
+    side: 'left' | 'right'; // Para alternar en el camino
 }
 
 export const BulkStore: React.FC = () => {
@@ -20,14 +20,15 @@ export const BulkStore: React.FC = () => {
 
     const buyPack = async (pack: string) => {
         if(!user) return;
+        
+        // Mensajes de confirmación
         let msg = "";
-        // Mensajes de confirmación...
-        if (pack === 'starter') msg = "Initialize Protocol: 10k Pts for 0.15 TON";
-        else if (pack === 'pro') msg = "Upgrade System: 50k Pts for 0.75 TON";
-        else if (pack === 'whale') msg = "Deploy Whale Node: 120k Pts for 1.50 TON";
-        else if (pack === 'tycoon') msg = "Execute Tycoon Override: 800k Pts for 7.50 TON";
-        else if (pack === 'emperor') msg = "System Overclock: 3M Pts for 25 TON";
-        else if (pack === 'blackhole') msg = "⚠️ WARNING: GOD MODE (15M Pts) for 100 TON";
+        if (pack === 'starter') msg = "Initialize Protocol: 100k Pts for 0.15 TON";
+        else if (pack === 'pro') msg = "Upgrade System: 500k Pts for 0.75 TON";
+        else if (pack === 'whale') msg = "Deploy Whale Node: 1M Pts for 1.50 TON";
+        else if (pack === 'tycoon') msg = "Execute Tycoon Override: 5M Pts for 7.50 TON";
+        else if (pack === 'emperor') msg = "System Overclock: 17M Pts for 25 TON";
+        else if (pack === 'blackhole') msg = "⚠️ WARNING: GOD MODE (70M Pts) for 100 TON";
 
         if (!window.confirm(msg)) return;
         
@@ -36,70 +37,86 @@ export const BulkStore: React.FC = () => {
         else alert('Error: Transaction Failed');
     };
 
-    // Función para desbloquear (Simulación de Video)
+    // Función simulada para desbloquear con video
     const unlockPack = (packName: string) => {
-        if(window.confirm(`🔒 This node is encrypted.\n\nWatch Ad-Stream to decrypt access to ${packName}?`)) {
-            // Aquí iría tu lógica de video real
-            alert("Decrypting... (Video playing)");
-            setTimeout(() => buyPack(packName.toLowerCase()), 2000); // Compra automática tras video? O solo desbloqueo.
+        if(window.confirm(`🔒 SECURE NODE DETECTED.\n\nWatch Ad-Stream to decrypt access to ${packName}?`)) {
+            console.log("Playing Ad for:", packName);
+            alert("🔓 Decrypting... Node Access Granted.");
+            // Aquí llamarías a tu lógica de anuncios real
         }
     }
 
     return (
         <div className="cyber-bg" style={{ minHeight: '100%', paddingBottom: '120px', paddingTop: '20px' }}>
             
-            {/* Línea de Flujo de Datos Central */}
+            {/* 1. Línea de Flujo de Datos Central */}
             <div className="data-stream"></div>
 
             {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: '40px', position: 'relative', zIndex: 2 }}>
+            <div style={{ textAlign: 'center', marginBottom: '50px', position: 'relative', zIndex: 2 }}>
                 <h2 style={{ 
-                    color: '#00F2FE', textShadow: '0 0 10px #00F2FE', 
-                    fontFamily: 'monospace', fontSize: '28px', margin: 0 
+                    color: '#00F2FE', textShadow: '0 0 15px #00F2FE', 
+                    fontFamily: 'monospace', fontSize: '32px', margin: 0, letterSpacing: '4px'
                 }}>
-                    &lt;SYSTEM STORE /&gt;
+                    &lt;NET_STORE /&gt;
                 </h2>
-                <p style={{ color: '#aaa', fontSize: '10px', marginTop: '5px' }}>SECURE CONNECTION ESTABLISHED</p>
+                <div style={{width: '100px', height: '2px', background: '#00F2FE', margin: '10px auto', boxShadow: '0 0 10px #00F2FE'}}></div>
+                <p style={{ color: '#aaa', fontSize: '10px' }}>SECURE CONNECTION: ENCRYPTED</p>
             </div>
 
-            {/* --- EL CAMINO DE NODOS (Alternando Izquierda/Derecha) --- */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '40px', padding: '0 20px' }}>
+            {/* --- EL CAMINO DE NODOS (Alternando Lados) --- */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '50px', padding: '0 20px', position: 'relative' }}>
                 
+                {/* Nivel 1: Starter (Abierto) - Izquierda */}
                 <PackNode 
-                    title="STARTER_NODE" points="10k" price="0.15 TON" 
-                    color="#00F2FE" icon={<Zap size={18}/>} side="left"
+                    title="STARTER_NODE" points="100k" price="0.15 TON" 
+                    color="#00F2FE" icon={<Zap size={20}/>} side="left"
                     onClick={() => buyPack('starter')} 
                 />
 
+                {/* Nivel 2: Pro (Abierto) - Derecha */}
                 <PackNode 
-                    title="PRO_MODULE" points="50k" price="0.75 TON" 
-                    color="#4CAF50" icon={<Cpu size={18}/>} side="right"
+                    title="PRO_MODULE" points="500k" price="0.75 TON" 
+                    color="#4CAF50" icon={<Cpu size={20}/>} side="right"
                     onClick={() => buyPack('pro')} 
                 />
 
+                {/* Nivel 3: Whale (Bloqueado) - Izquierda */}
                 <PackNode 
-                    title="WHALE_SERVER" points="120k" price="1.50 TON" 
-                    color="#FFD700" icon={<Shield size={18}/>} side="left"
-                    isLocked={true} onClick={() => unlockPack('WHALE')} // Ejemplo de bloqueo
+                    title="WHALE_SERVER" points="1M" price="1.50 TON" 
+                    color="#FFD700" icon={<Shield size={20}/>} side="left"
+                    isLocked={true} onClick={() => unlockPack('WHALE')} 
                 />
 
+                {/* Nivel 4: Tycoon (Bloqueado) - Derecha */}
                 <PackNode 
-                    title="TYCOON_CORE" points="800k" price="7.50 TON" 
-                    color="#E040FB" icon={<Rocket size={18}/>} side="right"
+                    title="TYCOON_CORE" points="5M" price="7.50 TON" 
+                    color="#E040FB" icon={<Rocket size={20}/>} side="right"
                     isLocked={true} onClick={() => unlockPack('TYCOON')}
                 />
 
-                {/* GOD MODE (Centro) */}
-                <div style={{ position: 'relative', zIndex: 2, margin: '20px 0' }}>
+                {/* Nivel 5: Emperor (Bloqueado) - Izquierda */}
+                <PackNode 
+                    title="EMPEROR_SYS" points="17M" price="25 TON" 
+                    color="#FF512F" icon={<Crown size={20}/>} side="left"
+                    isLocked={true} onClick={() => unlockPack('EMPEROR')}
+                />
+
+                {/* Nivel GOD: Black Hole (Centro) */}
+                <div style={{ position: 'relative', zIndex: 2, margin: '40px 0' }}>
                     <div className="cyber-card" style={{ 
-                        textAlign: 'center', padding: '20px', border: '2px solid #fff', 
-                        background: '#000', boxShadow: '0 0 30px rgba(255,255,255,0.3)' 
+                        textAlign: 'center', padding: '30px', border: '2px solid #fff', 
+                        background: '#000', boxShadow: '0 0 40px rgba(255,255,255,0.2)' 
                     }}>
+                        <div style={{position:'absolute', top:-15, left:'50%', transform:'translateX(-50%)', background:'white', color:'black', padding:'2px 10px', fontSize:'10px', fontWeight:'bold'}}>ULTIMATE</div>
+                        <Hexagon size={40} color="#fff" style={{margin:'0 auto 10px auto'}}/>
                         <h3 style={{margin:0, color:'#fff', fontSize:'24px', letterSpacing:'4px'}}>BLACK_HOLE</h3>
-                        <p style={{color:'#aaa', fontSize:'10px'}}>ULTIMATE RESOURCE INJECTION</p>
-                        <div style={{fontSize:'32px', fontWeight:'900', color:'#fff', margin:'10px 0', textShadow:'0 0 10px #fff'}}>15M PTS</div>
-                        <button className="btn-cyber" style={{width:'100%', padding:'15px', fontSize:'16px'}} onClick={() => unlockPack('BLACKHOLE')}>
-                            UNLOCK [100 TON]
+                        <p style={{color:'#aaa', fontSize:'10px', margin:'5px 0'}}>DATA INJECTION: 70M PTS</p>
+                        
+                        <button className="btn-cyber" style={{width:'100%', padding:'15px', fontSize:'16px', marginTop:'15px', background:'#fff', color:'#000'}} onClick={() => unlockPack('BLACKHOLE')}>
+                            <span style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}>
+                                <Lock size={16}/> UNLOCK [100 TON]
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -108,21 +125,21 @@ export const BulkStore: React.FC = () => {
 
             {/* --- LA BÓVEDA (Staking) --- */}
             <div style={{ marginTop: '60px', padding: '0 20px', position:'relative', zIndex:2 }}>
-                {/* Conector visual */}
-                <div style={{width:'4px', height:'40px', background:'#E040FB', margin:'0 auto 10px auto', boxShadow:'0 0 10px #E040FB'}}></div>
+                {/* Conector de energía hacia la bóveda */}
+                <div style={{width:'6px', height:'60px', background:'#E040FB', margin:'0 auto 15px auto', boxShadow:'0 0 15px #E040FB'}}></div>
                 
-                <div className="circuit-vault" style={{ borderRadius: '15px', padding: '2px' }}>
-                    <div style={{ background: 'rgba(0,0,0,0.9)', borderRadius: '13px', overflow: 'hidden' }}>
-                        {/* Usamos el componente del banco existente pero envuelto en el estilo cyber */}
+                <div className="circuit-vault" style={{ borderRadius: '20px', padding: '4px' }}>
+                    <div style={{ background: 'rgba(0,0,0,0.95)', borderRadius: '16px', overflow: 'hidden', padding:'10px' }}>
                         <StakingBank />
                     </div>
-                    {/* Decoración de "Luces LED" */}
-                    <div style={{position:'absolute', bottom:'-5px', left:'20px', width:'30px', height:'4px', background:'#00F2FE', boxShadow:'0 0 10px #00F2FE'}}></div>
-                    <div style={{position:'absolute', bottom:'-5px', right:'20px', width:'10px', height:'4px', background:'#FF512F', boxShadow:'0 0 10px #FF512F', animation:'blink 1s infinite'}}></div>
+                    {/* Luces LED decorativas */}
+                    <div style={{position:'absolute', bottom:'10px', left:'20px', width:'40px', height:'4px', background:'#00F2FE', boxShadow:'0 0 10px #00F2FE'}}></div>
+                    <div style={{position:'absolute', bottom:'10px', right:'20px', width:'15px', height:'4px', background:'#FF512F', boxShadow:'0 0 10px #FF512F', animation:'blink 1s infinite'}}></div>
                 </div>
+                <div style={{textAlign:'center', color:'#E040FB', fontSize:'10px', marginTop:'10px', letterSpacing:'2px'}}>SECURE VAULT ACCESS</div>
             </div>
             
-            <style>{`@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }`}</style>
+            <style>{`@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
         </div>
     );
 };
@@ -134,37 +151,53 @@ const PackNode: React.FC<PackNodeProps> = ({ title, points, price, color, icon, 
         justifyContent: side === 'left' ? 'flex-start' : 'flex-end',
         position: 'relative' 
     }}>
-        {/* Línea conectora hacia el centro */}
+        {/* Conector horizontal hacia la línea central */}
         <div style={{
             position: 'absolute', top: '50%', 
-            left: side === 'left' ? 'auto' : '0', 
-            right: side === 'left' ? '0' : 'auto',
-            width: '50%', height: '1px', background: color, 
-            boxShadow: `0 0 8px ${color}`, zIndex: 0
-        }}></div>
+            left: side === 'left' ? 'auto' : '50%', 
+            right: side === 'left' ? '50%' : 'auto',
+            width: '50%', height: '2px', background: color, 
+            boxShadow: `0 0 10px ${color}`, zIndex: 0,
+            opacity: 0.5
+        }}>
+            {/* Punto de conexión en la línea central */}
+            <div style={{
+                position: 'absolute', 
+                [side === 'left' ? 'right' : 'left']: '-4px', 
+                top: '-3px', width: '8px', height: '8px', 
+                background: color, borderRadius: '50%', boxShadow: `0 0 10px ${color}`
+            }}></div>
+        </div>
 
         <div className="cyber-card" style={{ 
-            width: '160px', padding: '15px', borderRadius: '10px', 
+            width: '180px', padding: '15px', borderRadius: '0', 
             borderLeft: side === 'left' ? `4px solid ${color}` : '1px solid #333',
             borderRight: side === 'right' ? `4px solid ${color}` : '1px solid #333',
-            cursor: 'pointer'
+            cursor: 'pointer', display:'flex', flexDirection:'column', gap:'10px'
         }} onClick={onClick}>
             
-            <div style={{display:'flex', justifyContent:'space-between', marginBottom:'5px'}}>
-                <span style={{color:color}}>{icon}</span>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <div style={{color:color, display:'flex', alignItems:'center', gap:'5px', fontSize:'12px', fontWeight:'bold', fontFamily:'monospace'}}>
+                    {icon} {title}
+                </div>
                 {isLocked && <Lock size={14} color="#FF512F" />}
             </div>
 
-            <div style={{fontSize:'12px', fontWeight:'bold', color:'#fff', marginBottom:'2px'}}>{title}</div>
-            <div style={{fontSize:'18px', fontWeight:'900', color:color, textShadow:`0 0 5px ${color}`}}>{points}</div>
-            
-            <div style={{
-                marginTop:'10px', fontSize:'10px', background: isLocked ? '#330000' : 'rgba(255,255,255,0.1)', 
-                padding:'4px', textAlign:'center', color: isLocked ? '#FF512F' : '#fff', borderRadius:'4px',
-                border: isLocked ? '1px solid #FF512F' : 'none'
-            }}>
-                {isLocked ? <span style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'4px'}}><Play size={8}/> UNLOCK</span> : price}
+            <div style={{fontSize:'24px', fontWeight:'900', color:'#fff', textShadow:`0 0 10px ${color}40`}}>
+                {points}
             </div>
+            
+            {isLocked ? (
+                <button className="btn-cyber" style={{fontSize:'10px', padding:'8px', borderColor:'#FF512F', color:'#FF512F'}}>
+                    <span style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'}}>
+                        <Play size={10}/> WATCH TO UNLOCK
+                    </span>
+                </button>
+            ) : (
+                <button className="btn-cyber" style={{fontSize:'12px', padding:'8px', borderColor:color, color:color}}>
+                    {price}
+                </button>
+            )}
         </div>
     </div>
 );
