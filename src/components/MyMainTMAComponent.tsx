@@ -5,6 +5,7 @@ import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
 import { Trophy, Zap, Gamepad2, Rocket, Bot, Video } from 'lucide-react';
+
 import type { SetStateAction, Dispatch, ReactElement } from 'react';
 
 interface GameProps {
@@ -37,13 +38,11 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const [showBoosts, setShowBoosts] = useState(false);
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
-
     const [multiplier, setMultiplier] = useState(1);
     const [turboActive, setTurboActive] = useState(false);
     const [botTime, setBotTime] = useState(0); 
 
     const { score, setScore, energy, setEnergy, levels, setLevels, maxEnergy, regenRate } = props;
-
     const globalLevel = Math.min(levels.multitap, levels.limit, levels.speed);
     const isPremiumBot = globalLevel >= 7; 
     const tapLevelIndex = Math.min(levels.multitap - 1, GAME_CONFIG.multitap.values.length - 1);
@@ -84,10 +83,8 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             return;
         }
         if (window.navigator.vibrate) window.navigator.vibrate(10);
-        
         setScore(s => s + finalTap);
         setEnergy(e => Math.max(0, e - finalTap)); 
-        
         if (turboActive) {
             document.body.style.backgroundColor = '#220011';
             setTimeout(() => document.body.style.backgroundColor = '#0B0E14', 50);
@@ -117,7 +114,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         setLoading(false);
     }, [user, loading, setScore, setLevels]);
 
-    const radius = 120; 
+    const radius = 105; 
     const circumference = 2 * Math.PI * radius;
     const energyPercent = Math.min(100, Math.max(0, (energy / maxEnergy) * 100));
     const strokeDashoffset = circumference - (energyPercent / 100) * circumference;
@@ -125,38 +122,38 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     return (
         <div style={{ 
             display: 'flex', flexDirection: 'column', 
-            // 🛡️ CAMBIO CLAVE: justifyContent 'center' + 'gap' en lugar de 'space-between'
-            justifyContent: 'center', alignItems: 'center', gap: '15px',
-            height: 'calc(100dvh - 130px)', 
+            // 🤏 AJUSTE: Centrado y gaps reducidos
+            justifyContent: 'center', alignItems: 'center', gap: '10px',
+            height: 'calc(100dvh - 145px)', 
             padding: '0', maxWidth: '500px', margin: '0 auto',
             position: 'relative', overflow: 'hidden'
         }}>
             
-            {/* 1. TOP SECTION */}
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop: '0' }}>
+            {/* 1. TOP SECTION (Pegado arriba) */}
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-10px' }}>
                 <div onClick={() => setShowRanking(true)} className="glass-card" style={{ 
-                    padding: '4px 12px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', 
+                    padding: '3px 10px', borderRadius:'20px', display:'flex', gap:'5px', alignItems:'center', 
                     background: 'rgba(0, 242, 254, 0.1)', border: '1px solid rgba(0, 242, 254, 0.3)', cursor:'pointer',
-                    marginBottom: '2px'
+                    marginBottom: '0px'
                 }}>
-                    <Trophy size={12} color="#FFD700"/>
-                    <span style={{fontSize:'9px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>
+                    <Trophy size={10} color="#FFD700"/>
+                    <span style={{fontSize:'8px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>
                         {LEVEL_NAMES[Math.min(globalLevel-1, 7)].toUpperCase()}
                     </span>
                 </div>
-                <div className="text-gradient" style={{ fontSize: '42px', fontWeight: '900', margin: '0', lineHeight:1 }}>
+                {/* 📉 AJUSTE: Fuente reducida a 32px */}
+                <div className="text-gradient" style={{ fontSize: '32px', fontWeight: '900', margin: '2px 0 0 0', lineHeight:1 }}>
                     {score.toLocaleString()}
                 </div>
-                <div style={{fontSize:'9px', color:'#aaa', marginTop:'2px'}}>+ {finalTap} per tap</div>
+                <div style={{fontSize:'8px', color:'#aaa', marginTop:'0px'}}>+ {finalTap} per tap</div>
             </div>
 
-            {/* 2. CENTER: RING + BUTTON */}
-            {/* 🛡️ CAMBIO: Quitamos flex:1 para que no empuje, altura fija para el contenedor */}
+            {/* 2. CENTRO */}
             <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '320px', height: '320px' }}>
-                <div style={{ position: 'absolute', width: '320px', height: '320px', zIndex: 0, transform: 'rotate(-90deg)' }}>
-                    <svg width="320" height="320">
-                        <circle cx="160" cy="160" r={radius} stroke="#333" strokeWidth="10" fill="transparent" />
-                        <circle cx="160" cy="160" r={radius} stroke="#00F2FE" strokeWidth="10" fill="transparent" 
+                <div style={{ position: 'absolute', width: '260px', height: '260px', zIndex: 0, transform: 'rotate(-90deg)' }}>
+                    <svg width="260" height="260">
+                        <circle cx="130" cy="130" r={radius} stroke="#333" strokeWidth="8" fill="transparent" />
+                        <circle cx="130" cy="130" r={radius} stroke="#00F2FE" strokeWidth="8" fill="transparent" 
                             strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round"
                             style={{ transition: 'stroke-dashoffset 0.1s linear' }}
                         />
@@ -164,33 +161,33 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 </div>
                 <button onClick={handleTap} disabled={!user}
                     style={{
-                        width: '220px', height: '220px', borderRadius: '50%', zIndex: 2, border: 'none',
+                        width: '180px', height: '180px', borderRadius: '50%', zIndex: 2, border: 'none',
                         background: turboActive ? 'radial-gradient(circle, #FF0055 0%, #550000 100%)' : 'radial-gradient(circle at 30% 30%, #00F2FE, #0072FF)',
-                        boxShadow: turboActive ? '0 0 50px #FF0055' : `0 0 ${energyPercent > 20 ? '30px' : '5px'} rgba(0,242,254,0.4)`, 
+                        boxShadow: turboActive ? '0 0 40px #FF0055' : `0 0 ${energyPercent > 20 ? '20px' : '5px'} rgba(0,242,254,0.4)`, 
                         cursor: 'pointer', transform: 'scale(1)', transition: 'transform 0.05s'
                     }}
                     onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
                     onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
-                    <div style={{fontSize:'32px'}}>💎</div>
+                    <div style={{fontSize:'26px'}}>💎</div>
                 </button>
-                <div style={{ position: 'absolute', top: '72%', width: '100%', textAlign:'center', height: '20px', color: '#FFD700', fontWeight: 'bold', fontSize:'12px', textShadow: '0 2px 4px #000', zIndex:5 }}>
+                <div style={{ position: 'absolute', top: '72%', width: '100%', textAlign:'center', height: '20px', color: '#FFD700', fontWeight: 'bold', fontSize:'10px', textShadow: '0 2px 4px #000', zIndex:5 }}>
                     {message ? message : `${Math.floor(energy)} / ${maxEnergy}`}
                 </div>
             </div>
 
-            {/* 3. BOTTOM: DOCK */}
+            {/* 3. BOTTOM */}
             <div style={{ width: '100%', padding: '0 20px', zIndex: 10 }}>
-                <div style={{ marginBottom:'4px', display:'flex', justifyContent:'center', fontSize:'9px', color:'#aaa' }}>
+                <div style={{ marginBottom:'2px', display:'flex', justifyContent:'center', fontSize:'8px', color:'#aaa' }}>
                     <span>+{regenRate}/s Regen</span>
                 </div>
 
                 <div className="glass-card" style={{ 
-                    padding: '8px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', 
+                    padding: '6px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', 
                     border: '1px solid rgba(255,255,255,0.1)',
-                    display: 'flex', flexDirection: 'column', gap:'6px'
+                    display: 'flex', flexDirection: 'column', gap:'5px'
                 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '5px' }}>
                         <DockButton icon={<Rocket/>} label="BOOST" color="#00F2FE" onClick={() => setShowBoosts(true)} />
                         <DockButton icon={<Bot/>} label={botTime>0 ? `${Math.ceil(botTime/60)}m` : "AUTO"} sub={isPremiumBot?"PRO":"AD"} color={botTime>0?"#4CAF50":"#fff"} onClick={handleBotClick} />
                         <DockButton icon={<Zap/>} label="TURBO" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
@@ -200,7 +197,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     <button onClick={() => setShowLucky(true)} style={{
                         width:'100%', padding:'8px', borderRadius:'10px', border:'1px solid #E040FB', 
                         background:'rgba(224, 64, 251, 0.15)', color:'#fff', cursor:'pointer',
-                        display:'flex', justifyContent:'center', alignItems:'center', gap:'8px'
+                        display:'flex', justifyContent:'center', alignItems:'center', gap:'6px'
                     }}>
                         <Gamepad2 size={14} color="#E040FB"/> 
                         <span style={{fontSize:'10px', fontWeight:'bold'}}>LUCKY SPIN</span>
@@ -221,7 +218,8 @@ const DockButton: React.FC<DockButtonProps> = ({ icon, label, sub, color, onClic
         alignItems: 'center', justifyContent: 'center', gap: '0px', cursor: 'pointer', color: color || '#fff',
         padding: '4px 0'
     }}>
-        {React.isValidElement(icon) ? React.cloneElement(icon as ReactElement<{ size?: number | string }>, { size: 18 }) : icon}
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+        {React.isValidElement(icon) ? React.cloneElement(icon as ReactElement<any>, { size: 18 }) : icon}
         <span style={{ fontSize: '8px', fontWeight: 'bold', marginTop:'1px' }}>{label}</span>
         {sub && <span style={{ fontSize: '6px', background: '#333', padding: '0px 3px', borderRadius: '2px', color: '#aaa', marginTop:'1px' }}>{sub}</span>}
     </button>
