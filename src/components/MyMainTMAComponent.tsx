@@ -4,9 +4,8 @@ import { useAuth } from '../hooks/useAuth';
 import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
-import { Trophy, Zap, Gamepad2, Rocket, Bot, Video } from 'lucide-react';
-
-// Importamos los tipos
+// 1. Quitamos 'Trophy'
+import { Zap, Gamepad2, Rocket, Bot, Video, Server } from 'lucide-react';
 import type { SetStateAction, Dispatch, ReactElement } from 'react';
 
 interface GameProps {
@@ -25,7 +24,7 @@ interface DockButtonProps {
     onClick: () => void;
 }
 
-const LEVEL_NAMES = ["Rookie", "Scout", "Miner", "Engineer", "Captain", "Commander", "Lord", "Nova God"];
+const LEVEL_NAMES = ["Laptop", "GPU Rig", "Garage Farm", "Server Room", "Industrial", "Geothermal", "Fusion", "Quantum"];
 const GAME_CONFIG = {
     multitap: { costs: [5000, 30000, 100000, 500000, 2000000, 5000000, 10000000], values: [1, 2, 3, 4, 6, 8, 12, 20] },
     limit:    { costs: [5000, 30000, 100000, 500000, 2000000, 5000000, 10000000], values: [500, 1000, 1500, 2500, 4000, 6000, 9000, 15000] },
@@ -37,72 +36,91 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const [showRanking, setShowRanking] = useState(false);
     const [showLucky, setShowLucky] = useState(false);
     const [showBoosts, setShowBoosts] = useState(false);
-    const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
+    const [claiming, setClaiming] = useState(false);
+
     const [multiplier, setMultiplier] = useState(1);
-    const [turboActive, setTurboActive] = useState(false);
     const [botTime, setBotTime] = useState(0); 
 
     const { score, setScore, energy, setEnergy, levels, setLevels, maxEnergy, regenRate } = props;
 
-    const globalLevel = Math.min(levels.multitap, levels.limit, levels.speed);
+    const globalLevel = Math.min(levels.limit, levels.speed);
     const isPremiumBot = globalLevel >= 7; 
-    const tapLevelIndex = Math.min(levels.multitap - 1, GAME_CONFIG.multitap.values.length - 1);
-    const baseTap = GAME_CONFIG.multitap.values[Math.max(0, tapLevelIndex)] || 1;
-    const finalTap = baseTap * multiplier;
 
+    // 2. Definimos handleClaim PRIMERO y con useCallback
+    const handleClaim = useCallback(async () => {
+        if (!user || energy < 1 || claiming) return;
+        
+        if (window.navigator.vibrate) window.navigator.vibrate(50);
+        setClaiming(true);
+
+        const amount = Math.floor(energy);
+        setScore(s => s + amount);
+        setEnergy(0); 
+
+        const { data, error } = await supabase.rpc('claim_mining', { user_id_in: user.id });
+        
+        if (data && data[0] && data[0].success) {
+            setScore(data[0].new_score);
+        } else {
+            console.error("Claim Error", error);
+        }
+        
+        setTimeout(() => setClaiming(false), 500);
+    }, [user, energy, claiming, setScore, setEnergy]); // Dependencias correctas
+
+    // 3. El efecto va DESPUÉS de definir la función
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
+        
+        // Loop de Minado Visual
+        const mineInterval = setInterval(() => {
+            setEnergy(current => {
+                if (current >= maxEnergy) return maxEnergy;
+                return Math.min(maxEnergy, current + (regenRate * multiplier));
+            });
+        }, 1000);
+
+        // Loop del Bot (Si está activo)
         if (botTime > 0) {
             interval = setInterval(() => {
-                setBotTime(t => { if (t <= 1) return 0; return t - 1; });
-                setEnergy(currentEnergy => {
-                    if (currentEnergy >= baseTap) {
-                        setScore(s => s + baseTap);
-                        return currentEnergy - baseTap;
-                    }
-                    return currentEnergy; 
-                });
+                setBotTime(t => Math.max(0, t - 1));
+                if (energy >= maxEnergy * 0.9) {
+                    handleClaim(); // Ahora sí podemos llamarla
+                }
             }, 1000); 
         }
-        return () => clearInterval(interval);
-    }, [botTime, baseTap, setScore, setEnergy]);
+
+        return () => {
+            clearInterval(mineInterval);
+            if(interval) clearInterval(interval);
+        };
+    }, [botTime, energy, maxEnergy, regenRate, multiplier, handleClaim, setEnergy]);
+
 
     const handleBotClick = () => {
-        if (botTime > 0) { alert(`🤖 Bot Running: ${Math.ceil(botTime/60)}m left`); return; }
+        if (botTime > 0) { alert(`🤖 Supervisor Active: ${Math.ceil(botTime/60)}m left`); return; }
         if (isPremiumBot) {
-            if(window.confirm("💎 LEVEL 7: Activate 6H Bot?")) setBotTime(21600);
+            if(window.confirm("💎 LEVEL 7: Deploy AI Supervisor (6 Hours)?")) setBotTime(21600);
         } else {
-            if(window.confirm("📺 Watch Ad for 10m Auto-Miner?")) {
+            if(window.confirm("📺 Hire Supervisor for 10m? (Watch Ad)")) {
                 console.log("Ad..."); setTimeout(() => setBotTime(600), 2000);
             }
         }
     };
 
-    const handleTap = async () => {
-        if (!user || energy < finalTap) {
-            if(energy < finalTap) { setMessage("Low Energy!"); setTimeout(() => setMessage(''), 1000); }
-            return;
-        }
-        if (window.navigator.vibrate) window.navigator.vibrate(10);
-        setScore(s => s + finalTap);
-        setEnergy(e => Math.max(0, e - finalTap)); 
-        if (turboActive) {
-            document.body.style.backgroundColor = '#220011';
-            setTimeout(() => document.body.style.backgroundColor = '#0B0E14', 50);
-        }
-        const { data } = await supabase.rpc('tap_and_earn', { user_id_in: user.id, multiplier: multiplier });
-        if(data && data[0].success) setScore(data[0].new_score);
-    };
-
     const watchVideo = useCallback((type: 'turbo' | 'refill') => {
-        if(!window.confirm("📺 Watch Ad?")) return;
+        const msg = type === 'turbo' ? "📺 Watch Ad to double mining speed (1m)?" : "📺 Watch Ad to instantly FILL tank?";
+        if(!window.confirm(msg)) return;
+        
         setTimeout(() => {
             if (type === 'turbo') {
-                setMultiplier(3); setTurboActive(true); 
-                setTimeout(() => { setMultiplier(1); setTurboActive(false); }, 60000);
+                setMultiplier(2);
+                alert("🚀 OVERCLOCK ACTIVATED! (Visual)");
+                setTimeout(() => setMultiplier(1), 60000);
             } else {
-                setEnergy(maxEnergy); alert("🔋 Energy Refilled");
+                setEnergy(maxEnergy); 
+                alert("🔋 Tank Filled!");
             }
         }, 2000);
     }, [maxEnergy, setEnergy]);
@@ -116,70 +134,83 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         setLoading(false);
     }, [user, loading, setScore, setLevels]);
 
-    const radius = 105; 
+    const radius = 100; 
     const circumference = 2 * Math.PI * radius;
-    const energyPercent = Math.min(100, Math.max(0, (energy / maxEnergy) * 100));
-    const strokeDashoffset = circumference - (energyPercent / 100) * circumference;
+    const fillPercent = Math.min(100, (energy / maxEnergy) * 100);
+    const strokeDashoffset = circumference - (fillPercent / 100) * circumference;
+    const ringColor = fillPercent < 50 ? '#00F2FE' : (fillPercent < 90 ? '#FFD700' : '#FF512F');
 
     return (
         <div style={{ 
             display: 'flex', flexDirection: 'column', 
-            justifyContent: 'center', alignItems: 'center', gap: '15px',
-            height: 'calc(100dvh - 145px)', 
-            padding: '0', maxWidth: '500px', margin: '0 auto',
+            justifyContent: 'center', alignItems: 'center', gap: '10px',
+            height: 'calc(100dvh - 135px)', padding: '0', maxWidth: '500px', margin: '0 auto',
             position: 'relative', overflow: 'hidden'
         }}>
             
-            {/* 1. TOP SECTION */}
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-10px' }}>
                 <div onClick={() => setShowRanking(true)} className="glass-card" style={{ 
                     padding: '4px 12px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', 
-                    background: 'rgba(0, 242, 254, 0.1)', border: '1px solid rgba(0, 242, 254, 0.3)', cursor:'pointer',
-                    marginBottom: '2px'
+                    background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '2px'
                 }}>
-                    <Trophy size={12} color="#FFD700"/>
+                    <Server size={12} color={isPremiumBot ? "#FFD700" : "#aaa"}/>
                     <span style={{fontSize:'9px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>
-                        {LEVEL_NAMES[Math.min(globalLevel-1, 7)].toUpperCase()}
+                        RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}
                     </span>
                 </div>
-                <div className="text-gradient" style={{ fontSize: '38px', fontWeight: '900', margin: '0', lineHeight:1 }}>
+                <div className="text-gradient" style={{ fontSize: '36px', fontWeight: '900', margin: '0', lineHeight:1 }}>
                     {score.toLocaleString()}
                 </div>
-                <div style={{fontSize:'9px', color:'#aaa', marginTop:'2px'}}>+ {finalTap} per tap</div>
+                <div style={{fontSize:'9px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
             </div>
 
-            {/* 2. CENTRO */}
             <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '260px', height: '260px' }}>
+                <div style={{ 
+                    position: 'absolute', width: '100%', height: '100%', 
+                    borderRadius: '50%', border: '1px dashed rgba(255,255,255,0.1)',
+                    animation: 'spin 20s linear infinite' 
+                }}></div>
+
                 <div style={{ position: 'absolute', width: '260px', height: '260px', zIndex: 0, transform: 'rotate(-90deg)' }}>
                     <svg width="260" height="260">
-                        <circle cx="130" cy="130" r={radius} stroke="#333" strokeWidth="8" fill="transparent" />
-                        <circle cx="130" cy="130" r={radius} stroke="#00F2FE" strokeWidth="8" fill="transparent" 
+                        <circle cx="130" cy="130" r={radius} stroke="#1a1a1a" strokeWidth="12" fill="transparent" />
+                        <circle cx="130" cy="130" r={radius} stroke={ringColor} strokeWidth="12" fill="transparent" 
                             strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round"
-                            style={{ transition: 'stroke-dashoffset 0.1s linear' }}
+                            style={{ transition: 'stroke-dashoffset 0.5s ease-out, stroke 0.5s ease' }}
                         />
                     </svg>
                 </div>
-                <button onClick={handleTap} disabled={!user}
+
+                <button onClick={handleClaim} disabled={energy < 1}
                     style={{
-                        width: '180px', height: '180px', borderRadius: '50%', zIndex: 2, border: 'none',
-                        background: turboActive ? 'radial-gradient(circle, #FF0055 0%, #550000 100%)' : 'radial-gradient(circle at 30% 30%, #00F2FE, #0072FF)',
-                        boxShadow: turboActive ? '0 0 40px #FF0055' : `0 0 ${energyPercent > 20 ? '20px' : '5px'} rgba(0,242,254,0.4)`, 
-                        cursor: 'pointer', transform: 'scale(1)', transition: 'transform 0.05s'
+                        width: '170px', height: '170px', borderRadius: '50%', zIndex: 2, border: 'none',
+                        background: claiming ? '#fff' : `radial-gradient(circle at 30% 30%, ${ringColor}, #000)`,
+                        boxShadow: `0 0 ${fillPercent/2}px ${ringColor}`, 
+                        cursor: 'pointer', transform: claiming ? 'scale(0.95)' : 'scale(1)', transition: 'all 0.1s',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
                     }}
-                    onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
-                    onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
-                    <div style={{fontSize:'26px'}}>💎</div>
+                    {claiming ? (
+                        <span style={{color:'#000', fontWeight:'bold', fontSize:'14px'}}>COLLECTING...</span>
+                    ) : (
+                        <>
+                            <div style={{fontSize:'24px', filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))'}}>
+                                {fillPercent >= 100 ? '⚠️' : '⚡'}
+                            </div>
+                            <div style={{fontSize:'18px', fontWeight:'900', color:'#fff', textShadow:'0 0 5px #000'}}>
+                                +{Math.floor(energy)}
+                            </div>
+                            <div style={{fontSize:'8px', color:'rgba(255,255,255,0.8)', marginTop:'2px'}}>
+                                {fillPercent.toFixed(0)}% FULL
+                            </div>
+                        </>
+                    )}
                 </button>
-                <div style={{ position: 'absolute', top: '72%', width: '100%', textAlign:'center', height: '20px', color: '#FFD700', fontWeight: 'bold', fontSize:'10px', textShadow: '0 2px 4px #000', zIndex:5 }}>
-                    {message ? message : `${Math.floor(energy)} / ${maxEnergy}`}
-                </div>
             </div>
 
-            {/* 3. BOTTOM */}
             <div style={{ width: '100%', padding: '0 15px', zIndex: 10 }}>
-                <div style={{ marginBottom:'4px', display:'flex', justifyContent:'center', fontSize:'9px', color:'#aaa' }}>
-                    <span>+{regenRate}/s Regen</span>
+                <div style={{ marginBottom:'2px', display:'flex', justifyContent:'center', fontSize:'9px', color: ringColor, fontWeight:'bold' }}>
+                    <span>PRODUCTION: {regenRate * 3600} PTS/HOUR</span>
                 </div>
 
                 <div className="glass-card" style={{ 
@@ -188,10 +219,10 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     display: 'flex', flexDirection: 'column', gap:'5px'
                 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '5px' }}>
-                        <DockButton icon={<Rocket/>} label="BOOST" color="#00F2FE" onClick={() => setShowBoosts(true)} />
-                        <DockButton icon={<Bot/>} label={botTime>0 ? `${Math.ceil(botTime/60)}m` : "AUTO"} sub={isPremiumBot?"PRO":"AD"} color={botTime>0?"#4CAF50":"#fff"} onClick={handleBotClick} />
-                        <DockButton icon={<Zap/>} label="TURBO" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
-                        <DockButton icon={<Video/>} label="REFILL" sub="AD" color="#4CAF50" onClick={() => watchVideo('refill')} />
+                        <DockButton icon={<Rocket/>} label="UPGRADE" color="#00F2FE" onClick={() => setShowBoosts(true)} />
+                        <DockButton icon={<Bot/>} label="MANAGER" sub={isPremiumBot?"AI":"HIRE"} color={botTime>0?"#4CAF50":"#fff"} onClick={handleBotClick} />
+                        <DockButton icon={<Zap/>} label="OVERCLOCK" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
+                        <DockButton icon={<Video/>} label="INSTA-FILL" sub="AD" color="#4CAF50" onClick={() => watchVideo('refill')} />
                     </div>
 
                     <button onClick={() => setShowLucky(true)} style={{
@@ -200,7 +231,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                         display:'flex', justifyContent:'center', alignItems:'center', gap:'6px'
                     }}>
                         <Gamepad2 size={14} color="#E040FB"/> 
-                        <span style={{fontSize:'10px', fontWeight:'bold'}}>LUCKY SPIN</span>
+                        <span style={{fontSize:'10px', fontWeight:'bold'}}>CASINO SPIN</span>
                     </button>
                 </div>
             </div>
@@ -208,6 +239,8 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
             {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} onUpdateScore={setScore} />}
             {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} configs={GAME_CONFIG} />}
+            
+            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
     );
 };
