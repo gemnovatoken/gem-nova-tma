@@ -5,7 +5,6 @@ import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
 import { Trophy, Zap, Gamepad2, Rocket, Bot, Video } from 'lucide-react';
-
 import type { SetStateAction, Dispatch, ReactElement } from 'react';
 
 interface GameProps {
@@ -17,11 +16,7 @@ interface GameProps {
 }
 
 interface DockButtonProps {
-    icon: React.ReactNode; 
-    label: string; 
-    sub?: string; 
-    color?: string; 
-    onClick: () => void;
+    icon: React.ReactNode; label: string; sub?: string; color?: string; onClick: () => void;
 }
 
 const LEVEL_NAMES = ["Rookie", "Scout", "Miner", "Engineer", "Captain", "Commander", "Lord", "Nova God"];
@@ -114,7 +109,8 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         setLoading(false);
     }, [user, loading, setScore, setLevels]);
 
-    const radius = 105; 
+    // 📉 AJUSTE FINAL: Radio de 105 a 95 (Más pequeño para juntar todo)
+    const radius = 95; 
     const circumference = 2 * Math.PI * radius;
     const energyPercent = Math.min(100, Math.max(0, (energy / maxEnergy) * 100));
     const strokeDashoffset = circumference - (energyPercent / 100) * circumference;
@@ -122,17 +118,18 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     return (
         <div style={{ 
             display: 'flex', flexDirection: 'column', 
-            // 🤏 AJUSTE: Centrado y gaps reducidos
-            justifyContent: 'center', alignItems: 'center', gap: '10px',
-            height: 'calc(100dvh - 145px)', 
+            // 📉 GAP MÍNIMO: De 10px a 2px para pegar todo
+            justifyContent: 'center', alignItems: 'center', gap: '2px',
+            // 📉 Altura ajustada
+            height: 'calc(100dvh - 130px)', 
             padding: '0', maxWidth: '500px', margin: '0 auto',
             position: 'relative', overflow: 'hidden'
         }}>
             
-            {/* 1. TOP SECTION (Pegado arriba) */}
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-10px' }}>
+            {/* 1. TOP SECTION (Pegado arriba con margen negativo) */}
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-20px' }}>
                 <div onClick={() => setShowRanking(true)} className="glass-card" style={{ 
-                    padding: '3px 10px', borderRadius:'20px', display:'flex', gap:'5px', alignItems:'center', 
+                    padding: '2px 10px', borderRadius:'15px', display:'flex', gap:'4px', alignItems:'center', 
                     background: 'rgba(0, 242, 254, 0.1)', border: '1px solid rgba(0, 242, 254, 0.3)', cursor:'pointer',
                     marginBottom: '0px'
                 }}>
@@ -141,19 +138,18 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                         {LEVEL_NAMES[Math.min(globalLevel-1, 7)].toUpperCase()}
                     </span>
                 </div>
-                {/* 📉 AJUSTE: Fuente reducida a 32px */}
-                <div className="text-gradient" style={{ fontSize: '32px', fontWeight: '900', margin: '2px 0 0 0', lineHeight:1 }}>
+                <div className="text-gradient" style={{ fontSize: '36px', fontWeight: '900', margin: '0', lineHeight:1 }}>
                     {score.toLocaleString()}
                 </div>
                 <div style={{fontSize:'8px', color:'#aaa', marginTop:'0px'}}>+ {finalTap} per tap</div>
             </div>
 
-            {/* 2. CENTRO */}
-            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '320px', height: '320px' }}>
-                <div style={{ position: 'absolute', width: '260px', height: '260px', zIndex: 0, transform: 'rotate(-90deg)' }}>
-                    <svg width="260" height="260">
-                        <circle cx="130" cy="130" r={radius} stroke="#333" strokeWidth="8" fill="transparent" />
-                        <circle cx="130" cy="130" r={radius} stroke="#00F2FE" strokeWidth="8" fill="transparent" 
+            {/* 2. CENTRO: Anillo Reducido */}
+            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '240px', height: '240px' }}>
+                <div style={{ position: 'absolute', width: '240px', height: '240px', zIndex: 0, transform: 'rotate(-90deg)' }}>
+                    <svg width="240" height="240">
+                        <circle cx="120" cy="120" r={radius} stroke="#333" strokeWidth="8" fill="transparent" />
+                        <circle cx="120" cy="120" r={radius} stroke="#00F2FE" strokeWidth="8" fill="transparent" 
                             strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round"
                             style={{ transition: 'stroke-dashoffset 0.1s linear' }}
                         />
@@ -161,7 +157,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 </div>
                 <button onClick={handleTap} disabled={!user}
                     style={{
-                        width: '180px', height: '180px', borderRadius: '50%', zIndex: 2, border: 'none',
+                        width: '170px', height: '170px', borderRadius: '50%', zIndex: 2, border: 'none',
                         background: turboActive ? 'radial-gradient(circle, #FF0055 0%, #550000 100%)' : 'radial-gradient(circle at 30% 30%, #00F2FE, #0072FF)',
                         boxShadow: turboActive ? '0 0 40px #FF0055' : `0 0 ${energyPercent > 20 ? '20px' : '5px'} rgba(0,242,254,0.4)`, 
                         cursor: 'pointer', transform: 'scale(1)', transition: 'transform 0.05s'
@@ -169,25 +165,25 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
                     onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
                 >
-                    <div style={{fontSize:'26px'}}>💎</div>
+                    <div style={{fontSize:'24px'}}>💎</div>
                 </button>
-                <div style={{ position: 'absolute', top: '72%', width: '100%', textAlign:'center', height: '20px', color: '#FFD700', fontWeight: 'bold', fontSize:'10px', textShadow: '0 2px 4px #000', zIndex:5 }}>
+                <div style={{ position: 'absolute', top: '75%', width: '100%', textAlign:'center', height: '20px', color: '#FFD700', fontWeight: 'bold', fontSize:'10px', textShadow: '0 2px 4px #000', zIndex:5 }}>
                     {message ? message : `${Math.floor(energy)} / ${maxEnergy}`}
                 </div>
             </div>
 
-            {/* 3. BOTTOM */}
-            <div style={{ width: '100%', padding: '0 20px', zIndex: 10 }}>
+            {/* 3. BOTTOM: DOCK (Sin padding extra) */}
+            <div style={{ width: '100%', padding: '0 15px', zIndex: 10, marginBottom: '0' }}>
                 <div style={{ marginBottom:'2px', display:'flex', justifyContent:'center', fontSize:'8px', color:'#aaa' }}>
                     <span>+{regenRate}/s Regen</span>
                 </div>
 
                 <div className="glass-card" style={{ 
-                    padding: '6px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', 
+                    padding: '5px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', 
                     border: '1px solid rgba(255,255,255,0.1)',
-                    display: 'flex', flexDirection: 'column', gap:'5px'
+                    display: 'flex', flexDirection: 'column', gap:'4px'
                 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '5px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '4px' }}>
                         <DockButton icon={<Rocket/>} label="BOOST" color="#00F2FE" onClick={() => setShowBoosts(true)} />
                         <DockButton icon={<Bot/>} label={botTime>0 ? `${Math.ceil(botTime/60)}m` : "AUTO"} sub={isPremiumBot?"PRO":"AD"} color={botTime>0?"#4CAF50":"#fff"} onClick={handleBotClick} />
                         <DockButton icon={<Zap/>} label="TURBO" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
@@ -195,12 +191,12 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     </div>
 
                     <button onClick={() => setShowLucky(true)} style={{
-                        width:'100%', padding:'8px', borderRadius:'10px', border:'1px solid #E040FB', 
+                        width:'100%', padding:'6px', borderRadius:'10px', border:'1px solid #E040FB', 
                         background:'rgba(224, 64, 251, 0.15)', color:'#fff', cursor:'pointer',
                         display:'flex', justifyContent:'center', alignItems:'center', gap:'6px'
                     }}>
                         <Gamepad2 size={14} color="#E040FB"/> 
-                        <span style={{fontSize:'10px', fontWeight:'bold'}}>LUCKY SPIN</span>
+                        <span style={{fontSize:'9px', fontWeight:'bold'}}>LUCKY SPIN</span>
                     </button>
                 </div>
             </div>
@@ -216,11 +212,11 @@ const DockButton: React.FC<DockButtonProps> = ({ icon, label, sub, color, onClic
     <button onClick={onClick} style={{ 
         background: 'transparent', border: 'none', flex: 1, display: 'flex', flexDirection: 'column', 
         alignItems: 'center', justifyContent: 'center', gap: '0px', cursor: 'pointer', color: color || '#fff',
-        padding: '4px 0'
+        padding: '3px 0'
     }}>
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        {React.isValidElement(icon) ? React.cloneElement(icon as ReactElement<any>, { size: 18 }) : icon}
+        {React.isValidElement(icon) ? React.cloneElement(icon as ReactElement<any>, { size: 16 }) : icon}
         <span style={{ fontSize: '8px', fontWeight: 'bold', marginTop:'1px' }}>{label}</span>
-        {sub && <span style={{ fontSize: '6px', background: '#333', padding: '0px 3px', borderRadius: '2px', color: '#aaa', marginTop:'1px' }}>{sub}</span>}
+        {sub && <span style={{ fontSize: '6px', background: '#333', padding: '0px 2px', borderRadius: '2px', color: '#aaa', marginTop:'1px' }}>{sub}</span>}
     </button>
 );
