@@ -4,8 +4,10 @@ import { useAuth } from '../hooks/useAuth';
 import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
-// 1. Quitamos 'Trophy'
+// 1. Eliminamos 'Trophy'
 import { Zap, Gamepad2, Rocket, Bot, Video, Server } from 'lucide-react';
+
+// Importamos los tipos
 import type { SetStateAction, Dispatch, ReactElement } from 'react';
 
 interface GameProps {
@@ -25,37 +27,34 @@ interface DockButtonProps {
 }
 
 const LEVEL_NAMES = ["Laptop", "GPU Rig", "Garage Farm", "Server Room", "Industrial", "Geothermal", "Fusion", "Quantum"];
-const GAME_CONFIG = {
-    multitap: { costs: [5000, 30000, 100000, 500000, 2000000, 5000000, 10000000], values: [1, 2, 3, 4, 6, 8, 12, 20] },
-    limit:    { costs: [5000, 30000, 100000, 500000, 2000000, 5000000, 10000000], values: [500, 1000, 1500, 2500, 4000, 6000, 9000, 15000] },
-    speed:    { costs: [5000, 30000, 100000, 500000, 2000000, 5000000, 10000000], values: [1, 2, 3, 4, 5, 6, 8, 12] }
-};
+// 2. Eliminamos 'GAME_CONFIG' porque no se usaba aquí
 
 export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const { user } = useAuth();
+    
     const [showRanking, setShowRanking] = useState(false);
     const [showLucky, setShowLucky] = useState(false);
     const [showBoosts, setShowBoosts] = useState(false);
     const [loading, setLoading] = useState(false);
     const [claiming, setClaiming] = useState(false);
 
-    const [multiplier, setMultiplier] = useState(1);
+    const [multiplier, setMultiplier] = useState(1); 
     const [botTime, setBotTime] = useState(0); 
 
     const { score, setScore, energy, setEnergy, levels, setLevels, maxEnergy, regenRate } = props;
 
-    const globalLevel = Math.min(levels.limit, levels.speed);
+    const globalLevel = Math.min(levels.limit, levels.speed); 
     const isPremiumBot = globalLevel >= 7; 
 
-    // 2. Definimos handleClaim PRIMERO y con useCallback
+    // --- FUNCIÓN DE COBRO (CLAIM) ---
     const handleClaim = useCallback(async () => {
         if (!user || energy < 1 || claiming) return;
         
         if (window.navigator.vibrate) window.navigator.vibrate(50);
         setClaiming(true);
 
-        const amount = Math.floor(energy);
-        setScore(s => s + amount);
+        const amountToClaim = Math.floor(energy);
+        setScore(prev => prev + amountToClaim);
         setEnergy(0); 
 
         const { data, error } = await supabase.rpc('claim_mining', { user_id_in: user.id });
@@ -67,36 +66,26 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
         
         setTimeout(() => setClaiming(false), 500);
-    }, [user, energy, claiming, setScore, setEnergy]); // Dependencias correctas
+    }, [user, energy, claiming, setScore, setEnergy]);
 
-    // 3. El efecto va DESPUÉS de definir la función
+    // --- LÓGICA DE MINADO ---
     useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-        
-        // Loop de Minado Visual
-        const mineInterval = setInterval(() => {
+        const interval = setInterval(() => {
             setEnergy(current => {
                 if (current >= maxEnergy) return maxEnergy;
                 return Math.min(maxEnergy, current + (regenRate * multiplier));
             });
-        }, 1000);
 
-        // Loop del Bot (Si está activo)
-        if (botTime > 0) {
-            interval = setInterval(() => {
+            if (botTime > 0) {
                 setBotTime(t => Math.max(0, t - 1));
                 if (energy >= maxEnergy * 0.9) {
-                    handleClaim(); // Ahora sí podemos llamarla
+                    handleClaim();
                 }
-            }, 1000); 
-        }
-
-        return () => {
-            clearInterval(mineInterval);
-            if(interval) clearInterval(interval);
-        };
-    }, [botTime, energy, maxEnergy, regenRate, multiplier, handleClaim, setEnergy]);
-
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+        // 3. Eliminamos el comentario eslint-disable innecesario
+    }, [regenRate, multiplier, maxEnergy, botTime, energy, handleClaim, setEnergy]); 
 
     const handleBotClick = () => {
         if (botTime > 0) { alert(`🤖 Supervisor Active: ${Math.ceil(botTime/60)}m left`); return; }
@@ -110,17 +99,17 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     };
 
     const watchVideo = useCallback((type: 'turbo' | 'refill') => {
-        const msg = type === 'turbo' ? "📺 Watch Ad to double mining speed (1m)?" : "📺 Watch Ad to instantly FILL tank?";
+        const msg = type === 'turbo' ? "📺 Watch Ad to DOUBLE mining speed (1m)?" : "📺 Watch Ad to INSTANTLY fill tank?";
         if(!window.confirm(msg)) return;
         
         setTimeout(() => {
             if (type === 'turbo') {
-                setMultiplier(2);
-                alert("🚀 OVERCLOCK ACTIVATED! (Visual)");
-                setTimeout(() => setMultiplier(1), 60000);
+                setMultiplier(2); 
+                alert("🚀 OVERCLOCK ACTIVATED! (Speed x2)");
+                setTimeout(() => setMultiplier(1), 60000); 
             } else {
                 setEnergy(maxEnergy); 
-                alert("🔋 Tank Filled!");
+                alert("🔋 Tank Filled Instantly!");
             }
         }, 2000);
     }, [maxEnergy, setEnergy]);
@@ -143,7 +132,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     return (
         <div style={{ 
             display: 'flex', flexDirection: 'column', 
-            justifyContent: 'center', alignItems: 'center', gap: '10px',
+            justifyContent: 'center', alignItems: 'center', gap: '15px',
             height: 'calc(100dvh - 135px)', padding: '0', maxWidth: '500px', margin: '0 auto',
             position: 'relative', overflow: 'hidden'
         }}>
@@ -238,7 +227,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
             {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} onUpdateScore={setScore} />}
-            {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} configs={GAME_CONFIG} />}
+            {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} />}
             
             <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
