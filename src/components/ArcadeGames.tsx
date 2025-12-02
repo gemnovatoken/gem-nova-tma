@@ -33,7 +33,9 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     }, []);
 
     useEffect(() => {
-        const timer = setTimeout(() => startRound(1), 100);
+        const timer = setTimeout(() => {
+            startRound(1);
+        }, 100);
         return () => clearTimeout(timer);
     }, [startRound]);
 
@@ -71,15 +73,16 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     );
 };
 
-// ☄️ JUEGO 2: ASTEROIDES (TEMPORIZADOR ARREGLADO)
+// ☄️ JUEGO 2: ASTEROIDES (CORREGIDO)
 export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(15);
     const [asteroidPos, setAsteroidPos] = useState({ top: 40, left: 40 });
     
-    // 🛡️ USO DE REF: Guardamos el score aquí para leerlo al final sin reiniciar el timer
+    // 🛡️ USAMOS REF PARA EL SCORE: Esto evita que el timer se reinicie al jugar
     const scoreRef = useRef(0);
     
+    // Sincronizamos la Ref con el Estado
     useEffect(() => {
         scoreRef.current = score;
     }, [score]);
@@ -89,12 +92,12 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     }, []);
 
     useEffect(() => {
-        // Timer independiente
+        // Temporizador del juego (Ahora independiente del score)
         const gameTimer = setInterval(() => {
             setTimeLeft(t => {
                 if (t <= 1) { 
                     clearInterval(gameTimer); 
-                    // Leemos el valor final desde la referencia
+                    // Leemos el puntaje final desde la Referencia, no desde el estado antiguo
                     onFinish(true, scoreRef.current * 100); 
                     return 0; 
                 }
@@ -102,13 +105,15 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
             });
         }, 1000);
 
-        const spawnTimer = setTimeout(() => spawnAsteroid(), 100);
+        const spawnTimer = setTimeout(() => {
+            spawnAsteroid();
+        }, 100);
 
         return () => {
             clearInterval(gameTimer);
             clearTimeout(spawnTimer);
         };
-        // Quitamos 'score' de las dependencias para que no reinicie el reloj
+        // Quitamos 'score' de las dependencias
     }, [onFinish, spawnAsteroid]); 
 
     const hit = () => {
