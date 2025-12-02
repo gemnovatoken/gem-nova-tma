@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Crosshair } from 'lucide-react';
+import { Crosshair } from 'lucide-react'; // Quitamos 'X' que no se usaba
 
 interface GameProps {
     onClose: () => void;
     onFinish: (won: boolean, score: number) => void;
 }
 
-// Estilo compartido
+// Estilo compartido (Overlay)
 const GameOverlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div style={{ 
         position: 'fixed', inset: 0, zIndex: 5000, 
@@ -17,114 +17,105 @@ const GameOverlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     </div>
 );
 
-// 🧠 JUEGO 1: MEMORIA (LÓGICA CORREGIDA: Patrón, no Secuencia)
+// 🧠 JUEGO 1: MEMORIA
 export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
-    const [pattern, setPattern] = useState<number[]>([]); // Cuadros correctos
-    const [selected, setSelected] = useState<number[]>([]); // Cuadros que ya encontraste
+    const [sequence, setSequence] = useState<number[]>([]);
     const [showing, setShowing] = useState(true);
     const [round, setRound] = useState(1);
+    const [inputIndex, setInputIndex] = useState(0);
 
     const startRound = useCallback((currentRound: number) => {
-        // 1. Generar patrón ÚNICO (sin repetidos)
-        const newPattern = new Set<number>();
-        // Nivel 1: 3 cuadros, Nivel 2: 4 cuadros, etc.
-        while(newPattern.size < (currentRound + 2)) {
-            newPattern.add(Math.floor(Math.random() * 9));
-        }
-        
-        setPattern(Array.from(newPattern));
-        setSelected([]);
+        const newSeq = Array.from({ length: currentRound + 2 }, () => Math.floor(Math.random() * 9));
+        setSequence(newSeq);
+        setInputIndex(0);
         setShowing(true);
-        
-        // Tiempo para memorizar (1.5s + un poco más si es difícil)
-        setTimeout(() => setShowing(false), 1500 + (currentRound * 200));
+        setTimeout(() => setShowing(false), 1000 + (currentRound * 500));
     }, []);
 
     useEffect(() => {
-        const timer = setTimeout(() => startRound(1), 100);
-        return () => clearTimeout(timer);
+        const t = setTimeout(() => startRound(1), 100);
+        return () => clearTimeout(t);
     }, [startRound]);
 
     const handleTap = (index: number) => {
-        if (showing) return; // No tocar mientras memorizas
-        if (selected.includes(index)) return; // Ya lo tocaste
-
-        // 2. Lógica: ¿Es parte del patrón?
-        if (pattern.includes(index)) {
-            // ✅ CORRECTO
-            const newSelected = [...selected, index];
-            setSelected(newSelected);
-
-            // ¿Encontró todos?
-            if (newSelected.length === pattern.length) {
-                if (round >= 3) {
-                    // Ganó el juego completo
-                    setTimeout(() => onFinish(true, 3000), 500);
-                } else {
-                    // Siguiente ronda
-                    setTimeout(() => {
-                        setRound(r => r + 1);
-                        startRound(round + 1);
-                    }, 500);
-                }
+        if (showing) return;
+        if (index !== sequence[inputIndex]) { onFinish(false, 0); return; }
+        
+        if (inputIndex + 1 === sequence.length) {
+            if (round >= 3) onFinish(true, 3000);
+            else {
+                setRound(r => {
+                    setTimeout(() => startRound(r + 1), 500);
+                    return r + 1;
+                });
             }
-        } else {
-            // ❌ INCORRECTO (Tocó uno que no era)
-            // Feedback visual de error podría ir aquí
-            onFinish(false, 0);
-        }
+        } else setInputIndex(i => i + 1);
     };
 
     return (
         <GameOverlay>
-            <h2 style={{color:'#E040FB', marginBottom:'10px'}}>QUANTUM CODE: LVL {round}</h2>
-            <p style={{color:'#aaa', marginBottom:'20px'}}>{showing ? "MEMORIZE THE PATTERN..." : "FIND THE NODES!"}</p>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
-                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => {
-                    // Estado visual del botón
-                    let bgColor = '#222'; // Apagado
-                    if (showing && pattern.includes(i)) bgColor = '#E040FB'; // Mostrando patrón
-                    if (!showing && selected.includes(i)) bgColor = '#4CAF50'; // Encontrado (Verde)
-
-                    return (
-                        <button key={i} onClick={() => handleTap(i)} style={{
-                            width: '80px', height: '80px', borderRadius: '12px', border:'2px solid #333',
-                            background: bgColor,
-                            boxShadow: (showing && pattern.includes(i)) || selected.includes(i) ? `0 0 15px ${bgColor}` : 'none',
-                            transition: 'all 0.2s', cursor:'pointer', transform: 'scale(1)'
-                        }} 
-                        onMouseDown={e => e.currentTarget.style.transform = 'scale(0.95)'}
-                        onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
-                        />
-                    );
-                })}
+            <h2 style={{color:'#E040FB', marginBottom:'10px'}}>MEMORY HACK: LVL {round}</h2>
+            <p style={{color:'#aaa', marginBottom:'20px'}}>{showing ? "MEMORIZE..." : "REPEAT!"}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                    <button key={i} onClick={() => handleTap(i)} style={{
+                        width: '70px', height: '70px', borderRadius: '10px', border:'2px solid #333',
+                        background: showing && sequence.includes(i) ? '#E040FB' : 'transparent',
+                        boxShadow: showing && sequence.includes(i) ? '0 0 20px #E040FB' : 'none',
+                        transition: 'all 0.2s', cursor:'pointer'
+                    }} />
+                ))}
             </div>
-            <button onClick={onClose} style={{marginTop:'40px', background:'none', border:'1px solid #555', color:'#fff', padding:'10px 30px', borderRadius:'20px'}}>GIVE UP</button>
+            <button onClick={onClose} style={{marginTop:'30px', background:'none', border:'none', color:'#555'}}>GIVE UP</button>
         </GameOverlay>
     );
 };
 
-// ☄️ JUEGO 2: ASTEROIDES (IGUAL QUE ANTES)
+// ☄️ JUEGO 2: ASTEROIDES (TEMPORIZADOR ARREGLADO)
 export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(15);
     const [asteroidPos, setAsteroidPos] = useState({ top: 40, left: 40 });
+    
+    // 🛡️ USAMOS REF PARA EL SCORE: Esto evita que el timer se reinicie al jugar
+    const scoreRef = useRef(0);
+    
+    // Sincronizamos la Ref con el Estado
+    useEffect(() => {
+        scoreRef.current = score;
+    }, [score]);
 
     const spawnAsteroid = useCallback(() => {
         setAsteroidPos({ top: Math.random() * 70 + 10, left: Math.random() * 70 + 10 });
     }, []);
 
     useEffect(() => {
+        // Timer independiente
         const gameTimer = setInterval(() => {
             setTimeLeft(t => {
-                if (t <= 1) { clearInterval(gameTimer); onFinish(true, score * 100); return 0; }
+                if (t <= 1) { 
+                    clearInterval(gameTimer); 
+                    // Leemos el valor final desde la referencia
+                    onFinish(true, scoreRef.current * 100); 
+                    return 0; 
+                }
                 return t - 1;
             });
         }, 1000);
+
         const spawnTimer = setTimeout(() => spawnAsteroid(), 100);
-        return () => { clearInterval(gameTimer); clearTimeout(spawnTimer); };
-    }, [onFinish, score, spawnAsteroid]);
+
+        return () => {
+            clearInterval(gameTimer);
+            clearTimeout(spawnTimer);
+        };
+        // Quitamos 'score' de las dependencias para que no reinicie el reloj
+    }, [onFinish, spawnAsteroid]); 
+
+    const hit = () => {
+        setScore(s => s + 1);
+        spawnAsteroid();
+    };
 
     return (
         <GameOverlay>
@@ -139,7 +130,7 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                 width: '300px', height: '300px', border: '2px dashed #333', borderRadius:'20px', 
                 position: 'relative', overflow:'hidden', background:'rgba(255,255,255,0.02)' 
             }}>
-                <div onClick={() => { setScore(s=>s+1); spawnAsteroid(); }} style={{
+                <div onClick={hit} style={{
                     position: 'absolute', top: `${asteroidPos.top}%`, left: `${asteroidPos.left}%`,
                     width: '60px', height: '60px', background: 'radial-gradient(circle, #FF512F 20%, transparent 70%)',
                     borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -154,7 +145,7 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     );
 };
 
-// 🔐 JUEGO 3: HACKER (IGUAL QUE ANTES)
+// 🔐 JUEGO 3: HACKER
 export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const [targetZone, setTargetZone] = useState(50);
     const [cursorPos, setCursorPos] = useState(0);
