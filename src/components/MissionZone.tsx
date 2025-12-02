@@ -157,10 +157,6 @@ export const MissionZone: React.FC = () => {
                     )}
                 </div>
             </div>
-            
-            // ... (Imports iguales que antes)
-
-// ... (Componente MissionZone y lógica igual, solo cambiamos la parte del return de las tarjetas)
 
             {/* Lista de Juegos */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
@@ -186,8 +182,6 @@ export const MissionZone: React.FC = () => {
                     onPlay={() => handlePlayGame('hacker')}
                 />
             </div>
-
-// ... (Resto del código igual)
         </div>
     );
 };
