@@ -6,7 +6,7 @@ interface GameProps {
     onFinish: (won: boolean, score: number) => void;
 }
 
-// Estilo compartido (Overlay Centrado y Fijo)
+// Estilo compartido
 const GameOverlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <div style={{ 
         position: 'fixed', top: 0, left: 0, width: '100vw', height: '100dvh', zIndex: 5000, 
@@ -18,26 +18,21 @@ const GameOverlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     </div>
 );
 
-// 🧠 JUEGO 1: MEMORIA (LÓGICA DE PATRÓN RESTAURADA)
+// 🧠 JUEGO 1: MEMORIA
 export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
-    const [pattern, setPattern] = useState<number[]>([]); // Cuadros correctos
-    const [selected, setSelected] = useState<number[]>([]); // Cuadros que ya encontraste
+    const [pattern, setPattern] = useState<number[]>([]);
+    const [selected, setSelected] = useState<number[]>([]);
     const [showing, setShowing] = useState(true);
     const [round, setRound] = useState(1);
 
     const startRound = useCallback((currentRound: number) => {
-        // 1. Generar patrón ÚNICO (sin repetidos)
         const newPattern = new Set<number>();
-        // Nivel 1: 3 cuadros, Nivel 2: 4 cuadros, etc.
         while(newPattern.size < (currentRound + 2)) {
             newPattern.add(Math.floor(Math.random() * 9));
         }
-        
         setPattern(Array.from(newPattern));
         setSelected([]);
         setShowing(true);
-        
-        // Tiempo para memorizar
         setTimeout(() => setShowing(false), 1500 + (currentRound * 200));
     }, []);
 
@@ -47,22 +42,18 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     }, [startRound]);
 
     const handleTap = (index: number) => {
-        if (showing) return; // No tocar mientras memorizas
-        if (selected.includes(index)) return; // Ya lo tocaste
+        if (showing) return;
+        if (selected.includes(index)) return;
 
-        // 2. Lógica: ¿Es parte del patrón?
         if (pattern.includes(index)) {
-            // ✅ CORRECTO
             const newSelected = [...selected, index];
             setSelected(newSelected);
 
-            // ¿Encontró todos?
             if (newSelected.length === pattern.length) {
                 if (round >= 3) {
-                    // Ganó el juego completo
-                    setTimeout(() => onFinish(true, 3000), 500);
+                    // 📉 CAMBIO: Premio ajustado a 1,500
+                    setTimeout(() => onFinish(true, 1500), 500);
                 } else {
-                    // Siguiente ronda
                     setTimeout(() => {
                         setRound(r => r + 1);
                         startRound(round + 1);
@@ -70,7 +61,6 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                 }
             }
         } else {
-            // ❌ INCORRECTO (Tocó uno que no era)
             onFinish(false, 0);
         }
     };
@@ -78,15 +68,12 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     return (
         <GameOverlay>
             <h2 style={{color:'#E040FB', marginBottom:'10px'}}>QUANTUM CODE: LVL {round}</h2>
-            <p style={{color:'#aaa', marginBottom:'20px'}}>{showing ? "MEMORIZE THE PATTERN..." : "FIND THE NODES!"}</p>
-            
+            <p style={{color:'#aaa', marginBottom:'20px'}}>{showing ? "MEMORIZE..." : "FIND NODES!"}</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
                 {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => {
-                    // Estado visual del botón
-                    let bgColor = '#222'; // Apagado
-                    if (showing && pattern.includes(i)) bgColor = '#E040FB'; // Mostrando patrón
-                    if (!showing && selected.includes(i)) bgColor = '#4CAF50'; // Encontrado (Verde)
-
+                    let bgColor = '#222';
+                    if (showing && pattern.includes(i)) bgColor = '#E040FB';
+                    if (!showing && selected.includes(i)) bgColor = '#4CAF50';
                     return (
                         <button key={i} onClick={() => handleTap(i)} style={{
                             width: '80px', height: '80px', borderRadius: '12px', border:'2px solid #333',
@@ -105,13 +92,11 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     );
 };
 
-// ☄️ JUEGO 2: ASTEROIDES (CON RELOJ ARREGLADO)
+// ☄️ JUEGO 2: ASTEROIDES (Puntos por acierto)
 export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(15);
     const [asteroidPos, setAsteroidPos] = useState({ top: 40, left: 40 });
-    
-    // 🛡️ ESCUDO DE REFERENCIAS (Para que el reloj no se congele)
     const scoreRef = useRef(0);
     const onFinishRef = useRef(onFinish);
 
@@ -125,25 +110,20 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
         });
     }, []);
 
-    // ⏰ TEMPORIZADOR BLINDADO
     useEffect(() => {
         const timer = setInterval(() => {
             setTimeLeft(prev => {
                 if (prev <= 1) {
                     clearInterval(timer);
+                    // 📉 CAMBIO: 15 segundos x 1 acierto/seg x 100pts = 1,500 pts aprox.
                     onFinishRef.current(true, scoreRef.current * 100);
                     return 0;
                 }
                 return prev - 1;
             });
         }, 1000);
-
         const spawnTimer = setTimeout(() => spawnAsteroid(), 0);
-
-        return () => {
-            clearInterval(timer);
-            clearTimeout(spawnTimer);
-        };
+        return () => { clearInterval(timer); clearTimeout(spawnTimer); };
     }, [spawnAsteroid]); 
 
     const hit = () => {
@@ -153,53 +133,35 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
 
     return (
         <GameOverlay>
-            {/* HUD Centrado */}
-            <div style={{ 
-                width: '300px', display:'flex', justifyContent:'space-between', 
-                marginBottom:'10px', color:'#fff', fontWeight:'bold', fontSize:'18px'
-            }}>
+            <div style={{ width: '300px', display:'flex', justifyContent:'space-between', marginBottom:'10px', color:'#fff', fontWeight:'bold', fontSize:'18px' }}>
                 <span>⏳ {timeLeft}s</span>
                 <span style={{color:'#FF512F'}}>💥 {score}</span>
             </div>
-            
-            <div style={{textAlign:'center', color:'#888', marginBottom:'15px', fontSize:'12px'}}>
-                TAP THE TARGETS!
-            </div>
-
-            {/* Área de Juego */}
+            <div style={{textAlign:'center', color:'#888', marginBottom:'15px', fontSize:'12px'}}>TAP TARGETS (100 pts/hit)</div>
             <div style={{ 
                 width: '300px', height: '300px', border: '2px dashed #333', borderRadius:'20px', 
-                position: 'relative', overflow:'hidden', background:'rgba(255,255,255,0.02)',
-                boxShadow: '0 0 20px rgba(0,0,0,0.5)'
+                position: 'relative', overflow:'hidden', background:'rgba(255,255,255,0.02)', boxShadow: '0 0 20px rgba(0,0,0,0.5)'
             }}>
                 <div onClick={hit} style={{
-                    position: 'absolute', 
-                    top: `${asteroidPos.top}%`, 
-                    left: `${asteroidPos.left}%`,
-                    width: '60px', height: '60px', 
-                    background: 'radial-gradient(circle, #FF512F 20%, transparent 70%)',
-                    borderRadius: '50%', 
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    cursor:'pointer', transition: 'top 0.1s, left 0.1s',
-                    border: '2px solid #FF512F',
-                    boxShadow: '0 0 15px #FF512F',
-                    transform: 'translate(-50%, -50%)'
+                    position: 'absolute', top: `${asteroidPos.top}%`, left: `${asteroidPos.left}%`,
+                    width: '60px', height: '60px', background: 'radial-gradient(circle, #FF512F 20%, transparent 70%)',
+                    borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor:'pointer', transition: 'top 0.1s, left 0.1s', border: '2px solid #FF512F',
+                    boxShadow: '0 0 15px #FF512F', transform: 'translate(-50%, -50%)'
                 }}>
                     <Crosshair size={30} color="#fff"/>
                 </div>
             </div>
-            
-            <button onClick={onClose} style={{marginTop:'40px', background:'none', border:'1px solid #555', color:'#aaa', padding:'10px 30px', borderRadius:'10px', cursor:'pointer'}}>EXIT GAME</button>
+            <button onClick={onClose} style={{marginTop:'40px', background:'none', border:'1px solid #555', color:'#aaa', padding:'10px 30px', borderRadius:'10px', cursor:'pointer'}}>EXIT</button>
         </GameOverlay>
     );
 };
 
-// 🔐 JUEGO 3: HACKER (INTACTO)
+// 🔐 JUEGO 3: HACKER
 export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const [targetZone, setTargetZone] = useState(50);
     const [cursorPos, setCursorPos] = useState(0);
     const [level, setLevel] = useState(1);
-    
     const directionRef = useRef(1);
     const posRef = useRef(0);
     const requestRef = useRef<number>(0);
@@ -219,8 +181,14 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
 
     const handleLock = () => {
         if (Math.abs(posRef.current - targetZone) < 10) {
-            if (level >= 3) onFinish(true, 5000);
-            else { setLevel(l => l + 1); setTargetZone(Math.random() * 80 + 10); posRef.current = 0; }
+            if (level >= 3) {
+                // 📉 CAMBIO: Premio ajustado a 1,500
+                onFinish(true, 1500);
+            } else { 
+                setLevel(l => l + 1); 
+                setTargetZone(Math.random() * 80 + 10); 
+                posRef.current = 0; 
+            }
         } else onFinish(false, 0);
     };
 

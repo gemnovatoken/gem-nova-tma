@@ -158,11 +158,36 @@ export const MissionZone: React.FC = () => {
                 </div>
             </div>
             
+            // ... (Imports iguales que antes)
+
+// ... (Componente MissionZone y lógica igual, solo cambiamos la parte del return de las tarjetas)
+
+            {/* Lista de Juegos */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <GameCard title="Quantum Code" desc="Memory Challenge" reward="3,000" icon={<Brain color="#E040FB"/>} color="#E040FB" onPlay={() => handlePlayGame('memory')} />
-                <GameCard title="Asteroid Defense" desc="Reaction Test" reward="500/hit" icon={<Shield color="#FF512F"/>} color="#FF512F" onPlay={() => handlePlayGame('asteroid')} />
-                <GameCard title="Vault Hacker" desc="Precision Timing" reward="5,000" icon={<Rocket color="#00F2FE"/>} color="#00F2FE" onPlay={() => handlePlayGame('hacker')} />
+                <GameCard 
+                    title="Quantum Code" 
+                    desc="Memory Challenge" 
+                    reward="1,500" // 📉 CAMBIO
+                    icon={<Brain color="#E040FB"/>} color="#E040FB"
+                    onPlay={() => handlePlayGame('memory')}
+                />
+                <GameCard 
+                    title="Asteroid Defense" 
+                    desc="Reaction Test" 
+                    reward="~1,500" // 📉 CAMBIO (Aprox)
+                    icon={<Shield color="#FF512F"/>} color="#FF512F"
+                    onPlay={() => handlePlayGame('asteroid')}
+                />
+                <GameCard 
+                    title="Vault Hacker" 
+                    desc="Precision Timing" 
+                    reward="1,500" // 📉 CAMBIO
+                    icon={<Rocket color="#00F2FE"/>} color="#00F2FE"
+                    onPlay={() => handlePlayGame('hacker')}
+                />
             </div>
+
+// ... (Resto del código igual)
         </div>
     );
 };
