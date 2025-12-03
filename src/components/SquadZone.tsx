@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-// 1. Eliminamos 'useRef', 'Users' y 'Zap' que no se usaban
 import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight } from 'lucide-react';
 
-// Interfaces
+// Interfaces para evitar errores de tipo
 interface RewardRowProps {
     icon: React.ReactNode;
     title: string;
@@ -21,7 +20,7 @@ interface MilestoneRowProps {
     isBig?: boolean;
 }
 
-// --- COMPONENTE INTERNO: EL SOL (RAID) ---
+// --- 1. EL SOL (RAID CORE) ---
 const SunRaid = () => {
     const [hp, setHp] = useState(1000000); 
     const maxHp = 1000000;
@@ -29,13 +28,14 @@ const SunRaid = () => {
 
     const handleHit = () => {
         if (window.navigator.vibrate) window.navigator.vibrate(10);
-        setHp(prev => Math.max(0, prev - 100)); 
+        setHp(prev => Math.max(0, prev - 100)); // Daño por click
         setScale(0.95);
         setTimeout(() => setScale(1), 50);
     };
 
     return (
         <div style={{ position: 'relative', height: '220px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginBottom:'10px' }}>
+            {/* Barra de Vida */}
             <div style={{ width: '80%', height: '8px', background: '#333', borderRadius: '4px', marginBottom: '15px', overflow: 'hidden', border: '1px solid #555' }}>
                 <div style={{ width: `${(hp / maxHp) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #FF512F, #F09819)' }} />
             </div>
@@ -43,6 +43,7 @@ const SunRaid = () => {
                 SOLAR BOSS: {hp.toLocaleString()} HP
             </div>
 
+            {/* Sol Interactivo */}
             <div 
                 onClick={handleHit}
                 style={{
@@ -72,6 +73,8 @@ export const SquadZone: React.FC = () => {
 
     useEffect(() => {
         if(user) {
+            // Solo cargamos el contador de referidos aquí. 
+            // Las ganancias ($TON) se cargan en WalletRoadmap.tsx
             supabase.from('user_score').select('referral_count').eq('user_id', user.id).single()
                 .then(({data}) => { if(data) setReferrals(data.referral_count) });
         }
@@ -85,9 +88,10 @@ export const SquadZone: React.FC = () => {
     return (
         <div style={{ padding: '10px 20px', paddingBottom: '100px', height: '100%', overflowY: 'auto' }}>
             
+            {/* Raid Boss */}
             <SunRaid />
 
-            {/* TARJETA DE INVITACIÓN */}
+            {/* Tarjeta de Invitación */}
             <div className="glass-card" style={{ 
                 padding: '12px', marginBottom: '15px', 
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -108,7 +112,7 @@ export const SquadZone: React.FC = () => {
                 </div>
             </div>
 
-            {/* BOTÓN DE HITOS */}
+            {/* Botón de Hitos */}
             <button onClick={() => setShowMilestones(true)} className="glass-card" style={{
                 width: '100%', padding: '15px', marginBottom: '15px',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -121,15 +125,15 @@ export const SquadZone: React.FC = () => {
                 <ChevronRight size={20} color="#aaa" />
             </button>
 
-            {/* BOUNTY BOARD */}
+            {/* Tabla de Recompensas */}
             <div className="glass-card">
                 <h3 style={{ fontSize: '14px', marginBottom: '10px', margin: 0, paddingBottom: '10px', borderBottom: '1px solid #333' }}>Bounty Board</h3>
                 <RewardRow icon={<Gift size={14} color="#4CAF50"/>} title="Sign Up Bonus" reward="+2,500 Pts" />
                 <RewardRow icon={<Crown size={14} color="#E040FB"/>} title="Active Miner" reward="+5,000 Pts" isHighlight desc="Level 4 Recruit" />
-                <RewardRow icon={<Percent size={14} color="#FFD700"/>} title="Shop Commission" reward="1% - 5%" isGold desc="Real TON" />
+                <RewardRow icon={<Percent size={14} color="#FFD700"/>} title="Cash Commission" reward="1% of Sales" isGold desc="Real TON Earnings" />
             </div>
 
-            {/* MODAL DE HITOS */}
+            {/* Modal de Hitos */}
             {showMilestones && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000,
@@ -153,7 +157,8 @@ export const SquadZone: React.FC = () => {
     );
 };
 
-// 2. Usamos la interfaz RewardRowProps en lugar de 'any'
+// --- COMPONENTES AUXILIARES ---
+
 const RewardRow: React.FC<RewardRowProps> = ({ icon, title, reward, isHighlight, isGold, desc }) => (
     <div style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -166,7 +171,6 @@ const RewardRow: React.FC<RewardRowProps> = ({ icon, title, reward, isHighlight,
     </div>
 );
 
-// 3. Usamos la interfaz MilestoneRowProps en lugar de 'any'
 const MilestoneRow: React.FC<MilestoneRowProps> = ({ count, reward, done, isBig }) => (
     <div style={{ 
         display: 'flex', justifyContent: 'space-between', padding: '15px', marginBottom: '8px', borderRadius: '10px',
