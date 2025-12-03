@@ -1,89 +1,102 @@
-/* --- FONDO CYBERPUNK --- */
-.cyber-bg {
-  background-color: #050510;
-  background-image: 
-    linear-gradient(rgba(0, 242, 254, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 242, 254, 0.1) 1px, transparent 1px);
-  background-size: 40px 40px;
-  position: relative;
-  overflow: hidden;
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  background-color: #000000;
+  color: rgba(255, 255, 255, 0.87);
 }
 
-/* Efecto de "Flujo de Datos" (Línea brillante vertical) */
-.data-stream {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 2px;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateX(-50%);
-  z-index: 0;
-}
-
-.data-stream::after {
-  content: '';
-  position: absolute;
-  top: -100px;
-  left: 0;
-  width: 100%;
-  height: 100px;
-  background: linear-gradient(180deg, transparent, #00F2FE, transparent);
-  animation: streamFlow 3s infinite linear;
-}
-
-@keyframes streamFlow {
-  0% { top: -100px; }
-  100% { top: 100%; }
-}
-
-/* Tarjeta Cyber */
-.cyber-card {
-  background: rgba(10, 10, 20, 0.8);
-  border: 1px solid #333;
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.8);
-  position: relative;
-  z-index: 1;
-  backdrop-filter: blur(5px);
-  transition: all 0.3s ease;
-}
-
-.cyber-card:hover {
-  border-color: #00F2FE;
-  box-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
-  transform: scale(1.02);
-}
-
-/* Bóveda de Circuito */
-.circuit-vault {
-  background-color: #000;
-  background-image: radial-gradient(#111 15%, transparent 16%), radial-gradient(#111 15%, transparent 16%);
-  background-size: 10px 10px;
-  border: 2px solid #E040FB;
-  box-shadow: 0 0 15px #E040FB, inset 0 0 30px #E040FB;
-  position: relative;
-}
-
-/* Botón Glitch */
-.btn-cyber {
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  overflow-x: hidden;
   background: #000;
-  color: #00F2FE;
-  border: 1px solid #00F2FE;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  font-family: 'Courier New', Courier, monospace;
-  font-weight: bold;
-  transition: all 0.2s;
 }
-.btn-cyber:active {
-  background: #00F2FE;
+
+/* --- ESTILOS FUTURISTAS (Para Squad, Mine y Wallet) --- */
+
+/* Tarjeta de Vidrio (Glassmorphism) */
+.glass-card {
+  background: rgba(20, 20, 30, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.glass-card:active {
+  transform: scale(0.98);
+}
+
+/* Botón Neón Genérico */
+.btn-neon {
+  background: linear-gradient(90deg, #00F2FE, #4FACFE);
   color: #000;
-  box-shadow: 0 0 20px #00F2FE;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.4);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
 }
 
-/* --- ESTILOS CYBERPUNK (Solo para Mercado) --- */
+.btn-neon:hover {
+  box-shadow: 0 0 25px rgba(0, 242, 254, 0.6);
+  transform: translateY(-1px);
+}
 
-/* 1. El Fondo de Rejilla (Solo afecta al contenedor con esta clase) */
+.btn-neon:active {
+  transform: scale(0.95);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+}
+
+.btn-neon:disabled {
+  background: #333;
+  color: #666;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Texto con Gradiente */
+.text-gradient {
+  background: linear-gradient(to right, #fff, #00F2FE);
+  /* ✅ CORRECCIÓN: Agregamos la propiedad estándar */
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 0 20px rgba(0, 242, 254, 0.3);
+}
+
+/* Animación de Giro (Para reactores y soles) */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes blink { 
+  0%, 100% { opacity: 1; } 
+  50% { opacity: 0.3; } 
+}
+
+/* Scrollbar invisible para listas horizontales */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* --- ESTILOS CYBERPUNK (Específicos para el Mercado) --- */
+
 .cyber-bg {
   background-color: #050510;
   background-image: 
@@ -92,11 +105,10 @@
   background-size: 40px 40px;
   position: relative;
   overflow: hidden;
-  /* Asegura que cubra toda la altura disponible en el componente */
   min-height: 100%; 
 }
 
-/* 2. La Línea de Datos Central (Animación) */
+/* Línea de Datos */
 .data-stream {
   position: absolute;
   top: 0;
@@ -106,7 +118,7 @@
   background: rgba(255, 255, 255, 0.1);
   transform: translateX(-50%);
   z-index: 0;
-  pointer-events: none; /* Para que no bloquee clics */
+  pointer-events: none;
 }
 
 .data-stream::after {
@@ -125,7 +137,7 @@
   100% { top: 100%; }
 }
 
-/* 3. Tarjeta Cyber (Bordes y Brillo) */
+/* Tarjeta del Mercado */
 .cyber-card {
   background: rgba(10, 10, 20, 0.85);
   border: 1px solid #333;
@@ -141,10 +153,9 @@
   transform: scale(1.02);
 }
 
-/* 4. Bóveda de Circuito (Para el Banco) */
+/* Bóveda del Banco */
 .circuit-vault {
   background-color: #020205;
-  /* Patrón de puntos sutil */
   background-image: radial-gradient(#222 15%, transparent 16%);
   background-size: 8px 8px;
   border: 2px solid #E040FB;
@@ -152,7 +163,7 @@
   position: relative;
 }
 
-/* 5. Botón Estilo Glitch */
+/* Botón Cyber (Mercado) */
 .btn-cyber {
   background: #000;
   color: #00F2FE;
@@ -169,105 +180,4 @@
   background: #00F2FE;
   color: #000;
   box-shadow: 0 0 20px #00F2FE;
-}
-
-/* Animación de parpadeo para luces LED */
-@keyframes blink { 
-  0%, 100% { opacity: 1; } 
-  50% { opacity: 0.3; } 
-}
-
-/* --- FONDO Y AMBIENTE CYBERPUNK --- */
-.cyber-bg {
-  background-color: #050510;
-  /* Rejilla digital de fondo */
-  background-image: 
-    linear-gradient(rgba(0, 242, 254, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 242, 254, 0.1) 1px, transparent 1px);
-  background-size: 40px 40px;
-  position: relative;
-  overflow-x: hidden; /* Evitar scroll horizontal */
-}
-
-/* La "Autopista de Datos" (Línea central) */
-.data-stream {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 2px;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.1);
-  transform: translateX(-50%);
-  z-index: 0;
-}
-
-/* Animación del flujo de datos */
-.data-stream::after {
-  content: '';
-  position: absolute;
-  top: -100px;
-  left: 0;
-  width: 100%;
-  height: 150px;
-  background: linear-gradient(180deg, transparent, #00F2FE, transparent);
-  animation: streamFlow 3s infinite linear;
-  box-shadow: 0 0 15px #00F2FE;
-}
-
-@keyframes streamFlow {
-  0% { top: -150px; }
-  100% { top: 100%; }
-}
-
-/* Tarjetas de Nodos (Paquetes) */
-.cyber-card {
-  background: rgba(10, 10, 20, 0.9);
-  border: 1px solid #333;
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.8);
-  position: relative;
-  z-index: 1;
-  backdrop-filter: blur(5px);
-  transition: all 0.3s ease;
-  clip-path: polygon(
-    10px 0, 100% 0, 
-    100% calc(100% - 10px), calc(100% - 10px) 100%, 
-    0 100%, 0 10px
-  ); /* Bordes recortados estilo futurista */
-}
-
-.cyber-card:hover {
-  border-color: #00F2FE;
-  box-shadow: 0 0 25px rgba(0, 242, 254, 0.3);
-  transform: scale(1.03);
-}
-
-/* La Bóveda (Staking) - Estilo Placa de Circuito */
-.circuit-vault {
-  background-color: #000;
-  /* Patrón de puntos simulando circuito */
-  background-image: radial-gradient(#1a1a1a 15%, transparent 16%), radial-gradient(#1a1a1a 15%, transparent 16%);
-  background-size: 10px 10px;
-  border: 2px solid #E040FB;
-  box-shadow: 0 0 20px rgba(224, 64, 251, 0.4), inset 0 0 40px rgba(224, 64, 251, 0.2);
-  position: relative;
-}
-
-/* Botón Cyber */
-.btn-cyber {
-  background: rgba(0, 0, 0, 0.8);
-  color: #00F2FE;
-  border: 1px solid #00F2FE;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  font-family: 'Courier New', Courier, monospace;
-  font-weight: 900;
-  transition: all 0.2s;
-  position: relative;
-  overflow: hidden;
-}
-
-.btn-cyber:active {
-  background: #00F2FE;
-  color: #000;
-  box-shadow: 0 0 25px #00F2FE;
 }
