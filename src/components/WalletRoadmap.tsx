@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Lock, TrendingUp, Users, DollarSign } from 'lucide-react'; // ❌ Eliminamos Wallet
+import { Wallet, Lock, TrendingUp, Users, DollarSign, ShieldCheck, ArrowUpRight } from 'lucide-react';
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
 
 interface InfoRowProps {
@@ -55,97 +55,110 @@ export const WalletRoadmap: React.FC = () => {
         }, 1000);
     };
 
+    // LÓGICA DE RETIRO
+    const minWithdraw = userLevel >= 5 ? 0 : 1.0;
+    const canWithdraw = tonEarnings > 0 && tonEarnings >= minWithdraw;
+
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
             
+            {/* Header */}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'25px' }}>
                 <h2 style={{margin:0, fontSize:'24px'}}>My Wallet</h2>
-                <TonConnectButton />
+                <div style={{transform: 'scale(0.9)', transformOrigin: 'right center'}}>
+                    <TonConnectButton />
+                </div>
             </div>
 
-            <div className="glass-card" style={{ 
-                padding:'20px', marginBottom:'15px', textAlign:'center',
-                background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.1), rgba(0,0,0,0))',
-                border: '1px solid #00F2FE'
-            }}>
-                <div style={{fontSize:'12px', color:'#00F2FE', letterSpacing:'1px', fontWeight:'bold', marginBottom:'5px'}}>
-                    PARTNER BALANCE
-                </div>
-                <div style={{fontSize:'42px', fontWeight:'900', color:'#fff', textShadow:'0 0 20px rgba(0, 242, 254, 0.4)'}}>
-                    {tonEarnings.toFixed(2)} <span style={{fontSize:'16px'}}>TON</span>
-                </div>
-                <div style={{fontSize:'12px', color:'#aaa', marginBottom:'20px'}}>
-                    ≈ ${(tonEarnings * 5.40).toFixed(2)} USD
-                </div>
-
-                <div style={{display:'flex', gap:'10px'}}>
-                    <div style={{flex:1, background:'rgba(0,0,0,0.3)', padding:'10px', borderRadius:'10px'}}>
-                        <div style={{fontSize:'10px', color:'#aaa'}}>Referrals</div>
-                        <div style={{fontSize:'16px', fontWeight:'bold', color:'#fff'}}>{referralCount}</div>
-                    </div>
-                    <button 
-                        onClick={handleWithdraw}
-                        disabled={tonEarnings < 2 || loadingClaim}
-                        className="btn-neon" 
-                        style={{
-                            flex:2, fontSize:'14px', border:'none', 
-                            background: tonEarnings >= 2 ? '#00F2FE' : '#333', 
-                            color: tonEarnings >= 2 ? '#000' : '#aaa'
-                        }}
-                    >
-                        {loadingClaim ? 'PROCESSING...' : (tonEarnings < 2 ? 'MIN 2 TON' : 'WITHDRAW NOW')}
-                    </button>
-                </div>
+            {/* --- GRID DE 2 COLUMNAS --- */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '25px' }}>
                 
-                {/* Aviso de Nivel 5 */}
-                {userLevel < 5 && (
-                    <div style={{marginTop:'10px', fontSize:'9px', color:'#E040FB'}}>
-                        🔒 Reach <strong>Level 5</strong> to unlock withdrawals without minimums.
-                    </div>
-                )}
-            </div>
-
-            {/* TARJETA DE BONO NIVEL 8 (2.5%) */}
-            <div className="glass-card" style={{ 
-                padding:'20px', marginBottom:'30px', position:'relative', overflow:'hidden',
-                border: '1px dashed #FFD700', background:'rgba(255, 215, 0, 0.05)'
-            }}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px'}}>
-                    <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                        <div style={{background:'rgba(255, 215, 0, 0.2)', padding:'8px', borderRadius:'50%'}}>
-                            <Lock size={20} color="#FFD700"/>
+                {/* 1. TARJETA DE BALANCE */}
+                <div className="glass-card" style={{ 
+                    padding:'15px', display:'flex', flexDirection:'column', justifyContent:'space-between',
+                    background: 'linear-gradient(160deg, rgba(0, 242, 254, 0.1), rgba(0,0,0,0.4))',
+                    border: '1px solid rgba(0, 242, 254, 0.3)', height: '180px', position: 'relative'
+                }}>
+                    <div style={{position:'absolute', top:10, right:10, opacity:0.5}}><Wallet size={18} color="#00F2FE"/></div>
+                    
+                    <div>
+                        <div style={{fontSize:'10px', color:'#aaa', fontWeight:'bold', letterSpacing:'1px'}}>AVAILABLE</div>
+                        <div style={{fontSize:'26px', fontWeight:'900', color:'#fff', textShadow:'0 0 15px rgba(0, 242, 254, 0.5)'}}>
+                            {tonEarnings.toFixed(2)} <span style={{fontSize:'12px'}}>TON</span>
                         </div>
-                        <div>
-                            <div style={{fontWeight:'bold', color:'#FFD700'}}>SUPER PARTNER (2.5%)</div>
-                            <div style={{fontSize:'10px', color:'#aaa'}}>Total commission rate</div>
-                        </div>
+                        <div style={{fontSize:'10px', color:'#666'}}>≈ ${(tonEarnings * 5.40).toFixed(2)}</div>
                     </div>
-                    <div style={{fontSize:'18px', fontWeight:'bold', color:'#555'}}>Locked</div>
-                </div>
-                
-                <p style={{fontSize:'12px', color:'#ccc', lineHeight:'1.4', marginBottom:'15px'}}>
-                    Level 8 "Nova God" users earn a total of <strong>2.5% commission</strong> on every purchase made by their referrals. (Standard is 1%).
-                </p>
 
-                {userLevel >= 8 ? (
-                    <div style={{background:'#4CAF50', color:'#fff', padding:'10px', borderRadius:'8px', textAlign:'center', fontWeight:'bold', fontSize:'12px'}}>
-                        ✅ YOU ARE LEVEL 8 - 2.5% ACTIVE
-                    </div>
-                ) : (
-                    <div style={{background:'rgba(0,0,0,0.3)', padding:'10px', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                        <span style={{fontSize:'11px', color:'#aaa'}}>Current Level: {userLevel} / 8</span>
-                        <button style={{background:'none', border:'none', color:'#FFD700', fontSize:'11px', cursor:'pointer', fontWeight:'bold'}}>
-                            UPGRADE NOW &gt;
+                    <div>
+                        <div style={{fontSize:'9px', color:'#aaa', marginBottom:'5px', display:'flex', alignItems:'center', gap:'4px'}}>
+                            <Users size={10}/> {referralCount} Referrals
+                        </div>
+                        <button 
+                            onClick={handleWithdraw}
+                            disabled={!canWithdraw || loadingClaim}
+                            className="btn-neon" 
+                            style={{
+                                width:'100%', fontSize:'10px', padding:'8px', border:'none', borderRadius:'8px',
+                                background: canWithdraw ? '#00F2FE' : '#222', 
+                                color: canWithdraw ? '#000' : '#555',
+                                boxShadow: canWithdraw ? '0 0 10px rgba(0,242,254,0.3)' : 'none'
+                            }}
+                        >
+                            {loadingClaim ? '...' : (canWithdraw ? 'WITHDRAW' : `MIN ${minWithdraw} TON`)}
                         </button>
                     </div>
-                )}
+                </div>
+
+                {/* 2. TARJETA VIP */}
+                <div className="glass-card" style={{ 
+                    padding:'15px', display:'flex', flexDirection:'column', justifyContent:'space-between',
+                    background: userLevel >= 8 ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 215, 0, 0.05)',
+                    border: userLevel >= 8 ? '1px solid #4CAF50' : '1px dashed #FFD700', 
+                    height: '180px', position: 'relative'
+                }}>
+                    <div style={{position:'absolute', top:10, right:10, opacity:0.5}}>
+                        {userLevel >= 8 ? <ShieldCheck size={18} color="#4CAF50"/> : <Lock size={18} color="#FFD700"/>}
+                    </div>
+
+                    <div>
+                        <div style={{fontSize:'10px', color: userLevel >= 8 ? '#4CAF50' : '#FFD700', fontWeight:'bold', letterSpacing:'1px'}}>
+                            SUPER PARTNER
+                        </div>
+                        <div style={{fontSize:'26px', fontWeight:'900', color:'#fff'}}>
+                            2.5%
+                        </div>
+                        <div style={{fontSize:'10px', color:'#aaa'}}>Commission Rate</div>
+                    </div>
+
+                    <div>
+                        <div style={{fontSize:'9px', color:'#666', marginBottom:'5px', lineHeight:'1.2'}}>
+                            {userLevel >= 8 ? "Bonus Active! You earn 2.5% total." : "Reach Level 8 to unlock +1.5% bonus."}
+                        </div>
+                        
+                        {userLevel >= 8 ? (
+                            <div style={{background:'#4CAF50', color:'#fff', padding:'6px', borderRadius:'8px', textAlign:'center', fontSize:'10px', fontWeight:'bold'}}>
+                                ACTIVE
+                            </div>
+                        ) : (
+                            <button className="btn-neon" style={{
+                                width:'100%', fontSize:'10px', padding:'8px', borderRadius:'8px',
+                                // ✅ CORRECCIÓN: Eliminado border: 'none' duplicado
+                                background: 'transparent', border: '1px solid #FFD700', color:'#FFD700', boxShadow:'none'
+                            }}>
+                                UPGRADE <ArrowUpRight size={10} style={{marginLeft:'2px'}}/>
+                            </button>
+                        )}
+                    </div>
+                </div>
+
             </div>
 
+            {/* SECCIÓN DE INFORMACIÓN */}
             <h3 style={{fontSize:'16px', margin:'0 0 15px 0'}}>How it works</h3>
             <div style={{display:'flex', flexDirection:'column', gap:'10px'}}>
                 <InfoRow icon={<Users size={16} color="#4CAF50"/>} title="1. Invite Friends" desc="Share your link from the Squad Zone."/>
                 <InfoRow icon={<DollarSign size={16} color="#00F2FE"/>} title="2. They Buy Packs" desc="When they buy points with TON, you get paid."/>
-                <InfoRow icon={<TrendingUp size={16} color="#E040FB"/>} title="3. Withdrawals" desc="Min 1 TON (Or 0 TON if you are Level 5+)."/>
+                <InfoRow icon={<TrendingUp size={16} color="#E040FB"/>} title="3. Withdrawals" desc={`Min 1 TON (Or 0 TON if Level 5+).`} />
             </div>
 
         </div>
