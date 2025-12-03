@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, ChevronRight, BookOpen } from 'lucide-react';
+import { X, ChevronRight, Globe, ShieldCheck, Rocket, Coins } from 'lucide-react'; // 🛡️ Eliminado BookOpen
 
 interface WhitepaperModalProps {
     onClose: () => void;
@@ -11,65 +11,68 @@ interface WhitepaperModalProps {
 export const WhitepaperModal: React.FC<WhitepaperModalProps> = ({ onClose, onClaim, canClaim, isClaiming }) => {
     const [page, setPage] = useState(0);
 
-    const pages = [
+    const slides = [
         {
-            title: "1. The Hard Money Vision",
-            icon: "💎",
-            content: "We are tired of games printing trillions of worthless tokens. Gem Nova is built on SCARCITY. Points are hard to get. Energy is limited. This is a Deflationary Engine designed to protect value, not dilute it. We don't sell air; we mine digital gold."
+            icon: <Globe size={60} color="#00F2FE" />,
+            title: "1. The Vision",
+            text: "Gem Nova isn't just a game. It's a Community-Driven Ecosystem built on TON. We don't pay marketing agencies; we pay YOU. Our goal is to create a sustainable, deflationary token owned by the people."
         },
         {
-            title: "2. The 1% Partner Revolution",
-            icon: "🤝",
-            content: "Marketing agencies are expensive and useless. We fired them to pay YOU. Every user is a Partner. Invite a friend, and earn 1% of their TON purchases instantly. Real cash rewards for growing the tribe. No limits. The first Community-Driven Economy."
+            icon: <ShieldCheck size={60} color="#4CAF50" />,
+            title: "2. Hard Money",
+            text: "Unlike other clickers with infinite inflation, Gem Nova has strict supply limits. Energy is scarce. Mining Rigs are hard to upgrade. This creates real value for your points when the TGE (Token Generation Event) happens."
         },
         {
-            title: "3. Reverse Tokenomics",
-            icon: "📉",
-            content: "Most projects dump on retail. We flip the script with a 'Merit-Based Swap'. Active players (Level 8) unlock the prime 80:1 rate, while passive users get 500:1. 70% of revenue goes back into Liquidity and Buybacks. We burn points daily via Raids & Arcade."
+            icon: <Coins size={60} color="#FFD700" />,
+            title: "3. The 1% Economy",
+            text: "We share revenue directly. Every user earns 1% commission in REAL TON from their referrals' purchases. Level 8 'Nova Gods' unlock the Super Partner status (2.5%). This ensures the project has cashflow while rewarding leaders."
         },
         {
-            title: "4. The Ecosystem Future",
-            icon: "🪐",
-            content: "Phase 1 is just the spark. Coming next: 'Nova Bank' (High Yield Staking), 'Operation Eclipse' (Raid Events with TON prizes), and the P2P Marketplace. Our goal: Listing on Ston.fi with a liquidity pool funded by the community, owned by the community."
+            icon: <Rocket size={60} color="#E040FB" />,
+            title: "4. Roadmap & Launch",
+            text: "Phase 1: Mining & Squad Building (Now). \nPhase 2: Nova Bank & Marketplace. \nPhase 3: Listing on Ston.fi & Airdrop. \n\nThe Launch Progress bar is real. When it hits 100%, we launch."
         }
     ];
 
-    const isLastPage = page === pages.length - 1;
+    const isLastPage = page === slides.length - 1;
 
     return (
         <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.95)', zIndex: 3000, padding: '20px',
-            display: 'flex', flexDirection: 'column', justifyContent: 'center'
+            background: 'rgba(0,0,0,0.95)', zIndex: 6000,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+            padding: '20px'
         }}>
-            <div className="glass-card" style={{ position: 'relative', height: 'auto', minHeight: '450px', display: 'flex', flexDirection: 'column', border: '1px solid #00F2FE' }}>
-                
-                {/* Header */}
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px'}}>
-                    <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
-                        <BookOpen color="#00F2FE" />
-                        <span style={{fontWeight:'bold', color:'#fff'}}>WHITEPAPER v2.0</span>
-                    </div>
-                    <button onClick={onClose} style={{background:'none', border:'none', color:'#fff', cursor:'pointer'}}><X /></button>
-                </div>
+            <div className="glass-card" style={{ 
+                width: '100%', maxWidth: '400px', padding: '30px 20px', 
+                display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
+                border: '1px solid #00F2FE', position: 'relative'
+            }}>
+                <button onClick={onClose} style={{ position: 'absolute', top: 15, right: 15, background: 'none', border: 'none', color: '#fff' }}><X /></button>
 
-                {/* Contenido */}
-                <div style={{ flex: 1, textAlign: 'center', padding: '10px' }}>
-                    <div style={{ fontSize: '60px', marginBottom: '20px' }}>{pages[page].icon}</div>
-                    <h2 style={{ color: '#00F2FE', marginBottom: '15px', fontSize:'22px' }}>{pages[page].title}</h2>
-                    <p style={{ lineHeight: '1.6', color: '#ddd', fontSize: '14px' }}>
-                        {pages[page].content}
+                {/* Contenido Dinámico */}
+                <div style={{ marginBottom: '20px', animation: 'fadeIn 0.5s' }}>
+                    <div style={{ marginBottom: '20px', filter: 'drop-shadow(0 0 15px rgba(255,255,255,0.2))' }}>
+                        {slides[page].icon}
+                    </div>
+                    <h2 style={{ color: '#fff', fontSize: '24px', marginBottom: '15px' }}>{slides[page].title}</h2>
+                    <p style={{ color: '#ccc', fontSize: '14px', lineHeight: '1.5', whiteSpace: 'pre-line' }}>
+                        {slides[page].text}
                     </p>
                 </div>
 
-                {/* Indicador */}
-                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '20px' }}>
-                    {pages.map((_, i) => (
-                        <div key={i} style={{ width: '8px', height: '8px', borderRadius: '50%', background: i === page ? '#00F2FE' : '#333', transition:'all 0.3s' }} />
+                {/* Indicadores de Página */}
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '30px' }}>
+                    {slides.map((_, i) => (
+                        <div key={i} style={{
+                            width: '8px', height: '8px', borderRadius: '50%',
+                            background: i === page ? '#00F2FE' : '#333',
+                            transition: 'background 0.3s'
+                        }} />
                     ))}
                 </div>
 
-                {/* Botón */}
+                {/* Botón de Acción */}
                 <button 
                     className="btn-neon"
                     onClick={() => {
@@ -80,13 +83,13 @@ export const WhitepaperModal: React.FC<WhitepaperModalProps> = ({ onClose, onCla
                             setPage(p => p + 1);
                         }
                     }}
-                    disabled={isClaiming}
-                    style={{ width: '100%', padding: '15px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                    disabled={isLastPage && isClaiming}
+                    style={{ width: '100%', fontSize: '16px', padding: '12px', display:'flex', justifyContent:'center', alignItems:'center', gap:'10px' }}
                 >
                     {isLastPage ? (
-                        canClaim ? (isClaiming ? 'Claiming...' : '✅ I UNDERSTAND & CLAIM 5,000 PTS') : 'CLOSE'
+                        canClaim ? (isClaiming ? "CLAIMING..." : "✅ FINISH & CLAIM 2.5K") : "CLOSE (ALREADY CLAIMED)"
                     ) : (
-                        <>NEXT PAGE <ChevronRight size={18}/></>
+                        <>NEXT <ChevronRight size={16}/></>
                     )}
                 </button>
 
