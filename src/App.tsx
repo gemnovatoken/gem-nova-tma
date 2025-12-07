@@ -36,7 +36,7 @@ export default function App() {
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // 1. CARGA INICIAL
+    // 1. CARGA INICIAL ROBUSTA
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -54,15 +54,24 @@ export default function App() {
                 if (data) {
                     setScore(data.score);
                     
-                    const lastUpdate = new Date(data.last_energy_update).getTime();
+                    // --- 🛠️ CORRECCIÓN DE CÁLCULO OFFLINE ---
+                    // Aseguramos que las fechas sean válidas
+                    const lastUpdate = data.last_energy_update ? new Date(data.last_energy_update).getTime() : new Date().getTime();
                     const now = new Date().getTime();
-                    const secondsPassed = Math.floor((now - lastUpdate) / 1000);
+                    
+                    // Evitamos números negativos si el reloj del dispositivo está mal
+                    const secondsPassed = Math.max(0, Math.floor((now - lastUpdate) / 1000));
                     
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (data.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (data.limit_level || 1) - 1)];
+                    
                     const generatedOffline = secondsPassed * mySpeed;
                     
-                    setEnergy(Math.min(myLimit, data.energy + generatedOffline));
+                    // Sumamos lo que tenía guardado + lo generado offline
+                    const storedEnergy = data.energy || 0;
+                    const totalEnergy = Math.min(myLimit, storedEnergy + generatedOffline);
+                    
+                    setEnergy(totalEnergy);
                     
                     setLevels({ 
                         multitap: data.multitap_level || 1, 
@@ -77,7 +86,7 @@ export default function App() {
                         setBotTime(timeLeft);
                     }
 
-                    // Carga datos de Anuncios (Reset diario)
+                    // Carga datos de Anuncios
                     const today = new Date().toISOString().split('T')[0];
                     if (data.last_bot_ad_date !== today) {
                         setAdsWatched(0); 
@@ -90,6 +99,7 @@ export default function App() {
                     }
 
                 } else {
+                    // Nuevo usuario
                     await supabase.from('user_score').insert([{
                         user_id: user.id, score: 0, energy: 500, username: username,
                         last_energy_update: new Date().toISOString()
@@ -107,7 +117,6 @@ export default function App() {
                 if (p >= maxEnergy) return p;
                 return Math.min(maxEnergy, p + regenRate);
             });
-            // Resta tiempo al bot
             setBotTime(prev => Math.max(0, prev - 1));
         }, 1000);
         return () => clearInterval(timer);
@@ -131,7 +140,6 @@ export default function App() {
                             </div>
                             
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                {/* 👇 AQUÍ ESTÁ LA CORRECCIÓN: Agregamos botTime y adsWatched */}
                                 <MyMainTMAComponent 
                                     score={score} setScore={setScore} 
                                     energy={energy} setEnergy={setEnergy} 

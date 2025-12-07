@@ -137,26 +137,32 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     };
 
-    // --- 🔥 WATCH VIDEO (ACTUALIZADO CON LOGS) ---
+    // --- 🔥 WATCH VIDEO (CORREGIDO PARA INSTAFILL) ---
     const watchVideo = useCallback(async (type: 'turbo' | 'refill') => {
         const msg = type === 'turbo' ? "📺 Watch Ad to DOUBLE mining speed (1m)?" : "📺 Watch Ad to INSTANTLY fill tank?";
         if(!window.confirm(msg)) return;
         
-        // Simulación de espera (Aquí iría tu Adsgram)
         setTimeout(async () => {
             if(user) {
-                // REGISTRAR EN DASHBOARD
+                // 1. REGISTRAR EN DASHBOARD
                 await supabase.from('game_logs').insert({
                     user_id: user.id,
                     event_type: 'video_boost',
                     metadata: { type: type } 
                 });
+
+                // 2. 🔥 SI ES REFILL, AVISAR AL SERVIDOR (Aquí estaba el error)
+                if (type === 'refill') {
+                    const { error } = await supabase.rpc('apply_refill', { user_id_in: user.id });
+                    if (error) console.error("Refill Error:", error);
+                }
             }
 
+            // 3. ACTUALIZAR VISUALMENTE
             if (type === 'turbo') {
-                alert("🚀 OVERCLOCK ACTIVATED! (Speed x2 - Logging only)");
+                alert("🚀 OVERCLOCK ACTIVATED! (Speed x2)");
             } else {
-                setEnergy(maxEnergy); 
+                setEnergy(maxEnergy); // Llenado visual instantáneo
                 alert("🔋 Tank Filled Instantly!");
             }
         }, 1000);
