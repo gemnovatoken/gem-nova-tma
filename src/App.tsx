@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
-import { Header } from './components/Header';
+// import { Header } from './components/Header'; // <-- ELIMINADO
 import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
 import { MarketDashboard } from './components/MarketDashboard';
@@ -26,13 +26,12 @@ export default function App() {
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     const { user, loading: authLoading } = useAuth();
     
-    // Cálculos dinámicos (fuera del efecto para usarlos siempre)
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
     const speedIdx = Math.min(Math.max(0, levels.speed - 1), 7);
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // 1. CARGA INICIAL INTELIGENTE (Calcula lo que ganaste offline)
+    // 1. CARGA INICIAL
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -41,21 +40,16 @@ export default function App() {
                 if (data) {
                     setScore(data.score);
                     
-                    // --- LÓGICA DE REGENERACIÓN OFFLINE ---
                     const lastUpdate = new Date(data.last_energy_update).getTime();
                     const now = new Date().getTime();
-                    // Segundos que pasaron desde que cerraste la app
                     const secondsPassed = Math.floor((now - lastUpdate) / 1000);
                     
-                    // Recuperamos tu velocidad y límite reales de la base de datos
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (data.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (data.limit_level || 1) - 1)];
                     
-                    // Calculamos cuánto debiste recargar
                     const generatedOffline = secondsPassed * mySpeed;
                     const totalEnergy = Math.min(myLimit, data.energy + generatedOffline);
                     
-                    // Actualizamos el estado visual inmediatamente
                     setEnergy(totalEnergy);
                     
                     setLevels({ 
@@ -69,7 +63,7 @@ export default function App() {
         }
     }, [user, authLoading]);
 
-    // 2. Regeneración en Vivo (Mientras la app está abierta)
+    // 2. REGENERACIÓN EN VIVO
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -84,15 +78,14 @@ export default function App() {
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
             <div className="app-container" style={{ height: '100dvh', overflow: 'hidden', background: '#000', color: 'white', position: 'relative', display: 'flex', flexDirection: 'column' }}>
                 
-                <div style={{ flexShrink: 0 }}>
-                    <Header />
-                </div>
-
+                {/* HEADER ELIMINADO PARA MÁS ESPACIO */}
+                
                 <div style={{ 
                     flex: 1, 
                     overflowY: 'auto', 
                     position: 'relative',
-                    display: 'flex', flexDirection: 'column'
+                    display: 'flex', flexDirection: 'column',
+                    paddingTop: '20px' // Un poco de aire arriba ya que no hay header
                 }}>
                     {currentTab === 'mine' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
