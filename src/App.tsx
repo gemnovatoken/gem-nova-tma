@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
-// import { Header } from './components/Header'; // <-- ELIMINADO
+// import { Header } from './components/Header'; 
 import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
 import { MarketDashboard } from './components/MarketDashboard';
@@ -24,6 +24,11 @@ export default function App() {
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
+    
+    // 🔥 ESTADOS DEL BOT
+    const [botTime, setBotTime] = useState(0);
+    const [adsWatched, setAdsWatched] = useState(0);
+
     const { user, loading: authLoading } = useAuth();
     
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
@@ -31,36 +36,33 @@ export default function App() {
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // 1. CARGA INICIAL INTELIGENTE + CAPTURA DE USERNAME
+    // 1. CARGA INICIAL
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
-                // A. OBTENER DATOS DE TELEGRAM
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tg = (window as any).Telegram?.WebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
-                // Usamos el username, o el primer nombre, o "Miner" como respaldo
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
-                // B. BUSCAR USUARIO EN SUPABASE
-                const { data } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
+                const { data } = await supabase
+                    .from('user_score')
+                    .select('*, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
+                    .eq('user_id', user.id)
+                    .single();
                 
                 if (data) {
-                    // SI EL USUARIO YA EXISTE:
                     setScore(data.score);
                     
-                    // Lógica de regeneración offline
                     const lastUpdate = new Date(data.last_energy_update).getTime();
                     const now = new Date().getTime();
                     const secondsPassed = Math.floor((now - lastUpdate) / 1000);
                     
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (data.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (data.limit_level || 1) - 1)];
-                    
                     const generatedOffline = secondsPassed * mySpeed;
-                    const totalEnergy = Math.min(myLimit, data.energy + generatedOffline);
                     
-                    setEnergy(totalEnergy);
+                    setEnergy(Math.min(myLimit, data.energy + generatedOffline));
                     
                     setLevels({ 
                         multitap: data.multitap_level || 1, 
@@ -68,44 +70,45 @@ export default function App() {
                         speed: data.speed_level || 1 
                     });
 
-                    // C. ACTUALIZAR NOMBRE SI ES NECESARIO
-                    // Si el nombre en la base de datos es diferente al de Telegram, lo actualizamos
+                    // Carga datos del Bot
+                    if (data.bot_active_until) {
+                        const botExpiry = new Date(data.bot_active_until).getTime();
+                        const timeLeft = Math.max(0, Math.floor((botExpiry - now) / 1000));
+                        setBotTime(timeLeft);
+                    }
+
+                    // Carga datos de Anuncios (Reset diario)
+                    const today = new Date().toISOString().split('T')[0];
+                    if (data.last_bot_ad_date !== today) {
+                        setAdsWatched(0); 
+                    } else {
+                        setAdsWatched(data.bot_ads_watched_today || 0);
+                    }
+
                     if (data.username !== username) {
-                        await supabase
-                            .from('user_score')
-                            .update({ username: username })
-                            .eq('user_id', user.id);
+                        await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
                     }
 
                 } else {
-                    // SI ES UN USUARIO NUEVO (No existe en la tabla):
-                    // Creamos el registro inicial con el nombre de usuario
-                    const { error: insertError } = await supabase.from('user_score').insert([{
-                        user_id: user.id,
-                        score: 0,
-                        energy: 500,
-                        username: username, // Guardamos el nombre desde el principio
+                    await supabase.from('user_score').insert([{
+                        user_id: user.id, score: 0, energy: 500, username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
-
-                    if (!insertError) {
-                        setScore(0);
-                        setEnergy(500);
-                        setLevels({ multitap: 1, limit: 1, speed: 1 });
-                    }
                 }
             };
             fetchInitialData();
         }
     }, [user, authLoading]);
 
-    // 2. REGENERACIÓN EN VIVO
+    // 2. LOOP (Energía + Bot)
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
                 if (p >= maxEnergy) return p;
                 return Math.min(maxEnergy, p + regenRate);
             });
+            // Resta tiempo al bot
+            setBotTime(prev => Math.max(0, prev - 1));
         }, 1000);
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
@@ -113,8 +116,6 @@ export default function App() {
     return (
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
             <div className="app-container" style={{ height: '100dvh', overflow: 'hidden', background: '#000', color: 'white', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                
-                {/* HEADER ELIMINADO PARA MÁS ESPACIO */}
                 
                 <div style={{ 
                     flex: 1, 
@@ -130,11 +131,14 @@ export default function App() {
                             </div>
                             
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                {/* 👇 AQUÍ ESTÁ LA CORRECCIÓN: Agregamos botTime y adsWatched */}
                                 <MyMainTMAComponent 
                                     score={score} setScore={setScore} 
                                     energy={energy} setEnergy={setEnergy} 
                                     levels={levels} setLevels={setLevels}
                                     maxEnergy={maxEnergy} regenRate={regenRate}
+                                    botTime={botTime} setBotTime={setBotTime}
+                                    adsWatched={adsWatched} setAdsWatched={setAdsWatched}
                                 />
                             </div>
                         </div>
