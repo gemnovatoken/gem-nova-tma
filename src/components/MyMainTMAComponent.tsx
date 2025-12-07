@@ -118,7 +118,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 if (!user) return;
                 const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
                 
-                // LOG PARA EL DASHBOARD
+                // LOG PARA DASHBOARD
                 if (!error && data && data[0].success) {
                     await supabase.from('game_logs').insert({
                         user_id: user.id,
