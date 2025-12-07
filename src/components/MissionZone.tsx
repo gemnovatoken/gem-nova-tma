@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-// ✅ CORRECCIÓN: Importamos solo lo que vamos a usar
 import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Ticket, Video, Gift, Zap } from 'lucide-react';
 import { MemoryGame, AsteroidGame, HackerGame } from './ArcadeGames';
 
@@ -65,10 +64,20 @@ export const MissionZone: React.FC = () => {
     const handlePlayGame = async (gameId: string) => {
         if (!user) return;
         
+        // 1. SI NO TIENE TICKETS -> VER VIDEO
         if (tickets <= 0) {
             if(window.confirm("🎫 No tickets left!\n\nWatch Ad to get +2 Tickets?")) {
                 console.log("Watching Ad...");
+                
+                // Simulación de espera de anuncio
                 setTimeout(async () => {
+                    // 🔥 REGISTRO EN DASHBOARD: VIDEO ARCADE
+                    await supabase.from('game_logs').insert({
+                        user_id: user.id,
+                        event_type: 'video_arcade', // Esto cuenta para la métrica de Arcade
+                        metadata: { source: 'extra_tickets' } 
+                    });
+
                     await supabase.rpc('add_tickets', { user_id_in: user.id, amount: 2 });
                     alert("✅ +2 Tickets Added!");
                     loadData();
@@ -77,6 +86,7 @@ export const MissionZone: React.FC = () => {
             return;
         }
 
+        // 2. GASTAR TICKET Y JUGAR
         const { data } = await supabase.rpc('spend_ticket', { user_id_in: user.id });
         if (data) {
             setTickets(prev => prev - 1);
@@ -149,7 +159,6 @@ export const MissionZone: React.FC = () => {
                         width:'36px', height:'36px', borderRadius:'50%', background: isPast ? '#4CAF50' : 'rgba(0,0,0,0.3)',
                         display:'flex', alignItems:'center', justifyContent:'center', border:`1px solid ${borderColor}`
                     }}>
-                        {/* 🛡️ CORRECCIÓN: Usamos Calendar para días futuros (Solución error 'defined but never used') */}
                         {isPast ? <CheckCircle2 size={18} color="#000" /> : (
                             isMilestone ? <Gift size={18} color={iconColor} /> : 
                             (isToday ? <Zap size={18} color={iconColor} fill={iconColor} /> : <Calendar size={16} color="#444" />)

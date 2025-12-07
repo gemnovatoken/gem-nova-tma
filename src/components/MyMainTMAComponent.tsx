@@ -118,11 +118,11 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 if (!user) return;
                 const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
                 
-                // LOG PARA DASHBOARD
+                // LOG PARA DASHBOARD (BOT)
                 if (!error && data && data[0].success) {
                     await supabase.from('game_logs').insert({
                         user_id: user.id,
-                        event_type: 'video_ad',
+                        event_type: 'video_bot',
                         metadata: { source: 'bot_supervisor' } 
                     });
 
@@ -137,19 +137,30 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     };
 
-    const watchVideo = useCallback((type: 'turbo' | 'refill') => {
+    // --- 🔥 WATCH VIDEO (ACTUALIZADO CON LOGS) ---
+    const watchVideo = useCallback(async (type: 'turbo' | 'refill') => {
         const msg = type === 'turbo' ? "📺 Watch Ad to DOUBLE mining speed (1m)?" : "📺 Watch Ad to INSTANTLY fill tank?";
         if(!window.confirm(msg)) return;
         
-        setTimeout(() => {
+        // Simulación de espera (Aquí iría tu Adsgram)
+        setTimeout(async () => {
+            if(user) {
+                // REGISTRAR EN DASHBOARD
+                await supabase.from('game_logs').insert({
+                    user_id: user.id,
+                    event_type: 'video_boost',
+                    metadata: { type: type } 
+                });
+            }
+
             if (type === 'turbo') {
-                alert("🚀 OVERCLOCK ACTIVATED! (Speed x2)");
+                alert("🚀 OVERCLOCK ACTIVATED! (Speed x2 - Logging only)");
             } else {
                 setEnergy(maxEnergy); 
                 alert("🔋 Tank Filled Instantly!");
             }
         }, 1000);
-    }, [maxEnergy, setEnergy]);
+    }, [maxEnergy, setEnergy, user]);
 
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
         if (loading || !user) return; setLoading(true);
