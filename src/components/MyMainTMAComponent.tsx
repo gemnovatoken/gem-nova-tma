@@ -4,11 +4,8 @@ import { useAuth } from '../hooks/useAuth';
 import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
-// 1. Eliminamos 'Trophy'
 import { Zap, Gamepad2, Rocket, Bot, Video, Server } from 'lucide-react';
-
-// Importamos los tipos
-import type { SetStateAction, Dispatch, ReactElement } from 'react';
+import type { SetStateAction, Dispatch } from 'react';
 
 interface GameProps {
     score: number; setScore: Dispatch<SetStateAction<number>>;
@@ -16,18 +13,17 @@ interface GameProps {
     levels: { multitap: number; limit: number; speed: number }; 
     setLevels: Dispatch<SetStateAction<{ multitap: number; limit: number; speed: number }>>;
     maxEnergy: number; regenRate: number;
+    botTime: number; 
+    setBotTime: Dispatch<SetStateAction<number>>;
+    adsWatched: number; 
+    setAdsWatched: Dispatch<SetStateAction<number>>;
 }
 
 interface DockButtonProps {
-    icon: React.ReactNode; 
-    label: string; 
-    sub?: string; 
-    color?: string; 
-    onClick: () => void;
+    icon: React.ReactNode; label: string; sub?: string; color?: string; onClick: () => void;
 }
 
 const LEVEL_NAMES = ["Laptop", "GPU Rig", "Garage Farm", "Server Room", "Industrial", "Geothermal", "Fusion", "Quantum"];
-// 2. Eliminamos 'GAME_CONFIG' porque no se usaba aquí
 
 export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const { user } = useAuth();
@@ -37,14 +33,17 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const [showBoosts, setShowBoosts] = useState(false);
     const [loading, setLoading] = useState(false);
     const [claiming, setClaiming] = useState(false);
+    
+    const { 
+        score, setScore, energy, setEnergy, levels, setLevels, 
+        maxEnergy, regenRate, botTime, setBotTime, 
+        adsWatched, setAdsWatched 
+    } = props;
 
-    const [multiplier, setMultiplier] = useState(1); 
-    const [botTime, setBotTime] = useState(0); 
-
-    const { score, setScore, energy, setEnergy, levels, setLevels, maxEnergy, regenRate } = props;
-
-    const globalLevel = Math.min(levels.limit, levels.speed); 
-    const isPremiumBot = globalLevel >= 7; 
+    const globalLevel = levels.limit; 
+    const isGodMode = globalLevel >= 8; 
+    const isEliteMode = globalLevel >= 6 && globalLevel < 8; 
+    const isBasicMode = globalLevel < 6; 
 
     // --- FUNCIÓN DE COBRO (CLAIM) ---
     const handleClaim = useCallback(async () => {
@@ -59,41 +58,74 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
         const { data, error } = await supabase.rpc('claim_mining', { user_id_in: user.id });
         
+        if (error) console.error("Claim error:", error);
+
         if (data && data[0] && data[0].success) {
             setScore(data[0].new_score);
-        } else {
-            console.error("Claim Error", error);
         }
-        
         setTimeout(() => setClaiming(false), 500);
     }, [user, energy, claiming, setScore, setEnergy]);
 
-    // --- LÓGICA DE MINADO ---
+    // --- AUTO-CLAIM DEL BOT ---
     useEffect(() => {
-        const interval = setInterval(() => {
-            setEnergy(current => {
-                if (current >= maxEnergy) return maxEnergy;
-                return Math.min(maxEnergy, current + (regenRate * multiplier));
-            });
+        if (botTime > 0 && energy >= maxEnergy * 0.9) {
+            const t = setTimeout(() => {
+                handleClaim();
+            }, 0);
+            return () => clearTimeout(t);
+        }
+    }, [botTime, energy, maxEnergy, handleClaim]);
 
-            if (botTime > 0) {
-                setBotTime(t => Math.max(0, t - 1));
-                if (energy >= maxEnergy * 0.9) {
-                    handleClaim();
-                }
+    // --- FUNCIÓN PARA ACTIVAR BOT ---
+    const activateBot = async (duration: number) => {
+        if (!user) return;
+        setBotTime(prev => prev + duration); 
+        await supabase.rpc('activate_bot', { user_id_in: user.id, duration_seconds: duration });
+    };
+
+    const handleBotClick = async () => {
+        if (botTime > 0) { 
+            const hrs = Math.floor(botTime / 3600);
+            const mins = Math.floor((botTime % 3600) / 60);
+            alert(`🤖 Supervisor Active: ${hrs}h ${mins}m remaining.`); 
+            return; 
+        }
+
+        if (isGodMode) {
+            if(window.confirm("🌌 QUANTUM SUPERVISOR\n\nActivate for 5 DAYS (120 Hours)?")) {
+                activateBot(432000); 
+                alert("✅ Bot deployed for 5 days.");
             }
-        }, 1000);
-        return () => clearInterval(interval);
-        // 3. Eliminamos el comentario eslint-disable innecesario
-    }, [regenRate, multiplier, maxEnergy, botTime, energy, handleClaim, setEnergy]); 
+            return;
+        }
 
-    const handleBotClick = () => {
-        if (botTime > 0) { alert(`🤖 Supervisor Active: ${Math.ceil(botTime/60)}m left`); return; }
-        if (isPremiumBot) {
-            if(window.confirm("💎 LEVEL 7: Deploy AI Supervisor (6 Hours)?")) setBotTime(21600);
-        } else {
-            if(window.confirm("📺 Hire Supervisor for 10m? (Watch Ad)")) {
-                console.log("Ad..."); setTimeout(() => setBotTime(600), 2000);
+        if (isEliteMode) {
+            if(window.confirm("🌋 ELITE SUPERVISOR\n\nActivate for 2 DAYS (48 Hours)?")) {
+                activateBot(172800); 
+                alert("✅ Bot deployed for 48 hours.");
+            }
+            return;
+        }
+
+        if (isBasicMode) {
+            if (adsWatched >= 2) {
+                alert("🛑 Daily Limit Reached (2/2)\n\nUpgrade to Level 6 to remove limits and ads!");
+                return;
+            }
+
+            if(window.confirm(`📺 Hire Supervisor for 30m?\n\nWatch Ad (${2 - adsWatched} left today)`)) {
+                console.log("Watching Ad...");
+                if (!user) return;
+                const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
+                
+                if (!error && data && data[0].success) {
+                    setAdsWatched(data[0].new_count); 
+                    activateBot(1800); 
+                    alert("✅ Bot Activated for 30m!");
+                } else {
+                    console.error(error);
+                    alert(data?.[0]?.message || "Error watching ad.");
+                }
             }
         }
     };
@@ -104,19 +136,20 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         
         setTimeout(() => {
             if (type === 'turbo') {
-                setMultiplier(2); 
                 alert("🚀 OVERCLOCK ACTIVATED! (Speed x2)");
-                setTimeout(() => setMultiplier(1), 60000); 
             } else {
                 setEnergy(maxEnergy); 
                 alert("🔋 Tank Filled Instantly!");
             }
-        }, 2000);
+        }, 1000);
     }, [maxEnergy, setEnergy]);
 
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
         if (loading || !user) return; setLoading(true);
         const { data, error } = await supabase.rpc('buy_boost', { user_id_in: user.id, boost_type: type });
+        
+        if (error) console.error("Boost error:", error);
+
         if (!error && data && data[0].success) {
             setScore(data[0].new_score); setLevels(p => ({ ...p, [type]: data[0].new_level })); alert(data[0].message);
         } else alert(data?.[0]?.message || "Error");
@@ -128,6 +161,20 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const fillPercent = Math.min(100, (energy / maxEnergy) * 100);
     const strokeDashoffset = circumference - (fillPercent / 100) * circumference;
     const ringColor = fillPercent < 50 ? '#00F2FE' : (fillPercent < 90 ? '#FFD700' : '#FF512F');
+
+    const getBotLabel = () => {
+        if (botTime > 0) return "ACTIVE";
+        if (isGodMode) return "5 DAYS";
+        if (isEliteMode) return "48 HRS";
+        return adsWatched >= 2 ? "LIMIT" : "30 MIN";
+    };
+
+    const getBotColor = () => {
+        if (botTime > 0) return "#4CAF50"; 
+        if (isGodMode || isEliteMode) return "#FFD700"; 
+        if (adsWatched >= 2) return "#333"; 
+        return "#fff"; 
+    };
 
     return (
         <div style={{ 
@@ -142,7 +189,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     padding: '4px 12px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', 
                     background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '2px'
                 }}>
-                    <Server size={12} color={isPremiumBot ? "#FFD700" : "#aaa"}/>
+                    <Server size={12} color={isGodMode ? "#FFD700" : "#aaa"}/>
                     <span style={{fontSize:'9px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>
                         RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}
                     </span>
@@ -209,7 +256,13 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '5px' }}>
                         <DockButton icon={<Rocket/>} label="UPGRADE" color="#00F2FE" onClick={() => setShowBoosts(true)} />
-                        <DockButton icon={<Bot/>} label="MANAGER" sub={isPremiumBot?"AI":"HIRE"} color={botTime>0?"#4CAF50":"#fff"} onClick={handleBotClick} />
+                        <DockButton 
+                            icon={<Bot/>} 
+                            label="MANAGER" 
+                            sub={getBotLabel()} 
+                            color={getBotColor()} 
+                            onClick={handleBotClick} 
+                        />
                         <DockButton icon={<Zap/>} label="OVERCLOCK" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
                         <DockButton icon={<Video/>} label="INSTA-FILL" sub="AD" color="#4CAF50" onClick={() => watchVideo('refill')} />
                     </div>
@@ -240,8 +293,10 @@ const DockButton: React.FC<DockButtonProps> = ({ icon, label, sub, color, onClic
         alignItems: 'center', justifyContent: 'center', gap: '0px', cursor: 'pointer', color: color || '#fff',
         padding: '4px 0'
     }}>
-        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-        {React.isValidElement(icon) ? React.cloneElement(icon as ReactElement<any>, { size: 18 }) : icon}
+        {React.isValidElement(icon) 
+            // 🔥 SOLUCIÓN FINAL: Casting explícito para que TS sepa que el icono acepta 'size'
+            ? React.cloneElement(icon as React.ReactElement<{ size: number }>, { size: 18 }) 
+            : icon}
         <span style={{ fontSize: '8px', fontWeight: 'bold', marginTop:'1px' }}>{label}</span>
         {sub && <span style={{ fontSize: '6px', background: '#333', padding: '0px 3px', borderRadius: '2px', color: '#aaa', marginTop:'1px' }}>{sub}</span>}
     </button>
