@@ -2,7 +2,6 @@ import React from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { StakingBank } from './StakingBank';
-// Importamos el botón de Wallet
 import { TonConnectButton } from '@tonconnect/ui-react';
 import { Zap, Cpu, Shield, Rocket, Lock, Play, Hexagon, Crown } from 'lucide-react';
 
@@ -17,30 +16,53 @@ interface PackNodeProps {
     side: 'left' | 'right';
 }
 
+// 1. CONFIGURACIÓN DE PRECIOS Y PUNTOS (Para el Log)
+const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
+    'starter':   { ton: 0.15, pts: 100000,   label: "Initialize Protocol" },
+    'pro':       { ton: 0.75, pts: 500000,   label: "Upgrade System" },
+    'whale':     { ton: 1.50, pts: 1000000,  label: "Deploy Whale Node" },
+    'tycoon':    { ton: 7.50, pts: 5000000,  label: "Execute Tycoon Override" },
+    'emperor':   { ton: 25.0, pts: 17000000, label: "System Overclock" },
+    'blackhole': { ton: 100.0, pts: 70000000, label: "⚠️ GOD MODE" }
+};
+
 export const BulkStore: React.FC = () => {
     const { user } = useAuth();
 
     const buyPack = async (pack: string) => {
         if(!user) return;
         
-        let msg = "";
-        if (pack === 'starter') msg = "Initialize Protocol: 100k Pts for 0.15 TON";
-        else if (pack === 'pro') msg = "Upgrade System: 500k Pts for 0.75 TON";
-        else if (pack === 'whale') msg = "Deploy Whale Node: 1M Pts for 1.50 TON";
-        else if (pack === 'tycoon') msg = "Execute Tycoon Override: 5M Pts for 7.50 TON";
-        else if (pack === 'emperor') msg = "System Overclock: 17M Pts for 25 TON";
-        else if (pack === 'blackhole') msg = "⚠️ WARNING: GOD MODE (70M Pts) for 100 TON";
+        // Buscamos los datos del pack seleccionado
+        const selectedPack = PACK_DATA[pack];
+        if (!selectedPack) return;
+
+        const msg = `${selectedPack.label}: ${selectedPack.pts.toLocaleString()} Pts for ${selectedPack.ton} TON`;
 
         if (!window.confirm(msg)) return;
         
+        // A. Ejecutar la compra en el juego (Sumar puntos)
         const { error } = await supabase.rpc('buy_bulk_pack', { user_id_in: user.id, pack_type: pack });
-        if(!error) alert('✅ Transaction Verified. Database Updated.');
-        else alert('Error: Transaction Failed');
+        
+        if(!error) {
+            // B. 🔥 REGISTRAR TRANSACCIÓN EN EL DASHBOARD (Dinámico)
+            // Esto guarda exactamente cuánto pagó y cuántos puntos recibió, sea cual sea el paquete.
+            await supabase.from('transactions').insert({
+                user_id: user.id,
+                item_type: `bulk_${pack}`, // ej: 'bulk_starter' o 'bulk_whale'
+                amount_ton: selectedPack.ton,
+                amount_points: selectedPack.pts
+            });
+
+            alert('✅ Transaction Verified. Database Updated.');
+        } else {
+            alert('Error: Transaction Failed');
+        }
     };
 
     const unlockPack = (packName: string) => {
         if(window.confirm(`🔒 SECURE NODE DETECTED.\n\nWatch Ad-Stream to decrypt access to ${packName}?`)) {
             console.log("Playing Ad for:", packName);
+            // Aquí deberías agregar también el log de 'video_ad' si quieres contar estos desbloqueos
             alert("🔓 Decrypting... Node Access Granted.");
         }
     }
@@ -61,7 +83,6 @@ export const BulkStore: React.FC = () => {
                 <div style={{width: '100px', height: '2px', background: '#00F2FE', margin: '10px auto', boxShadow: '0 0 10px #00F2FE'}}></div>
                 <p style={{ color: '#aaa', fontSize: '10px', marginBottom: '15px' }}>SECURE CONNECTION: ENCRYPTED</p>
                 
-                {/* 🛡️ AQUÍ ESTÁ EL BOTÓN WALLET (Pequeño y Centrado) */}
                 <div style={{ display: 'flex', justifyContent: 'center', transform: 'scale(0.85)' }}>
                     <TonConnectButton />
                 </div>
@@ -70,35 +91,30 @@ export const BulkStore: React.FC = () => {
             {/* --- EL CAMINO DE NODOS --- */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '50px', padding: '0 20px', position: 'relative' }}>
                 
-                {/* Nivel 1: Starter */}
                 <PackNode 
                     title="STARTER_NODE" points="100k" price="0.15 TON" 
                     color="#00F2FE" icon={<Zap size={20}/>} side="left"
                     onClick={() => buyPack('starter')} 
                 />
 
-                {/* Nivel 2: Pro */}
                 <PackNode 
                     title="PRO_MODULE" points="500k" price="0.75 TON" 
                     color="#4CAF50" icon={<Cpu size={20}/>} side="right"
                     onClick={() => buyPack('pro')} 
                 />
 
-                {/* Nivel 3: Whale (Bloqueado) */}
                 <PackNode 
                     title="WHALE_SERVER" points="1M" price="1.50 TON" 
                     color="#FFD700" icon={<Shield size={20}/>} side="left"
                     isLocked={true} onClick={() => unlockPack('WHALE')} 
                 />
 
-                {/* Nivel 4: Tycoon (Bloqueado) */}
                 <PackNode 
                     title="TYCOON_CORE" points="5M" price="7.50 TON" 
                     color="#E040FB" icon={<Rocket size={20}/>} side="right"
                     isLocked={true} onClick={() => unlockPack('TYCOON')}
                 />
 
-                {/* Nivel 5: Emperor (Bloqueado) */}
                 <PackNode 
                     title="EMPEROR_SYS" points="17M" price="25 TON" 
                     color="#FF512F" icon={<Crown size={20}/>} side="left"
