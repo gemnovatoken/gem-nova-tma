@@ -118,7 +118,14 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 if (!user) return;
                 const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
                 
+                // LOG PARA EL DASHBOARD
                 if (!error && data && data[0].success) {
+                    await supabase.from('game_logs').insert({
+                        user_id: user.id,
+                        event_type: 'video_ad',
+                        metadata: { source: 'bot_supervisor' } 
+                    });
+
                     setAdsWatched(data[0].new_count); 
                     activateBot(1800); 
                     alert("✅ Bot Activated for 30m!");
@@ -294,7 +301,6 @@ const DockButton: React.FC<DockButtonProps> = ({ icon, label, sub, color, onClic
         padding: '4px 0'
     }}>
         {React.isValidElement(icon) 
-            // 🔥 SOLUCIÓN FINAL: Casting explícito para que TS sepa que el icono acepta 'size'
             ? React.cloneElement(icon as React.ReactElement<{ size: number }>, { size: 18 }) 
             : icon}
         <span style={{ fontSize: '8px', fontWeight: 'bold', marginTop:'1px' }}>{label}</span>
