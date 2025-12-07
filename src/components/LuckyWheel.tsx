@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { X, Zap, Video, Gift } from 'lucide-react'; // 🛡️ Eliminamos 'Sparkles' y 'Trophy'
+import { X, Zap, Video, Gift } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 
 interface LuckyWheelProps {
@@ -9,16 +9,22 @@ interface LuckyWheelProps {
     onUpdateScore: Dispatch<SetStateAction<number>>;
 }
 
+// 1. CONFIGURACIÓN CENTRALIZADA (Orden: Manecillas del reloj empezando a las 12)
+const WHEEL_ITEMS = [
+    { value: 5000, label: "5K", sub: "JACKPOT", color: "#FFD700", textCol: "#000" }, // 0-72 deg
+    { value: 500,  label: "500", sub: "",        color: "#222",    textCol: "#fff" }, // 72-144 deg
+    { value: 2000, label: "2K",  sub: "",        color: "#00F2FE", textCol: "#000" }, // 144-216 deg
+    { value: 0,    label: "FAIL",sub: "",        color: "#FF512F", textCol: "#fff" }, // 216-288 deg
+    { value: 1000, label: "1K",  sub: "",        color: "#E040FB", textCol: "#000" }  // 288-360 deg
+];
+
 export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }) => {
     const { user } = useAuth();
     const [spinning, setSpinning] = useState(false);
     const [rotation, setRotation] = useState(0);
     const [spinsUsed, setSpinsUsed] = useState(0);
-    const maxSpins = 7; // 7 Intentos
-    const freeSpins = 2; // 2 Gratis
-
-    const segments = [5000, 500, 2000, 0, 1000];
-    const segmentAngle = 360 / segments.length;
+    const maxSpins = 7; 
+    const freeSpins = 2; 
 
     useEffect(() => {
         if (user) {
@@ -46,6 +52,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
 
         setSpinning(true);
 
+        // A. LLAMADA A SUPABASE
         const { data, error } = await supabase.rpc('spin_wheel_v2', { user_id_in: user.id });
 
         if (error || !data || data.length === 0) {
@@ -57,13 +64,28 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
         const wonAmount = data[0].reward;
         const newSpins = data[0].new_spins_used;
 
-        const targetIndices = segments.map((val, idx) => val === wonAmount ? idx : -1).filter(i => i !== -1);
-        const targetIndex = targetIndices[Math.floor(Math.random() * targetIndices.length)];
-        const extraSpins = 5; 
-        const randomOffset = Math.floor(Math.random() * 40) - 20; 
-        const targetAngle = (360 - (targetIndex * segmentAngle)) + (360 * extraSpins) + randomOffset;
+        // B. CÁLCULO MATEMÁTICO PERFECTO
+        // Buscamos el índice del premio ganado en nuestra configuración
+        const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
+        
+        // Si por alguna razón el backend devuelve algo que no está en la lista, default al 0 (FAIL)
+        const targetIndex = winningIndex !== -1 ? winningIndex : 3; 
 
-        setRotation(rotation + targetAngle);
+        const segmentAngle = 360 / WHEEL_ITEMS.length; // 72 grados
+        
+        // Queremos que el segmento ganador termine ARRIBA (donde está la flecha)
+        // Fórmula: 360 - (Indice * Angulo) - (Mitad del segmento para centrarlo)
+        // Ejemplo: Si gana indice 1 (72-144), queremos rotar hacia atrás ~108 grados.
+        const centerOffset = segmentAngle / 2;
+        const baseRotation = 360 - (targetIndex * segmentAngle) - centerOffset;
+        
+        // Añadimos aleatoriedad DENTRO del segmento (+/- 20 grados) para que no caiga siempre en el centro exacto
+        const randomWobble = Math.floor(Math.random() * 40) - 20;
+
+        // Añadimos 5 vueltas completas (1800) para efecto visual
+        const finalRotation = rotation + 1800 + baseRotation + randomWobble;
+
+        setRotation(finalRotation);
 
         setTimeout(() => {
             setSpinning(false);
@@ -82,6 +104,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
 
     const isFreeNext = spinsUsed < freeSpins;
     const isLimitReached = spinsUsed >= maxSpins;
+
+    // Generar el gradiente CSS dinámicamente basado en la config
+    const conicGradient = `conic-gradient(
+        ${WHEEL_ITEMS.map((item, i) => `${item.color} ${i * 72}deg ${(i + 1) * 72}deg`).join(', ')}
+    )`;
 
     return (
         <div style={{
@@ -114,38 +141,39 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
 
             <div style={{ position: 'relative', width: '320px', height: '320px', marginBottom: '40px' }}>
                 
+                {/* FLECHA INDICADORA */}
                 <div style={{
                     position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)',
                     width: '40px', height: '40px', background: '#fff', clipPath: 'polygon(50% 100%, 0 0, 100% 0)',
                     zIndex: 20, filter: 'drop-shadow(0 0 10px #fff)'
                 }}></div>
 
+                {/* Borde exterior animado */}
                 <div style={{
                     position:'absolute', top:'-10px', left:'-10px', right:'-10px', bottom:'-10px',
                     borderRadius:'50%', border:'2px dashed rgba(255,255,255,0.3)',
                     animation: 'spinSlow 10s linear infinite'
                 }}></div>
 
+                {/* LA RULETA */}
                 <div style={{
                     width: '100%', height: '100%', borderRadius: '50%',
                     border: '8px solid #1a1a1a', 
                     boxShadow: '0 0 50px rgba(224, 64, 251, 0.2), inset 0 0 30px rgba(0,0,0,0.5)',
                     transform: `rotate(${rotation}deg)`,
                     transition: 'transform 4s cubic-bezier(0.1, 0, 0.2, 1)',
-                    background: `conic-gradient(
-                        #FFD700 0deg 72deg,   
-                        #222 72deg 144deg,    
-                        #00F2FE 144deg 216deg,
-                        #FF512F 216deg 288deg,
-                        #E040FB 288deg 360deg 
-                    )`,
+                    background: conicGradient,
                     position: 'relative'
                 }}>
-                    <WheelLabel text="5K" sub="JACKPOT" angle={36} color="#000" />
-                    <WheelLabel text="500" angle={108} color="#fff" />
-                    <WheelLabel text="2K" angle={180} color="#000" />
-                    <WheelLabel text="FAIL" angle={252} color="#fff" />
-                    <WheelLabel text="1K" angle={324} color="#000" />
+                    {WHEEL_ITEMS.map((item, i) => (
+                        <WheelLabel 
+                            key={i}
+                            text={item.label} 
+                            sub={item.sub} 
+                            angle={(i * 72) + 36} // 72deg por item, +36 para centrar el texto en el gajo
+                            color={item.textCol} 
+                        />
+                    ))}
                 </div>
 
                 <div style={{
@@ -197,10 +225,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
 const WheelLabel = ({ text, sub, angle, color }: { text: string, sub?: string, angle: number, color: string }) => (
     <div style={{
         position: 'absolute', top: '50%', left: '50%',
+        // La magia de CSS: Rotamos al ángulo del gajo, subimos el texto hacia el borde (-110px), y rotamos el texto para que sea legible
         transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-110px)`,
-        color: color, textAlign: 'center'
+        color: color, textAlign: 'center', width: '100px'
     }}>
-        <div style={{fontWeight:'900', fontSize:'20px', textShadow:'0 1px 2px rgba(0,0,0,0.3)'}}>{text}</div>
-        {sub && <div style={{fontSize:'8px', fontWeight:'bold', opacity:0.8}}>{sub}</div>}
+        <div style={{fontWeight:'900', fontSize:'20px', textShadow:'0 1px 2px rgba(0,0,0,0.3)', transform: `rotate(${-angle}deg)`}}>{text}</div>
+        {sub && <div style={{fontSize:'8px', fontWeight:'bold', opacity:0.8, transform: `rotate(${-angle}deg)`}}>{sub}</div>}
     </div>
 );
