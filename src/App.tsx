@@ -31,15 +31,25 @@ export default function App() {
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // 1. CARGA INICIAL
+    // 1. CARGA INICIAL INTELIGENTE + CAPTURA DE USERNAME
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
+                // A. OBTENER DATOS DE TELEGRAM
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const tg = (window as any).Telegram?.WebApp;
+                const tgUser = tg?.initDataUnsafe?.user;
+                // Usamos el username, o el primer nombre, o "Miner" como respaldo
+                const username = tgUser?.username || tgUser?.first_name || 'Miner';
+
+                // B. BUSCAR USUARIO EN SUPABASE
                 const { data } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
                 
                 if (data) {
+                    // SI EL USUARIO YA EXISTE:
                     setScore(data.score);
                     
+                    // Lógica de regeneración offline
                     const lastUpdate = new Date(data.last_energy_update).getTime();
                     const now = new Date().getTime();
                     const secondsPassed = Math.floor((now - lastUpdate) / 1000);
@@ -57,6 +67,32 @@ export default function App() {
                         limit: data.limit_level || 1, 
                         speed: data.speed_level || 1 
                     });
+
+                    // C. ACTUALIZAR NOMBRE SI ES NECESARIO
+                    // Si el nombre en la base de datos es diferente al de Telegram, lo actualizamos
+                    if (data.username !== username) {
+                        await supabase
+                            .from('user_score')
+                            .update({ username: username })
+                            .eq('user_id', user.id);
+                    }
+
+                } else {
+                    // SI ES UN USUARIO NUEVO (No existe en la tabla):
+                    // Creamos el registro inicial con el nombre de usuario
+                    const { error: insertError } = await supabase.from('user_score').insert([{
+                        user_id: user.id,
+                        score: 0,
+                        energy: 500,
+                        username: username, // Guardamos el nombre desde el principio
+                        last_energy_update: new Date().toISOString()
+                    }]);
+
+                    if (!insertError) {
+                        setScore(0);
+                        setEnergy(500);
+                        setLevels({ multitap: 1, limit: 1, speed: 1 });
+                    }
                 }
             };
             fetchInitialData();
@@ -85,7 +121,7 @@ export default function App() {
                     overflowY: 'auto', 
                     position: 'relative',
                     display: 'flex', flexDirection: 'column',
-                    paddingTop: '20px' // Un poco de aire arriba ya que no hay header
+                    paddingTop: '20px' 
                 }}>
                     {currentTab === 'mine' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
