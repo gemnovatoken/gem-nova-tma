@@ -17,34 +17,27 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
-// Interfaz para evitar el error de TypeScript
 interface TelegramWebApp {
-    initDataUnsafe?: {
-        user?: {
-            username?: string;
-            first_name?: string;
-        };
-    };
+    initDataUnsafe?: { user?: { username?: string; first_name?: string; }; };
 }
 
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
-    // Estados iniciales en 0 para evitar saltos visuales
+    // Estados del juego
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0); 
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
-    
-    // 🔥 BLOQUEO DE SEGURIDAD: Impide guardar "0" mientras carga
-    const [canSave, setCanSave] = useState(false);
-
-    // Referencias para el Auto-Save
-    const energyRef = useRef(0);
-    const scoreRef = useRef(0);
-    
     const [botTime, setBotTime] = useState(0);
     const [adsWatched, setAdsWatched] = useState(0);
 
+    // 🔥 ESTADO DE CARGA REAL (Bloquea la UI hasta estar listo)
+    const [isAppReady, setIsAppReady] = useState(false);
+
+    // Referencias para Auto-Save
+    const energyRef = useRef(0);
+    const scoreRef = useRef(0);
+    
     const { user, loading: authLoading } = useAuth();
     
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
@@ -55,27 +48,24 @@ export default function App() {
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // 🔥 FUNCIÓN DE GUARDADO
+    // AUTO-SAVE (Solo funciona si la app ya cargó)
     const saveProgress = useCallback(async () => {
-        // Si no estamos listos o no hay usuario, NO guardamos nada.
-        if (!user || !canSave) return; 
+        if (!user || !isAppReady) return; 
 
         await supabase.rpc('save_game_progress', {
             user_id_in: user.id,
             new_energy: Math.floor(energyRef.current),
             new_score: scoreRef.current
         });
-    }, [user, canSave]);
+    }, [user, isAppReady]);
 
-    // 1. CARGA INICIAL
+    // 1. CARGA INICIAL (SINCRONIZACIÓN)
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
-                // Casting seguro sin @ts-ignore
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
-                const tgUser = tg?.initDataUnsafe?.user;
-                const username = tgUser?.username || tgUser?.first_name || 'Miner';
+                const username = tg?.initDataUnsafe?.user?.username || tg?.initDataUnsafe?.user?.first_name || 'Miner';
 
                 const { data: userData } = await supabase
                     .from('user_score')
@@ -83,22 +73,21 @@ export default function App() {
                     .eq('user_id', user.id)
                     .single();
                 
-                // SI EL USUARIO EXISTE
                 if (userData) {
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
 
-                    // LLAMADA AL SERVIDOR PARA SINCRONIZAR
-                    const { data: syncData, error: syncError } = await supabase.rpc('sync_energy_on_load', { 
+                    // SINCRONIZACIÓN DE VERDAD (SQL UPDATE RETURNING)
+                    const { data: syncData, error } = await supabase.rpc('sync_energy_on_load', { 
                         user_id_in: user.id,
                         my_regen_rate: mySpeed,
                         my_max_energy: myLimit
                     });
 
-                    if (!syncError && syncData && syncData.length > 0) {
+                    if (!error && syncData && syncData.length > 0) {
                         const result = syncData[0];
-                        console.log("✅ Energía Sincronizada:", result.synced_energy);
                         
+                        // Aplicamos los datos REALES de la BD
                         setScore(result.current_score);
                         setEnergy(result.synced_energy);
                         energyRef.current = result.synced_energy;
@@ -117,36 +106,34 @@ export default function App() {
                         }
 
                         const today = new Date().toISOString().split('T')[0];
-                        if (userData.last_bot_ad_date !== today) setAdsWatched(0); 
-                        else setAdsWatched(userData.bot_ads_watched_today || 0);
+                        setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
 
-                        // 🟢 Habilitamos el guardado después de 2 segundos
-                        setTimeout(() => setCanSave(true), 2000);
+                        // ✅ DATOS LISTOS: QUITAMOS PANTALLA DE CARGA
+                        setIsAppReady(true);
                     }
-
-                    await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
+                    
+                    // Actualizar nombre en background
+                    supabase.from('user_score').update({ username: username }).eq('user_id', user.id).then();
 
                 } else {
-                    // SI ES USUARIO NUEVO
-                    console.log("🆕 Creando usuario...");
-                    const { error: insertError } = await supabase.from('user_score').insert([{
+                    // USUARIO NUEVO
+                    await supabase.from('user_score').insert([{
                         user_id: user.id, score: 0, energy: 0, username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
-                    
-                    if (!insertError) {
-                        setEnergy(0);
-                        energyRef.current = 0;
-                        setCanSave(true);
-                    }
+                    setEnergy(0);
+                    energyRef.current = 0;
+                    setIsAppReady(true);
                 }
             };
             fetchInitialData();
         }
     }, [user, authLoading]);
 
-    // 2. GAME LOOP (Visual)
+    // 2. GAME LOOP VISUAL
     useEffect(() => {
+        if (!isAppReady) return; // No hacer nada hasta estar listos
+
         const timer = setInterval(() => {
             setEnergy(p => {
                 if (p >= maxEnergy) return p;
@@ -155,18 +142,15 @@ export default function App() {
             setBotTime(prev => Math.max(0, prev - 1));
         }, 1000);
         return () => clearInterval(timer);
-    }, [maxEnergy, regenRate]);
+    }, [maxEnergy, regenRate, isAppReady]);
 
-    // 3. AUTO-SAVE (Intervalo y Salida)
+    // 3. AUTO-SAVE INTERVAL
     useEffect(() => {
-        if (!user || !canSave) return;
+        if (!user || !isAppReady) return;
 
-        // Guardar cada 5 segundos
         const intervalId = setInterval(saveProgress, 5000);
         
-        // Guardar al minimizar
         const handleVisibilityChange = () => { if (document.visibilityState === 'hidden') saveProgress(); };
-        
         window.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('beforeunload', saveProgress);
 
@@ -175,8 +159,27 @@ export default function App() {
             window.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('beforeunload', saveProgress);
         };
-    }, [user, canSave, saveProgress]);
+    }, [user, isAppReady, saveProgress]);
 
+    // 🔥 PANTALLA DE CARGA (Loading Spinner)
+    // Esto evita que veas "0" y luego saltos raros.
+    if (authLoading || !user || !isAppReady) {
+        return (
+            <div style={{
+                height: '100dvh', background: '#000', display: 'flex', 
+                alignItems: 'center', justifyContent: 'center', color: '#00F2FE'
+            }}>
+                <div style={{
+                    width: '40px', height: '40px', border: '4px solid #333', 
+                    borderTop: '4px solid #00F2FE', borderRadius: '50%', 
+                    animation: 'spin 1s linear infinite'
+                }}></div>
+                <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+            </div>
+        );
+    }
+
+    // APP REAL
     return (
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
             <div className="app-container" style={{ height: '100dvh', overflow: 'hidden', background: '#000', color: 'white', position: 'relative', display: 'flex', flexDirection: 'column' }}>
