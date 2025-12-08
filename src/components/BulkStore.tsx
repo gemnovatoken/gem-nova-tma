@@ -16,6 +16,7 @@ interface PackNodeProps {
     side: 'left' | 'right';
 }
 
+// Recibimos la función para avisar a la App principal
 interface BulkStoreProps {
     onPurchaseSuccess?: (newScore: number) => void;
 }
@@ -32,7 +33,7 @@ const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
 export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
     const { user } = useAuth();
     
-    // 🔥 ESTADO PARA FORZAR RECARGA DEL VAULT
+    // 🔥 ESTADO MAGICO: Cada vez que cambie, el banco se recarga
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const buyPack = async (pack: string) => {
@@ -53,13 +54,13 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
         
         if(!error && data && data.success) {
             
-            // 1. Actualizar Score Principal (App.tsx)
+            // 1. Actualizar el Balance Total (Arriba / Mine)
             if (onPurchaseSuccess) {
                 onPurchaseSuccess(data.new_score); 
             }
 
-            // 2. 🔥 ACTUALIZAR EL VAULT (StakingBank)
-            // Al cambiar este número, el componente StakingBank se reinicia y carga el dato nuevo
+            // 2. 🔥 ACTUALIZAR EL VAULT (Abajo / Purchased)
+            // Al sumar 1, la 'key' cambia y StakingBank se reinicia
             setRefreshTrigger(prev => prev + 1);
 
             alert(`✅ Transaction Verified.\nPoints Added: ${Number(data.added).toLocaleString()}`);
@@ -159,7 +160,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
                 <div className="circuit-vault" style={{ borderRadius: '20px', padding: '4px' }}>
                     <div style={{ background: 'rgba(0,0,0,0.95)', borderRadius: '16px', overflow: 'hidden', padding:'10px' }}>
                         
-                        {/* 🔥 AQUÍ PASAMOS LA KEY PARA QUE SE ACTUALICE SOLO */}
+                        {/* 🔥 AQUÍ ESTÁ EL TRUCO: Pasamos la key dinámica */}
                         <StakingBank key={refreshTrigger} />
                         
                     </div>
