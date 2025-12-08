@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
-// Asegúrate de que MarketDashboard.tsx sea el que tiene la interfaz correcta
 import { MarketDashboard } from './components/MarketDashboard'; 
 import { BulkStore } from './components/BulkStore';
 import { SquadZone } from './components/SquadZone';
@@ -18,9 +17,15 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
-// Interfaz TS
+// Interfaz para leer Referidos
 interface TelegramWebApp {
-    initDataUnsafe?: { user?: { username?: string; first_name?: string; }; };
+    initDataUnsafe?: {
+        user?: {
+            username?: string;
+            first_name?: string;
+        };
+        start_param?: string; // 🔥 AQUÍ LLEGA EL CÓDIGO DE REFERIDO
+    };
 }
 
 export default function App() {
@@ -30,10 +35,8 @@ export default function App() {
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0); 
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
-    
-    // Estado Barra Global
     const [globalProgress, setGlobalProgress] = useState(0);
-
+    
     // Seguridad
     const [canSave, setCanSave] = useState(false);
 
@@ -64,26 +67,27 @@ export default function App() {
         if (error) console.error("Save Error:", error);
     }, [user, canSave]);
 
-    // 1. CARGA INICIAL (LÓGICA HÍBRIDA: MOSTRAR -> LUEGO SINCRONIZAR)
+    // 1. CARGA INICIAL + SISTEMA DE REFERIDOS
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
-                const username = tg?.initDataUnsafe?.user?.username || 'Miner';
+                const tgUser = tg?.initDataUnsafe?.user;
+                const startParam = tg?.initDataUnsafe?.start_param; // 🔥 CAPTURAMOS EL LINK
+                const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
-                // A. OBTENER DATOS BÁSICOS (LECTURA RÁPIDA)
+                // Buscar usuario existente
                 const { data: userData } = await supabase
                     .from('user_score')
                     .select('score, energy, limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
                     .eq('user_id', user.id)
                     .single();
                 
+                // CASO A: USUARIO EXISTE (CARGAR NORMAL)
                 if (userData) {
-                    // 🔥 PASO CRÍTICO: MOSTRAR DATOS DE INMEDIATO (Para que no veas 0)
                     setScore(userData.score);
-                    // Mostramos la energía guardada mientras calculamos la nueva
-                    setEnergy(userData.energy); 
+                    setEnergy(userData.energy);
                     
                     setLevels({ 
                         multitap: userData.multitap_level || 1, 
@@ -91,7 +95,6 @@ export default function App() {
                         speed: userData.speed_level || 1 
                     });
 
-                    // Cargar Bot y Ads
                     if (userData.bot_active_until) {
                         const botExpiry = new Date(userData.bot_active_until).getTime();
                         const now = new Date().getTime();
@@ -100,39 +103,52 @@ export default function App() {
                     const today = new Date().toISOString().split('T')[0];
                     setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
 
-                    // B. SINCRONIZACIÓN OFFLINE (CALCULAR TIEMPO PERDIDO)
+                    // Sincronizar offline
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
-
                     const { data: syncData } = await supabase.rpc('sync_energy_on_load', { 
                         user_id_in: user.id,
                         my_regen_rate: mySpeed,
                         my_max_energy: myLimit
                     });
 
-                    // Si el cálculo responde, actualizamos la energía con lo nuevo
                     if (syncData && syncData.length > 0) {
                         const result = syncData[0];
-                        console.log("✅ Offline Sync:", result.synced_energy);
                         setEnergy(result.synced_energy);
                         energyRef.current = result.synced_energy;
                         scoreRef.current = result.current_score;
                     }
 
-                    // Habilitar guardado
                     setTimeout(() => setCanSave(true), 1500);
-                    
                     await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
-                } else {
-                    // USUARIO NUEVO
-                    await supabase.from('user_score').insert([{
-                        user_id: user.id, score: 0, energy: 0, username: username,
-                        last_energy_update: new Date().toISOString()
-                    }]);
-                    setEnergy(0);
-                    energyRef.current = 0;
-                    setCanSave(true);
+                } 
+                // CASO B: USUARIO NUEVO (REGISTRAR CON REFERIDO)
+                else {
+                    console.log("🆕 Usuario Nuevo. Referido por:", startParam);
+                    
+                    let referrerId = null;
+                    // Si el link es "ref_12345", limpiamos el "ref_"
+                    if (startParam && startParam.includes('_')) {
+                        referrerId = startParam.split('_')[1]; // Toma lo que está después del guion bajo
+                    } else if (startParam && startParam.length > 10) {
+                        referrerId = startParam; // Toma el ID directo
+                    }
+
+                    // Llamamos a la función MAESTRA de SQL que da los bonos
+                    const { error: insertError } = await supabase.rpc('register_new_user', {
+                        p_user_id: user.id,
+                        p_username: username,
+                        p_referral_code: referrerId // Pasamos el ID del padrino
+                    });
+                    
+                    if (!insertError) {
+                        setEnergy(0); 
+                        energyRef.current = 0;
+                        setCanSave(true);
+                    } else {
+                        console.error("Error registro:", insertError);
+                    }
                 }
             };
             fetchInitialData();
@@ -143,16 +159,14 @@ export default function App() {
     useEffect(() => {
         const fetchGlobalProgress = async () => {
             const { data, error } = await supabase.rpc('get_global_launch_progress');
-            if (!error && data !== null) {
-                setGlobalProgress(Number(data));
-            }
+            if (!error && data !== null) setGlobalProgress(Number(data));
         };
         fetchGlobalProgress();
         const interval = setInterval(fetchGlobalProgress, 60000);
         return () => clearInterval(interval);
     }, []);
 
-    // 3. GAME LOOP (VISUAL - SIEMPRE CORRE)
+    // 3. GAME LOOP
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
