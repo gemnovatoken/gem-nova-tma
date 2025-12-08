@@ -17,7 +17,7 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
-// Definición para evitar el error 'any'
+// Interfaz para evitar error 'any'
 interface TelegramWebApp {
     initDataUnsafe?: {
         user?: {
@@ -72,10 +72,9 @@ export default function App() {
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
-                // SOLUCIÓN ERROR ANY: Usamos unknown y casteamos o accedemos con seguridad
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                const tg = window.Telegram?.WebApp as TelegramWebApp;
+                // SOLUCIÓN FINAL: Casteamos window a any explícitamente sin usar @ts-ignore
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
