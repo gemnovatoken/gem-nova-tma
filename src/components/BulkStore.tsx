@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { StakingBank } from './StakingBank';
@@ -16,7 +16,6 @@ interface PackNodeProps {
     side: 'left' | 'right';
 }
 
-// 🔥 Nueva interfaz para recibir la función de actualización
 interface BulkStoreProps {
     onPurchaseSuccess?: (newScore: number) => void;
 }
@@ -32,6 +31,9 @@ const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
 
 export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
     const { user } = useAuth();
+    
+    // 🔥 ESTADO PARA FORZAR RECARGA DEL VAULT
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const buyPack = async (pack: string) => {
         if(!user) return;
@@ -43,22 +45,24 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
 
         if (!window.confirm(msg)) return;
         
-        // Llamada a la función SQL "buy_bulk_pack"
+        // Llamada a la función SQL
         const { data, error } = await supabase.rpc('buy_bulk_pack', { 
             user_id_in: user.id, 
             pack_type: pack 
         });
         
-        // 🔥 AQUÍ ESTÁ LA CORRECCIÓN: Leemos la respuesta del servidor
         if(!error && data && data.success) {
             
-            // 1. Avisamos a la App Principal que actualice el puntaje VISUALMENTE
+            // 1. Actualizar Score Principal (App.tsx)
             if (onPurchaseSuccess) {
                 onPurchaseSuccess(data.new_score); 
             }
 
-            // 2. Mensaje de éxito
-            alert(`✅ Transaction Verified.\nPoints Added: ${Number(data.added).toLocaleString()}\nNew Balance: ${Number(data.new_score).toLocaleString()}`);
+            // 2. 🔥 ACTUALIZAR EL VAULT (StakingBank)
+            // Al cambiar este número, el componente StakingBank se reinicia y carga el dato nuevo
+            setRefreshTrigger(prev => prev + 1);
+
+            alert(`✅ Transaction Verified.\nPoints Added: ${Number(data.added).toLocaleString()}`);
         
         } else {
             console.error("Purchase Error:", error || data);
@@ -78,7 +82,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
             
             <div className="data-stream"></div>
 
-            {/* HEADER con Wallet */}
+            {/* HEADER */}
             <div style={{ textAlign: 'center', marginBottom: '50px', position: 'relative', zIndex: 2 }}>
                 <h2 style={{ 
                     color: '#00F2FE', textShadow: '0 0 15px #00F2FE', 
@@ -94,7 +98,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
                 </div>
             </div>
 
-            {/* --- EL CAMINO DE NODOS --- */}
+            {/* NODOS DE COMPRA */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '50px', padding: '0 20px', position: 'relative' }}>
                 
                 <PackNode 
@@ -127,7 +131,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
                     isLocked={true} onClick={() => unlockPack('EMPEROR')}
                 />
 
-                {/* Nivel GOD: Black Hole */}
+                {/* BLACK HOLE */}
                 <div style={{ position: 'relative', zIndex: 2, margin: '40px 0' }}>
                     <div className="cyber-card" style={{ 
                         textAlign: 'center', padding: '30px', border: '2px solid #fff', 
@@ -148,13 +152,16 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
 
             </div>
 
-            {/* --- LA BÓVEDA --- */}
+            {/* --- LA BÓVEDA (STAKING BANK) --- */}
             <div style={{ marginTop: '60px', padding: '0 20px', position:'relative', zIndex:2 }}>
                 <div style={{width:'6px', height:'60px', background:'#E040FB', margin:'0 auto 15px auto', boxShadow:'0 0 15px #E040FB'}}></div>
                 
                 <div className="circuit-vault" style={{ borderRadius: '20px', padding: '4px' }}>
                     <div style={{ background: 'rgba(0,0,0,0.95)', borderRadius: '16px', overflow: 'hidden', padding:'10px' }}>
-                        <StakingBank />
+                        
+                        {/* 🔥 AQUÍ PASAMOS LA KEY PARA QUE SE ACTUALICE SOLO */}
+                        <StakingBank key={refreshTrigger} />
+                        
                     </div>
                     <div style={{position:'absolute', bottom:'10px', left:'20px', width:'40px', height:'4px', background:'#00F2FE', boxShadow:'0 0 10px #00F2FE'}}></div>
                     <div style={{position:'absolute', bottom:'10px', right:'20px', width:'15px', height:'4px', background:'#FF512F', boxShadow:'0 0 10px #FF512F', animation:'blink 1s infinite'}}></div>
