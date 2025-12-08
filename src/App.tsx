@@ -17,6 +17,16 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
+// Interfaz para Telegram
+interface TelegramWebApp {
+    initDataUnsafe?: {
+        user?: {
+            username?: string;
+            first_name?: string;
+        };
+    };
+}
+
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
@@ -24,16 +34,14 @@ export default function App() {
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0); 
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
-    
-    // Estado de carga para evitar guardar ceros
+    const [botTime, setBotTime] = useState(0);
+    const [adsWatched, setAdsWatched] = useState(0);
+
+    // Estado de carga
     const [isLoaded, setIsLoaded] = useState(false);
 
     const energyRef = useRef(0);
     const scoreRef = useRef(0);
-    
-    const [botTime, setBotTime] = useState(0);
-    const [adsWatched, setAdsWatched] = useState(0);
-
     const { user, loading: authLoading } = useAuth();
     
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
@@ -44,76 +52,88 @@ export default function App() {
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // 🔥 AUTO-SAVE AGRESIVO (Cada 1 segundo)
+    // 🔥 GUARDADO MANUAL (Usando la nueva función simple)
     const saveProgress = useCallback(async () => {
-        if (!user || !isLoaded) return; // Solo guarda si ya cargamos datos del servidor
+        if (!user || !isLoaded) return; 
 
-        // Llamada RPC sin esperar respuesta para no bloquear la UI
-        supabase.rpc('save_game_progress', {
-            user_id_in: user.id,
-            new_energy: Math.floor(energyRef.current),
-            new_score: scoreRef.current
-        }).then(({ error }) => {
-            if (error) console.error("Save Error:", error);
+        // Guardamos Energía, Score y la Hora Actual (ISO String)
+        const { error } = await supabase.rpc('update_user_data', {
+            p_user_id: user.id,
+            p_energy: Math.floor(energyRef.current),
+            p_score: scoreRef.current,
+            p_update_time: new Date().toISOString()
         });
+
+        if (error) console.error("Save Error:", error);
     }, [user, isLoaded]);
 
-    // 1. CARGA INICIAL
+    // 1. CARGA INICIAL + CÁLCULO JS
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const tg = (window as any).Telegram?.WebApp;
+                const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const username = tg?.initDataUnsafe?.user?.username || 'Miner';
 
-                // Intentamos cargar
+                // Descargar datos crudos
                 const { data: userData } = await supabase
                     .from('user_score')
-                    .select('limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
+                    .select('*') 
                     .eq('user_id', user.id)
                     .single();
                 
                 if (userData) {
+                    // --- CÁLCULO OFFLINE EN EL CLIENTE (JS) ---
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
+                    
+                    const lastTime = userData.last_energy_update ? new Date(userData.last_energy_update).getTime() : new Date().getTime();
+                    const now = new Date().getTime();
+                    
+                    // Segundos pasados (protegido contra negativos)
+                    const secondsPassed = Math.max(0, Math.floor((now - lastTime) / 1000));
+                    
+                    // Energía generada offline
+                    const generated = secondsPassed * mySpeed;
+                    const storedEnergy = Number(userData.energy) || 0;
+                    
+                    // Total real
+                    const totalEnergy = Math.min(myLimit, storedEnergy + generated);
+                    
+                    console.log(`🔌 Offline: ${secondsPassed}s pasados. Generado: ${generated}. Total: ${totalEnergy}`);
 
-                    // Sincronización Server-Side
-                    const { data: syncData, error } = await supabase.rpc('sync_energy_on_load', { 
-                        user_id_in: user.id,
-                        my_regen_rate: mySpeed,
-                        my_max_energy: myLimit
+                    // Aplicar datos
+                    setScore(userData.score);
+                    setEnergy(totalEnergy);
+                    energyRef.current = totalEnergy;
+                    scoreRef.current = userData.score;
+
+                    setLevels({ 
+                        multitap: userData.multitap_level || 1, 
+                        limit: userData.limit_level || 1, 
+                        speed: userData.speed_level || 1 
                     });
 
-                    if (!error && syncData && syncData.length > 0) {
-                        const result = syncData[0];
-                        
-                        setScore(result.current_score);
-                        setEnergy(result.synced_energy);
-                        energyRef.current = result.synced_energy;
-                        scoreRef.current = result.current_score;
-
-                        setLevels({ 
-                            multitap: userData.multitap_level || 1, 
-                            limit: userData.limit_level || 1, 
-                            speed: userData.speed_level || 1 
-                        });
-
-                        if (userData.bot_active_until) {
-                            const botExpiry = new Date(userData.bot_active_until).getTime();
-                            const now = new Date().getTime();
-                            setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
-                        }
-
-                        const today = new Date().toISOString().split('T')[0];
-                        setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
-
-                        setIsLoaded(true); // ✅ DATOS CARGADOS: YA PODEMOS GUARDAR
+                    if (userData.bot_active_until) {
+                        const botExpiry = new Date(userData.bot_active_until).getTime();
+                        setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
                     }
-                    
-                    supabase.from('user_score').update({ username: username }).eq('user_id', user.id).then();
+
+                    const today = new Date().toISOString().split('T')[0];
+                    setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
+
+                    setIsLoaded(true); // Ya podemos guardar
+
+                    // 🔥 GUARDAMOS EL CÁLCULO INMEDIATAMENTE PARA SINCRONIZAR DB
+                    supabase.rpc('update_user_data', {
+                        p_user_id: user.id,
+                        p_energy: totalEnergy,
+                        p_score: userData.score,
+                        p_update_time: new Date().toISOString()
+                    });
 
                 } else {
-                    // USUARIO NUEVO
+                    // NUEVO USUARIO
                     await supabase.from('user_score').insert([{
                         user_id: user.id, score: 0, energy: 0, username: username,
                         last_energy_update: new Date().toISOString()
@@ -138,14 +158,21 @@ export default function App() {
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
 
-    // 3. AUTO-SAVE INTERVAL (1 Segundo)
+    // 3. AUTO-SAVE AGRESIVO (Cada 1s para pruebas)
     useEffect(() => {
         if (!user || !isLoaded) return;
 
-        // Guardamos CADA SEGUNDO para evitar perdidas al cerrar
-        const intervalId = setInterval(saveProgress, 1000);
+        const intervalId = setInterval(saveProgress, 1000); // Guardamos cada segundo
         
-        return () => clearInterval(intervalId);
+        const handleVisibilityChange = () => { if (document.visibilityState === 'hidden') saveProgress(); };
+        window.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', saveProgress);
+
+        return () => {
+            clearInterval(intervalId);
+            window.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('beforeunload', saveProgress);
+        };
     }, [user, isLoaded, saveProgress]);
 
     return (
@@ -158,7 +185,6 @@ export default function App() {
                                 <MarketDashboard />
                             </div>
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                                {/* Si no ha cargado, mostramos 0 pero no guardamos */}
                                 <MyMainTMAComponent 
                                     score={score} setScore={setScore} 
                                     energy={energy} setEnergy={setEnergy} 
