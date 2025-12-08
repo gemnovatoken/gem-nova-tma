@@ -34,10 +34,9 @@ export default function App() {
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     
-    // 🔥 BLOQUEO DE SEGURIDAD: Impide guardar "0" al inicio
+    // 🔥 BLOQUEO DE SEGURIDAD
     const [canSave, setCanSave] = useState(false);
 
-    // Referencias para Auto-Save
     const energyRef = useRef(0);
     const scoreRef = useRef(0);
     
@@ -54,9 +53,8 @@ export default function App() {
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // 🔥 AUTO-SAVE PROTEGIDO
+    // AUTO-SAVE
     const saveProgress = useCallback(async () => {
-        // SI NO HA PASADO EL TIEMPO DE CALENTAMIENTO, NO GUARDAMOS NADA.
         if (!user || !canSave) return; 
 
         const { error } = await supabase.rpc('save_game_progress', {
@@ -72,37 +70,37 @@ export default function App() {
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
-                // SOLUCIÓN FINAL: Casteamos window a any explícitamente sin usar @ts-ignore
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
+
+                const tg = window.Telegram?.WebApp as TelegramWebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
+                // Intentamos buscar al usuario
                 const { data: userData } = await supabase
                     .from('user_score')
                     .select('limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
                     .eq('user_id', user.id)
                     .single();
                 
+                // CASO 1: USUARIO EXISTE
                 if (userData) {
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
 
-                    // SINCRONIZACIÓN SERVIDOR
-                    const { data: syncData, error } = await supabase.rpc('sync_energy_on_load', { 
+                    // Sincronización Server-Side
+                    const { data: syncData, error: syncError } = await supabase.rpc('sync_energy_on_load', { 
                         user_id_in: user.id,
                         my_regen_rate: mySpeed,
                         my_max_energy: myLimit
                     });
 
-                    if (!error && syncData && syncData.length > 0) {
+                    if (!syncError && syncData && syncData.length > 0) {
                         const result = syncData[0];
-                        
-                        console.log("✅ Synced Energy:", result.synced_energy);
+                        console.log("✅ Datos Cargados:", result.synced_energy);
                         
                         setScore(result.current_score);
                         setEnergy(result.synced_energy);
-                        energyRef.current = result.synced_energy; // Actualizamos ref inmediatamente
+                        energyRef.current = result.synced_energy;
                         scoreRef.current = result.current_score;
 
                         setLevels({ 
@@ -114,37 +112,37 @@ export default function App() {
                         if (userData.bot_active_until) {
                             const botExpiry = new Date(userData.bot_active_until).getTime();
                             const now = new Date().getTime();
-                            const timeLeft = Math.max(0, Math.floor((botExpiry - now) / 1000));
-                            setBotTime(timeLeft);
+                            setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
                         }
 
                         const today = new Date().toISOString().split('T')[0];
                         if (userData.last_bot_ad_date !== today) setAdsWatched(0); 
                         else setAdsWatched(userData.bot_ads_watched_today || 0);
 
-                        // 🟢 HABILITAR GUARDADO CON RETRASO DE SEGURIDAD
-                        // Esperamos 2 segundos para asegurar que React renderizó todo bien
-                        setTimeout(() => {
-                            setCanSave(true);
-                            console.log("🟢 Auto-Save Enabled");
-                        }, 2000);
-
-                    } else {
-                        // Si falla sync, permitimos guardar después para no bloquear, pero con cuidado
-                        setTimeout(() => setCanSave(true), 5000);
+                        // Habilitar guardado tras 2s
+                        setTimeout(() => setCanSave(true), 2000);
                     }
 
                     await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
-                } else {
-                    // NUEVO USUARIO
-                    await supabase.from('user_score').insert([{
-                        user_id: user.id, score: 0, energy: 500, username: username,
+                } 
+                // CASO 2: USUARIO NUEVO O NO ENCONTRADO
+                else {
+                    console.log("🆕 Usuario Nuevo Detectado. Creando con 0 energía...");
+                    
+                    const { error: insertError } = await supabase.from('user_score').insert([{
+                        user_id: user.id, 
+                        score: 0, 
+                        energy: 0, // 🔥 CAMBIO CLAVE: EMPEZAR EN 0, NO EN 500
+                        username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
-                    setEnergy(500);
-                    energyRef.current = 500;
-                    setCanSave(true);
+                    
+                    if (!insertError) {
+                        setEnergy(0); // 🔥 CAMBIO CLAVE: Visualmente 0
+                        energyRef.current = 0;
+                        setCanSave(true);
+                    }
                 }
             };
             fetchInitialData();
@@ -153,8 +151,8 @@ export default function App() {
 
     // 2. GAME LOOP
     useEffect(() => {
-        if (!canSave) return; // No animar hasta que estemos listos
-
+        // Eliminé la restricción !canSave para que veas la carga visual inmediatamente
+        // aunque no se guarde todavía en los primeros 2 segundos.
         const timer = setInterval(() => {
             setEnergy(p => {
                 if (p >= maxEnergy) return p;
@@ -163,17 +161,14 @@ export default function App() {
             setBotTime(prev => Math.max(0, prev - 1));
         }, 1000);
         return () => clearInterval(timer);
-    }, [maxEnergy, regenRate, canSave]);
+    }, [maxEnergy, regenRate]);
 
     // 3. AUTO-SAVE
     useEffect(() => {
-        if (!user || !canSave) return; // DOBLE CHEQUEO DE SEGURIDAD
+        if (!user || !canSave) return;
 
-        const intervalId = setInterval(saveProgress, 5000); // 5 segundos
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') saveProgress(); 
-        };
+        const intervalId = setInterval(saveProgress, 5000);
+        const handleVisibilityChange = () => { if (document.visibilityState === 'hidden') saveProgress(); };
         
         window.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('beforeunload', saveProgress);
@@ -206,7 +201,6 @@ export default function App() {
                             </div>
                         </div>
                     )}
-                    
                     {currentTab === 'market' && <div style={{ animation: 'fadeIn 0.3s' }}><BulkStore /></div>}
                     {currentTab === 'mission' && <div style={{ animation: 'fadeIn 0.3s' }}><MissionZone /></div>}
                     {currentTab === 'squad' && <div style={{ padding: '20px', animation: 'fadeIn 0.3s' }}><SquadZone /></div>}
