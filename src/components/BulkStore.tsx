@@ -16,7 +16,11 @@ interface PackNodeProps {
     side: 'left' | 'right';
 }
 
-// 1. CONFIGURACIÓN DE PRECIOS Y PUNTOS (Para el Log)
+// 🔥 Nueva interfaz para recibir la función de actualización
+interface BulkStoreProps {
+    onPurchaseSuccess?: (newScore: number) => void;
+}
+
 const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
     'starter':   { ton: 0.15, pts: 100000,   label: "Initialize Protocol" },
     'pro':       { ton: 0.75, pts: 500000,   label: "Upgrade System" },
@@ -26,13 +30,12 @@ const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
     'blackhole': { ton: 100.0, pts: 70000000, label: "⚠️ GOD MODE" }
 };
 
-export const BulkStore: React.FC = () => {
+export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
     const { user } = useAuth();
 
     const buyPack = async (pack: string) => {
         if(!user) return;
         
-        // Buscamos los datos del pack seleccionado
         const selectedPack = PACK_DATA[pack];
         if (!selectedPack) return;
 
@@ -40,29 +43,32 @@ export const BulkStore: React.FC = () => {
 
         if (!window.confirm(msg)) return;
         
-        // A. Ejecutar la compra en el juego (Sumar puntos)
-        const { error } = await supabase.rpc('buy_bulk_pack', { user_id_in: user.id, pack_type: pack });
+        // Llamada a la función SQL "buy_bulk_pack"
+        const { data, error } = await supabase.rpc('buy_bulk_pack', { 
+            user_id_in: user.id, 
+            pack_type: pack 
+        });
         
-        if(!error) {
-            // B. 🔥 REGISTRAR TRANSACCIÓN EN EL DASHBOARD (Dinámico)
-            // Esto guarda exactamente cuánto pagó y cuántos puntos recibió, sea cual sea el paquete.
-            await supabase.from('transactions').insert({
-                user_id: user.id,
-                item_type: `bulk_${pack}`, // ej: 'bulk_starter' o 'bulk_whale'
-                amount_ton: selectedPack.ton,
-                amount_points: selectedPack.pts
-            });
+        // 🔥 AQUÍ ESTÁ LA CORRECCIÓN: Leemos la respuesta del servidor
+        if(!error && data && data.success) {
+            
+            // 1. Avisamos a la App Principal que actualice el puntaje VISUALMENTE
+            if (onPurchaseSuccess) {
+                onPurchaseSuccess(data.new_score); 
+            }
 
-            alert('✅ Transaction Verified. Database Updated.');
+            // 2. Mensaje de éxito
+            alert(`✅ Transaction Verified.\nPoints Added: ${Number(data.added).toLocaleString()}\nNew Balance: ${Number(data.new_score).toLocaleString()}`);
+        
         } else {
-            alert('Error: Transaction Failed');
+            console.error("Purchase Error:", error || data);
+            alert('Error: Transaction Failed or Invalid Pack');
         }
     };
 
     const unlockPack = (packName: string) => {
         if(window.confirm(`🔒 SECURE NODE DETECTED.\n\nWatch Ad-Stream to decrypt access to ${packName}?`)) {
             console.log("Playing Ad for:", packName);
-            // Aquí deberías agregar también el log de 'video_ad' si quieres contar estos desbloqueos
             alert("🔓 Decrypting... Node Access Granted.");
         }
     }
