@@ -17,7 +17,7 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
-// Interfaz para el objeto Telegram
+// Interfaz para evitar el error de TypeScript
 interface TelegramWebApp {
     initDataUnsafe?: {
         user?: {
@@ -30,14 +30,15 @@ interface TelegramWebApp {
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
-    // Iniciamos visualmente en 0 para evitar saltos falsos
+    // Estados iniciales en 0 para evitar saltos visuales
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0); 
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     
-    // 🔥 BLOQUEO DE SEGURIDAD
+    // 🔥 BLOQUEO DE SEGURIDAD: Impide guardar "0" mientras carga
     const [canSave, setCanSave] = useState(false);
 
+    // Referencias para el Auto-Save
     const energyRef = useRef(0);
     const scoreRef = useRef(0);
     
@@ -54,42 +55,40 @@ export default function App() {
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // AUTO-SAVE
+    // 🔥 FUNCIÓN DE GUARDADO
     const saveProgress = useCallback(async () => {
+        // Si no estamos listos o no hay usuario, NO guardamos nada.
         if (!user || !canSave) return; 
 
-        const { error } = await supabase.rpc('save_game_progress', {
+        await supabase.rpc('save_game_progress', {
             user_id_in: user.id,
             new_energy: Math.floor(energyRef.current),
             new_score: scoreRef.current
         });
-
-        if (error) console.error("Save Error:", error);
     }, [user, canSave]);
 
     // 1. CARGA INICIAL
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
-                // CORRECCIÓN FINAL: Casting seguro sin @ts-ignore
+                // Casting seguro sin @ts-ignore
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
-                // Intentamos buscar al usuario
-                const { data: userData, error: fetchError } = await supabase
+                const { data: userData } = await supabase
                     .from('user_score')
                     .select('limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
                     .eq('user_id', user.id)
                     .single();
                 
-                // CASO 1: USUARIO EXISTE
+                // SI EL USUARIO EXISTE
                 if (userData) {
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
 
-                    // Sincronización Server-Side (Calcula offline y actualiza)
+                    // LLAMADA AL SERVIDOR PARA SINCRONIZAR
                     const { data: syncData, error: syncError } = await supabase.rpc('sync_energy_on_load', { 
                         user_id_in: user.id,
                         my_regen_rate: mySpeed,
@@ -98,7 +97,7 @@ export default function App() {
 
                     if (!syncError && syncData && syncData.length > 0) {
                         const result = syncData[0];
-                        console.log("✅ Datos Cargados (Continuidad):", result.synced_energy);
+                        console.log("✅ Energía Sincronizada:", result.synced_energy);
                         
                         setScore(result.current_score);
                         setEnergy(result.synced_energy);
@@ -121,31 +120,22 @@ export default function App() {
                         if (userData.last_bot_ad_date !== today) setAdsWatched(0); 
                         else setAdsWatched(userData.bot_ads_watched_today || 0);
 
-                        // Habilitar guardado tras 2s
+                        // 🟢 Habilitamos el guardado después de 2 segundos
                         setTimeout(() => setCanSave(true), 2000);
                     }
 
                     await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
-                } 
-                // CASO 2: ERROR REAL (NO ES USUARIO NUEVO, ES ERROR)
-                else if (fetchError && fetchError.code !== 'PGRST116') {
-                    console.error("❌ Error Crítico BD:", fetchError);
-                }
-                // CASO 3: USUARIO REALMENTE NUEVO
-                else {
-                    console.log("🆕 Usuario Nuevo Detectado. Creando con 0 energía...");
-                    
+                } else {
+                    // SI ES USUARIO NUEVO
+                    console.log("🆕 Creando usuario...");
                     const { error: insertError } = await supabase.from('user_score').insert([{
-                        user_id: user.id, 
-                        score: 0, 
-                        energy: 0, 
-                        username: username,
+                        user_id: user.id, score: 0, energy: 0, username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
                     
                     if (!insertError) {
-                        setEnergy(0); 
+                        setEnergy(0);
                         energyRef.current = 0;
                         setCanSave(true);
                     }
@@ -155,7 +145,7 @@ export default function App() {
         }
     }, [user, authLoading]);
 
-    // 2. GAME LOOP
+    // 2. GAME LOOP (Visual)
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -167,11 +157,14 @@ export default function App() {
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
 
-    // 3. AUTO-SAVE
+    // 3. AUTO-SAVE (Intervalo y Salida)
     useEffect(() => {
         if (!user || !canSave) return;
 
+        // Guardar cada 5 segundos
         const intervalId = setInterval(saveProgress, 5000);
+        
+        // Guardar al minimizar
         const handleVisibilityChange = () => { if (document.visibilityState === 'hidden') saveProgress(); };
         
         window.addEventListener('visibilitychange', handleVisibilityChange);
