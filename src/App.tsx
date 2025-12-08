@@ -17,26 +17,18 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
-// Interfaz para evitar error 'any'
-interface TelegramWebApp {
-    initDataUnsafe?: {
-        user?: {
-            username?: string;
-            first_name?: string;
-        };
-    };
-}
-
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
+    // Iniciamos visualmente en 0 para evitar saltos falsos mientras carga
     const [score, setScore] = useState(0);
-    const [energy, setEnergy] = useState(0);
+    const [energy, setEnergy] = useState(0); 
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     
-    // 🔥 BLOQUEO DE SEGURIDAD
+    // 🔥 BLOQUEO DE SEGURIDAD: Impide guardar "0" al inicio
     const [canSave, setCanSave] = useState(false);
 
+    // Referencias para tener siempre el valor actual en el Auto-Save
     const energyRef = useRef(0);
     const scoreRef = useRef(0);
     
@@ -50,11 +42,13 @@ export default function App() {
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
+    // Sincronizamos las referencias con el estado visual
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // AUTO-SAVE
+    // 🔥 AUTO-SAVE (Guardado en Servidor)
     const saveProgress = useCallback(async () => {
+        // Si no estamos listos (canSave=false), NO guardamos para evitar reiniciar a 0
         if (!user || !canSave) return; 
 
         const { error } = await supabase.rpc('save_game_progress', {
@@ -66,17 +60,18 @@ export default function App() {
         if (error) console.error("Save Error:", error);
     }, [user, canSave]);
 
-    // 1. CARGA INICIAL
+    // 1. CARGA INICIAL Y SINCRONIZACIÓN OFFLINE
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
-
-                const tg = window.Telegram?.WebApp as TelegramWebApp;
+                // CORRECCIÓN: Acceso seguro a Telegram sin usar @ts-ignore
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const tg = (window as any).Telegram?.WebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
-                // Intentamos buscar al usuario
-                const { data: userData } = await supabase
+                // Buscamos datos del usuario
+                const { data: userData, error: fetchError } = await supabase
                     .from('user_score')
                     .select('limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
                     .eq('user_id', user.id)
@@ -87,7 +82,9 @@ export default function App() {
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
 
-                    // Sincronización Server-Side
+                    // 🔥 SINCRONIZACIÓN MÁGICA
+                    // Esta función en SQL calcula cuánto tiempo estuviste fuera y suma la energía correspondiente.
+                    // Si estuviste fuera 1 hora, te suma 3600 puntos (hasta llenar el tanque).
                     const { data: syncData, error: syncError } = await supabase.rpc('sync_energy_on_load', { 
                         user_id_in: user.id,
                         my_regen_rate: mySpeed,
@@ -96,10 +93,12 @@ export default function App() {
 
                     if (!syncError && syncData && syncData.length > 0) {
                         const result = syncData[0];
-                        console.log("✅ Datos Cargados:", result.synced_energy);
+                        console.log("✅ Datos Sincronizados:", result.synced_energy);
                         
                         setScore(result.current_score);
                         setEnergy(result.synced_energy);
+                        
+                        // Actualizamos referencias para que el próximo guardado sea correcto
                         energyRef.current = result.synced_energy;
                         scoreRef.current = result.current_score;
 
@@ -109,9 +108,11 @@ export default function App() {
                             speed: userData.speed_level || 1 
                         });
 
+                        // Restaurar Tiempo del Bot (Si existe)
                         if (userData.bot_active_until) {
                             const botExpiry = new Date(userData.bot_active_until).getTime();
                             const now = new Date().getTime();
+                            // Calculamos cuánto falta para que expire
                             setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
                         }
 
@@ -119,27 +120,29 @@ export default function App() {
                         if (userData.last_bot_ad_date !== today) setAdsWatched(0); 
                         else setAdsWatched(userData.bot_ads_watched_today || 0);
 
-                        // Habilitar guardado tras 2s
+                        // Habilitar el guardado automático después de 2 segundos
+                        // Esto evita que sobrescribamos con "0" mientras carga la interfaz
                         setTimeout(() => setCanSave(true), 2000);
                     }
 
+                    // Actualizar nombre de usuario si cambió en Telegram
                     await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
                 } 
-                // CASO 2: USUARIO NUEVO O NO ENCONTRADO
+                // CASO 2: ERROR DE CONEXIÓN
+                else if (fetchError && fetchError.code !== 'PGRST116') {
+                    console.error("❌ Error de Conexión:", fetchError);
+                }
+                // CASO 3: USUARIO NUEVO
                 else {
-                    console.log("🆕 Usuario Nuevo Detectado. Creando con 0 energía...");
-                    
+                    console.log("🆕 Creando nuevo usuario...");
                     const { error: insertError } = await supabase.from('user_score').insert([{
-                        user_id: user.id, 
-                        score: 0, 
-                        energy: 0, // 🔥 CAMBIO CLAVE: EMPEZAR EN 0, NO EN 500
-                        username: username,
+                        user_id: user.id, score: 0, energy: 0, username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
                     
                     if (!insertError) {
-                        setEnergy(0); // 🔥 CAMBIO CLAVE: Visualmente 0
+                        setEnergy(0);
                         energyRef.current = 0;
                         setCanSave(true);
                     }
@@ -149,10 +152,9 @@ export default function App() {
         }
     }, [user, authLoading]);
 
-    // 2. GAME LOOP
+    // 2. GAME LOOP (Regeneración Visual)
+    // Esto hace que el número suba en pantalla mientras tienes la app abierta
     useEffect(() => {
-        // Eliminé la restricción !canSave para que veas la carga visual inmediatamente
-        // aunque no se guarde todavía en los primeros 2 segundos.
         const timer = setInterval(() => {
             setEnergy(p => {
                 if (p >= maxEnergy) return p;
@@ -163,11 +165,14 @@ export default function App() {
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
 
-    // 3. AUTO-SAVE
+    // 3. EJECUTAR AUTO-SAVE
     useEffect(() => {
         if (!user || !canSave) return;
 
+        // Guardar cada 5 segundos
         const intervalId = setInterval(saveProgress, 5000);
+        
+        // Guardar si el usuario minimiza la app
         const handleVisibilityChange = () => { if (document.visibilityState === 'hidden') saveProgress(); };
         
         window.addEventListener('visibilitychange', handleVisibilityChange);
