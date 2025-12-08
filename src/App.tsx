@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
-// import { Header } from './components/Header'; 
 import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
 import { MarketDashboard } from './components/MarketDashboard';
@@ -18,6 +17,16 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
+// Definición para evitar el error 'any'
+interface TelegramWebApp {
+    initDataUnsafe?: {
+        user?: {
+            username?: string;
+            first_name?: string;
+        };
+    };
+}
+
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
@@ -25,8 +34,8 @@ export default function App() {
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     
-    // Estado de protección
-    const [isSynced, setIsSynced] = useState(false);
+    // 🔥 BLOQUEO DE SEGURIDAD: Impide guardar "0" al inicio
+    const [canSave, setCanSave] = useState(false);
 
     // Referencias para Auto-Save
     const energyRef = useRef(0);
@@ -45,12 +54,11 @@ export default function App() {
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // 🔥 AUTO-SAVE CORREGIDO (Server-Side Time)
+    // 🔥 AUTO-SAVE PROTEGIDO
     const saveProgress = useCallback(async () => {
-        if (!user || !isSynced) return; 
+        // SI NO HA PASADO EL TIEMPO DE CALENTAMIENTO, NO GUARDAMOS NADA.
+        if (!user || !canSave) return; 
 
-        // Usamos la RPC 'save_game_progress' en lugar de update directo
-        // Así la fecha la pone el servidor, evitando errores de zona horaria.
         const { error } = await supabase.rpc('save_game_progress', {
             user_id_in: user.id,
             new_energy: Math.floor(energyRef.current),
@@ -58,14 +66,16 @@ export default function App() {
         });
 
         if (error) console.error("Save Error:", error);
-    }, [user, isSynced]);
+    }, [user, canSave]);
 
-    // 1. CARGA INICIAL (SINCRONIZACIÓN)
+    // 1. CARGA INICIAL
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const tg = (window as any).Telegram?.WebApp;
+                // SOLUCIÓN ERROR ANY: Usamos unknown y casteamos o accedemos con seguridad
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                const tg = window.Telegram?.WebApp as TelegramWebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
@@ -79,7 +89,7 @@ export default function App() {
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
 
-                    // Sincronización Server-Side
+                    // SINCRONIZACIÓN SERVIDOR
                     const { data: syncData, error } = await supabase.rpc('sync_energy_on_load', { 
                         user_id_in: user.id,
                         my_regen_rate: mySpeed,
@@ -89,10 +99,12 @@ export default function App() {
                     if (!error && syncData && syncData.length > 0) {
                         const result = syncData[0];
                         
+                        console.log("✅ Synced Energy:", result.synced_energy);
+                        
                         setScore(result.current_score);
                         setEnergy(result.synced_energy);
+                        energyRef.current = result.synced_energy; // Actualizamos ref inmediatamente
                         scoreRef.current = result.current_score;
-                        energyRef.current = result.synced_energy;
 
                         setLevels({ 
                             multitap: userData.multitap_level || 1, 
@@ -111,33 +123,38 @@ export default function App() {
                         if (userData.last_bot_ad_date !== today) setAdsWatched(0); 
                         else setAdsWatched(userData.bot_ads_watched_today || 0);
 
-                        setIsSynced(true); // ✅ LISTO PARA GUARDAR
-                        console.log("✅ Synced Energy:", result.synced_energy);
+                        // 🟢 HABILITAR GUARDADO CON RETRASO DE SEGURIDAD
+                        // Esperamos 2 segundos para asegurar que React renderizó todo bien
+                        setTimeout(() => {
+                            setCanSave(true);
+                            console.log("🟢 Auto-Save Enabled");
+                        }, 2000);
+
                     } else {
-                        console.error("Sync Error:", error);
-                        setIsSynced(true); // Forzamos para no bloquear, aunque hubo error
+                        // Si falla sync, permitimos guardar después para no bloquear, pero con cuidado
+                        setTimeout(() => setCanSave(true), 5000);
                     }
 
                     await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
                 } else {
-                    // Nuevo Usuario
+                    // NUEVO USUARIO
                     await supabase.from('user_score').insert([{
                         user_id: user.id, score: 0, energy: 500, username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
                     setEnergy(500);
                     energyRef.current = 500;
-                    setIsSynced(true);
+                    setCanSave(true);
                 }
             };
             fetchInitialData();
         }
     }, [user, authLoading]);
 
-    // 2. GAME LOOP (Visual)
+    // 2. GAME LOOP
     useEffect(() => {
-        if (!isSynced) return;
+        if (!canSave) return; // No animar hasta que estemos listos
 
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -147,13 +164,13 @@ export default function App() {
             setBotTime(prev => Math.max(0, prev - 1));
         }, 1000);
         return () => clearInterval(timer);
-    }, [maxEnergy, regenRate, isSynced]);
+    }, [maxEnergy, regenRate, canSave]);
 
-    // 3. AUTO-SAVE (Intervalo + Salida)
+    // 3. AUTO-SAVE
     useEffect(() => {
-        if (!user || !isSynced) return;
+        if (!user || !canSave) return; // DOBLE CHEQUEO DE SEGURIDAD
 
-        const intervalId = setInterval(saveProgress, 5000);
+        const intervalId = setInterval(saveProgress, 5000); // 5 segundos
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden') saveProgress(); 
@@ -167,25 +184,17 @@ export default function App() {
             window.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('beforeunload', saveProgress);
         };
-    }, [user, isSynced, saveProgress]);
+    }, [user, canSave, saveProgress]);
 
     return (
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
             <div className="app-container" style={{ height: '100dvh', overflow: 'hidden', background: '#000', color: 'white', position: 'relative', display: 'flex', flexDirection: 'column' }}>
-                
-                <div style={{ 
-                    flex: 1, 
-                    overflowY: 'auto', 
-                    position: 'relative',
-                    display: 'flex', flexDirection: 'column',
-                    paddingTop: '20px' 
-                }}>
+                <div style={{ flex: 1, overflowY: 'auto', position: 'relative', display: 'flex', flexDirection: 'column', paddingTop: '20px' }}>
                     {currentTab === 'mine' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ padding: '0 15px', marginBottom: '0', flexShrink: 0 }}>
                                 <MarketDashboard />
                             </div>
-                            
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <MyMainTMAComponent 
                                     score={score} setScore={setScore} 
@@ -204,7 +213,6 @@ export default function App() {
                     {currentTab === 'squad' && <div style={{ padding: '20px', animation: 'fadeIn 0.3s' }}><SquadZone /></div>}
                     {currentTab === 'wallet' && <div style={{ animation: 'fadeIn 0.3s' }}><WalletRoadmap /></div>}
                 </div>
-
                 <div style={{ flexShrink: 0 }}>
                     <BottomNav activeTab={currentTab} setTab={setCurrentTab} />
                 </div>
