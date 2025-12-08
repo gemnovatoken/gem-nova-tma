@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
-import { MarketDashboard } from './components/MarketDashboard';
+import { MarketDashboard } from './components/MarketDashboard'; // Asegúrate que este sea el componente GLOBAL que te di antes
 import { BulkStore } from './components/BulkStore';
 import { SquadZone } from './components/SquadZone';
 import { WalletRoadmap } from './components/WalletRoadmap';
@@ -17,31 +17,31 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
-// Interfaz para Telegram
+// Interfaz TS
 interface TelegramWebApp {
-    initDataUnsafe?: {
-        user?: {
-            username?: string;
-            first_name?: string;
-        };
-    };
+    initDataUnsafe?: { user?: { username?: string; first_name?: string; }; };
 }
 
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
-    // Estados iniciales
+    // Estados Juego
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0); 
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
-    const [botTime, setBotTime] = useState(0);
-    const [adsWatched, setAdsWatched] = useState(0);
+    
+    // Estado Barra Global
+    const [globalProgress, setGlobalProgress] = useState(0);
 
-    // Estado de carga
-    const [isLoaded, setIsLoaded] = useState(false);
+    // Seguridad
+    const [canSave, setCanSave] = useState(false);
 
     const energyRef = useRef(0);
     const scoreRef = useRef(0);
+    
+    const [botTime, setBotTime] = useState(0);
+    const [adsWatched, setAdsWatched] = useState(0);
+
     const { user, loading: authLoading } = useAuth();
     
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
@@ -52,22 +52,18 @@ export default function App() {
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // 🔥 GUARDADO MANUAL (Usando la nueva función simple)
+    // AUTO-SAVE
     const saveProgress = useCallback(async () => {
-        if (!user || !isLoaded) return; 
-
-        // Guardamos Energía, Score y la Hora Actual (ISO String)
-        const { error } = await supabase.rpc('update_user_data', {
-            p_user_id: user.id,
-            p_energy: Math.floor(energyRef.current),
-            p_score: scoreRef.current,
-            p_update_time: new Date().toISOString()
+        if (!user || !canSave) return; 
+        const { error } = await supabase.rpc('save_game_progress', {
+            user_id_in: user.id,
+            new_energy: Math.floor(energyRef.current),
+            new_score: scoreRef.current
         });
-
         if (error) console.error("Save Error:", error);
-    }, [user, isLoaded]);
+    }, [user, canSave]);
 
-    // 1. CARGA INICIAL + CÁLCULO JS
+    // 1. CARGA INICIAL
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -75,78 +71,79 @@ export default function App() {
                 const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const username = tg?.initDataUnsafe?.user?.username || 'Miner';
 
-                // Descargar datos crudos
                 const { data: userData } = await supabase
                     .from('user_score')
-                    .select('*') 
+                    .select('limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
                     .eq('user_id', user.id)
                     .single();
                 
                 if (userData) {
-                    // --- CÁLCULO OFFLINE EN EL CLIENTE (JS) ---
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
-                    
-                    const lastTime = userData.last_energy_update ? new Date(userData.last_energy_update).getTime() : new Date().getTime();
-                    const now = new Date().getTime();
-                    
-                    // Segundos pasados (protegido contra negativos)
-                    const secondsPassed = Math.max(0, Math.floor((now - lastTime) / 1000));
-                    
-                    // Energía generada offline
-                    const generated = secondsPassed * mySpeed;
-                    const storedEnergy = Number(userData.energy) || 0;
-                    
-                    // Total real
-                    const totalEnergy = Math.min(myLimit, storedEnergy + generated);
-                    
-                    console.log(`🔌 Offline: ${secondsPassed}s pasados. Generado: ${generated}. Total: ${totalEnergy}`);
 
-                    // Aplicar datos
-                    setScore(userData.score);
-                    setEnergy(totalEnergy);
-                    energyRef.current = totalEnergy;
-                    scoreRef.current = userData.score;
-
-                    setLevels({ 
-                        multitap: userData.multitap_level || 1, 
-                        limit: userData.limit_level || 1, 
-                        speed: userData.speed_level || 1 
+                    // Sincronización Energía
+                    const { data: syncData, error: syncError } = await supabase.rpc('sync_energy_on_load', { 
+                        user_id_in: user.id,
+                        my_regen_rate: mySpeed,
+                        my_max_energy: myLimit
                     });
 
-                    if (userData.bot_active_until) {
-                        const botExpiry = new Date(userData.bot_active_until).getTime();
-                        setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
+                    if (!syncError && syncData && syncData.length > 0) {
+                        const result = syncData[0];
+                        setScore(result.current_score);
+                        setEnergy(result.synced_energy);
+                        energyRef.current = result.synced_energy;
+                        scoreRef.current = result.current_score;
+
+                        setLevels({ 
+                            multitap: userData.multitap_level || 1, 
+                            limit: userData.limit_level || 1, 
+                            speed: userData.speed_level || 1 
+                        });
+
+                        if (userData.bot_active_until) {
+                            const botExpiry = new Date(userData.bot_active_until).getTime();
+                            const now = new Date().getTime();
+                            setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
+                        }
+
+                        const today = new Date().toISOString().split('T')[0];
+                        setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
+
+                        setTimeout(() => setCanSave(true), 2000);
                     }
-
-                    const today = new Date().toISOString().split('T')[0];
-                    setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
-
-                    setIsLoaded(true); // Ya podemos guardar
-
-                    // 🔥 GUARDAMOS EL CÁLCULO INMEDIATAMENTE PARA SINCRONIZAR DB
-                    supabase.rpc('update_user_data', {
-                        p_user_id: user.id,
-                        p_energy: totalEnergy,
-                        p_score: userData.score,
-                        p_update_time: new Date().toISOString()
-                    });
+                    await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
                 } else {
-                    // NUEVO USUARIO
                     await supabase.from('user_score').insert([{
                         user_id: user.id, score: 0, energy: 0, username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
                     setEnergy(0);
-                    setIsLoaded(true);
+                    energyRef.current = 0;
+                    setCanSave(true);
                 }
             };
             fetchInitialData();
         }
     }, [user, authLoading]);
 
-    // 2. GAME LOOP
+    // 2. 🔥 FETCH BARRA GLOBAL (Esto actualiza la barra del 100% al 0%)
+    useEffect(() => {
+        const fetchGlobalProgress = async () => {
+            const { data, error } = await supabase.rpc('get_global_launch_progress');
+            if (!error && data !== null) {
+                console.log("Global Progress:", data);
+                setGlobalProgress(Number(data));
+            }
+        };
+
+        fetchGlobalProgress(); // Cargar al inicio
+        const interval = setInterval(fetchGlobalProgress, 60000); // Refrescar cada 1 min
+        return () => clearInterval(interval);
+    }, []);
+
+    // 3. GAME LOOP & SAVE
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -158,22 +155,18 @@ export default function App() {
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
 
-    // 3. AUTO-SAVE AGRESIVO (Cada 1s para pruebas)
     useEffect(() => {
-        if (!user || !isLoaded) return;
-
-        const intervalId = setInterval(saveProgress, 1000); // Guardamos cada segundo
-        
+        if (!user || !canSave) return;
+        const intervalId = setInterval(saveProgress, 5000);
         const handleVisibilityChange = () => { if (document.visibilityState === 'hidden') saveProgress(); };
         window.addEventListener('visibilitychange', handleVisibilityChange);
         window.addEventListener('beforeunload', saveProgress);
-
         return () => {
             clearInterval(intervalId);
             window.removeEventListener('visibilitychange', handleVisibilityChange);
             window.removeEventListener('beforeunload', saveProgress);
         };
-    }, [user, isLoaded, saveProgress]);
+    }, [user, canSave, saveProgress]);
 
     return (
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
@@ -182,7 +175,8 @@ export default function App() {
                     {currentTab === 'mine' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ padding: '0 15px', marginBottom: '0', flexShrink: 0 }}>
-                                <MarketDashboard />
+                                {/* 🔥 AQUÍ PASAMOS EL DATO GLOBAL */}
+                                <MarketDashboard globalProgress={globalProgress} />
                             </div>
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                 <MyMainTMAComponent 
