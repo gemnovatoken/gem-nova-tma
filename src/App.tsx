@@ -49,7 +49,8 @@ export default function App() {
     const { user, loading: authLoading } = useAuth();
     
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
-    const speedIdx = Math.min(Math.max(0, levels.speed - 1), 7);
+// FORZAMOS QUE LA VELOCIDAD USE EL MISMO NIVEL QUE EL LIMITE
+    const speedIdx = Math.min(Math.max(0, levels.limit - 1), 7);
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
@@ -103,7 +104,9 @@ export default function App() {
                     setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
 
                     // Sincronizar offline
-                    const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
+                    // Sincronizar offline
+// AHORA CALCULAMOS LA VELOCIDAD BASADA EN EL NIVEL DE LIMITE (userData.limit_level)
+                    const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.limit_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
                     const { data: syncData } = await supabase.rpc('sync_energy_on_load', { 
                         user_id_in: user.id,
