@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 // import { Header } from './components/Header'; 
 import { BottomNav } from './components/BottomNav';
@@ -21,11 +21,15 @@ const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json';
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
+    // Inicializamos en 0, pero la carga offline lo corregirá rápido
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     
-    // 🔥 ESTADOS DEL BOT
+    // Referencias para tener siempre el valor real sin reiniciar efectos
+    const energyRef = useRef(0);
+    const scoreRef = useRef(0);
+    
     const [botTime, setBotTime] = useState(0);
     const [adsWatched, setAdsWatched] = useState(0);
 
@@ -36,7 +40,28 @@ export default function App() {
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // 1. CARGA INICIAL ROBUSTA
+    // Actualizamos referencias constantemente
+    useEffect(() => { energyRef.current = energy; }, [energy]);
+    useEffect(() => { scoreRef.current = score; }, [score]);
+
+    // 🔥 FUNCIÓN CENTRALIZADA DE GUARDADO (La clave de la solución)
+    const saveProgress = useCallback(async () => {
+        if (!user) return;
+        
+        const currentE = energyRef.current;
+        const currentS = scoreRef.current;
+
+        // Guardamos Energía Y Score
+        await supabase.from('user_score').update({
+            energy: Math.floor(currentE),
+            score: currentS, // También guardamos el score por si acaso
+            last_energy_update: new Date().toISOString()
+        }).eq('user_id', user.id);
+        
+        // console.log("💾 Progress Saved:", Math.floor(currentE));
+    }, [user]);
+
+    // 1. CARGA INICIAL + CÁLCULO OFFLINE
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -53,40 +78,45 @@ export default function App() {
                 
                 if (data) {
                     setScore(data.score);
+                    scoreRef.current = data.score;
                     
-                    // --- 🛠️ CORRECCIÓN DE CÁLCULO OFFLINE ---
-                    // Aseguramos que las fechas sean válidas
+                    // --- CÁLCULO DE REGENERACIÓN OFFLINE ---
+                    // 1. ¿Cuándo fue la última vez que guardamos?
                     const lastUpdate = data.last_energy_update ? new Date(data.last_energy_update).getTime() : new Date().getTime();
                     const now = new Date().getTime();
                     
-                    // Evitamos números negativos si el reloj del dispositivo está mal
+                    // 2. ¿Cuántos segundos han pasado?
                     const secondsPassed = Math.max(0, Math.floor((now - lastUpdate) / 1000));
                     
+                    // 3. ¿Qué velocidad y tanque tiene el usuario?
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (data.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (data.limit_level || 1) - 1)];
                     
+                    // 4. Calculamos cuánto generó mientras dormía
                     const generatedOffline = secondsPassed * mySpeed;
+                    const storedEnergy = Number(data.energy) || 0; // Aseguramos que sea número
                     
-                    // Sumamos lo que tenía guardado + lo generado offline
-                    const storedEnergy = data.energy || 0;
+                    // 5. Energía Final = Lo que tenía + Lo generado (Sin pasarse del límite)
                     const totalEnergy = Math.min(myLimit, storedEnergy + generatedOffline);
                     
-                    setEnergy(totalEnergy);
+                    console.log(`🔌 Offline: Pasaron ${secondsPassed}s. Generado: ${generatedOffline}. Total: ${totalEnergy}`);
                     
+                    setEnergy(totalEnergy);
+                    energyRef.current = totalEnergy;
+
+                    // Actualizamos niveles y bot
                     setLevels({ 
                         multitap: data.multitap_level || 1, 
                         limit: data.limit_level || 1, 
                         speed: data.speed_level || 1 
                     });
 
-                    // Carga datos del Bot
                     if (data.bot_active_until) {
                         const botExpiry = new Date(data.bot_active_until).getTime();
                         const timeLeft = Math.max(0, Math.floor((botExpiry - now) / 1000));
                         setBotTime(timeLeft);
                     }
 
-                    // Carga datos de Anuncios
                     const today = new Date().toISOString().split('T')[0];
                     if (data.last_bot_ad_date !== today) {
                         setAdsWatched(0); 
@@ -99,18 +129,19 @@ export default function App() {
                     }
 
                 } else {
-                    // Nuevo usuario
+                    // Nuevo Usuario
                     await supabase.from('user_score').insert([{
                         user_id: user.id, score: 0, energy: 500, username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
+                    setEnergy(500);
                 }
             };
             fetchInitialData();
         }
     }, [user, authLoading]);
 
-    // 2. LOOP (Energía + Bot)
+    // 2. LOOP VISUAL (Solo actualiza la pantalla)
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -121,6 +152,30 @@ export default function App() {
         }, 1000);
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
+
+    // 3. 🔥 GUARDADO AUTOMÁTICO INTELIGENTE
+    useEffect(() => {
+        if (!user) return;
+
+        // A. Guardar cada 10 segundos (Respaldo)
+        const intervalId = setInterval(saveProgress, 10000);
+
+        // B. Guardar INMEDIATAMENTE si el usuario cambia de app o cierra la pestaña
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                saveProgress(); // ¡Guardar YA!
+            }
+        };
+
+        window.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('beforeunload', saveProgress); // Para navegadores de escritorio
+
+        return () => {
+            clearInterval(intervalId);
+            window.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('beforeunload', saveProgress);
+        };
+    }, [user, saveProgress]);
 
     return (
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
