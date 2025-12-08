@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
 import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
-import { MarketDashboard } from './components/MarketDashboard'; // Asegúrate que este sea el componente GLOBAL que te di antes
+// Asegúrate de que MarketDashboard.tsx sea el que tiene la interfaz correcta
+import { MarketDashboard } from './components/MarketDashboard'; 
 import { BulkStore } from './components/BulkStore';
 import { SquadZone } from './components/SquadZone';
 import { WalletRoadmap } from './components/WalletRoadmap';
@@ -63,7 +64,7 @@ export default function App() {
         if (error) console.error("Save Error:", error);
     }, [user, canSave]);
 
-    // 1. CARGA INICIAL
+    // 1. CARGA INICIAL (LÓGICA HÍBRIDA: MOSTRAR -> LUEGO SINCRONIZAR)
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -71,50 +72,60 @@ export default function App() {
                 const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const username = tg?.initDataUnsafe?.user?.username || 'Miner';
 
+                // A. OBTENER DATOS BÁSICOS (LECTURA RÁPIDA)
                 const { data: userData } = await supabase
                     .from('user_score')
-                    .select('limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
+                    .select('score, energy, limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
                     .eq('user_id', user.id)
                     .single();
                 
                 if (userData) {
+                    // 🔥 PASO CRÍTICO: MOSTRAR DATOS DE INMEDIATO (Para que no veas 0)
+                    setScore(userData.score);
+                    // Mostramos la energía guardada mientras calculamos la nueva
+                    setEnergy(userData.energy); 
+                    
+                    setLevels({ 
+                        multitap: userData.multitap_level || 1, 
+                        limit: userData.limit_level || 1, 
+                        speed: userData.speed_level || 1 
+                    });
+
+                    // Cargar Bot y Ads
+                    if (userData.bot_active_until) {
+                        const botExpiry = new Date(userData.bot_active_until).getTime();
+                        const now = new Date().getTime();
+                        setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
+                    }
+                    const today = new Date().toISOString().split('T')[0];
+                    setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
+
+                    // B. SINCRONIZACIÓN OFFLINE (CALCULAR TIEMPO PERDIDO)
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
 
-                    // Sincronización Energía
-                    const { data: syncData, error: syncError } = await supabase.rpc('sync_energy_on_load', { 
+                    const { data: syncData } = await supabase.rpc('sync_energy_on_load', { 
                         user_id_in: user.id,
                         my_regen_rate: mySpeed,
                         my_max_energy: myLimit
                     });
 
-                    if (!syncError && syncData && syncData.length > 0) {
+                    // Si el cálculo responde, actualizamos la energía con lo nuevo
+                    if (syncData && syncData.length > 0) {
                         const result = syncData[0];
-                        setScore(result.current_score);
+                        console.log("✅ Offline Sync:", result.synced_energy);
                         setEnergy(result.synced_energy);
                         energyRef.current = result.synced_energy;
                         scoreRef.current = result.current_score;
-
-                        setLevels({ 
-                            multitap: userData.multitap_level || 1, 
-                            limit: userData.limit_level || 1, 
-                            speed: userData.speed_level || 1 
-                        });
-
-                        if (userData.bot_active_until) {
-                            const botExpiry = new Date(userData.bot_active_until).getTime();
-                            const now = new Date().getTime();
-                            setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
-                        }
-
-                        const today = new Date().toISOString().split('T')[0];
-                        setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
-
-                        setTimeout(() => setCanSave(true), 2000);
                     }
+
+                    // Habilitar guardado
+                    setTimeout(() => setCanSave(true), 1500);
+                    
                     await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
                 } else {
+                    // USUARIO NUEVO
                     await supabase.from('user_score').insert([{
                         user_id: user.id, score: 0, energy: 0, username: username,
                         last_energy_update: new Date().toISOString()
@@ -128,22 +139,20 @@ export default function App() {
         }
     }, [user, authLoading]);
 
-    // 2. 🔥 FETCH BARRA GLOBAL (Esto actualiza la barra del 100% al 0%)
+    // 2. FETCH BARRA GLOBAL
     useEffect(() => {
         const fetchGlobalProgress = async () => {
             const { data, error } = await supabase.rpc('get_global_launch_progress');
             if (!error && data !== null) {
-                console.log("Global Progress:", data);
                 setGlobalProgress(Number(data));
             }
         };
-
-        fetchGlobalProgress(); // Cargar al inicio
-        const interval = setInterval(fetchGlobalProgress, 60000); // Refrescar cada 1 min
+        fetchGlobalProgress();
+        const interval = setInterval(fetchGlobalProgress, 60000);
         return () => clearInterval(interval);
     }, []);
 
-    // 3. GAME LOOP & SAVE
+    // 3. GAME LOOP (VISUAL - SIEMPRE CORRE)
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -155,6 +164,7 @@ export default function App() {
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
 
+    // 4. AUTO-SAVE
     useEffect(() => {
         if (!user || !canSave) return;
         const intervalId = setInterval(saveProgress, 5000);
@@ -175,7 +185,6 @@ export default function App() {
                     {currentTab === 'mine' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                             <div style={{ padding: '0 15px', marginBottom: '0', flexShrink: 0 }}>
-                                {/* 🔥 AQUÍ PASAMOS EL DATO GLOBAL */}
                                 <MarketDashboard globalProgress={globalProgress} />
                             </div>
                             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
