@@ -26,7 +26,7 @@ export const MarketDashboard: React.FC<MarketProps> = ({ globalProgress = 0 }) =
                     fontSize: '10px', fontWeight: '900', color: '#000', 
                     letterSpacing: '0.5px', textTransform: 'uppercase'
                 }}>
-                    Ads + Upgrades + BulkBuy = 🚀 LAUNCH
+                    Ads + Upgrades + BulkBuy + Referal = 🚀 LAUNCH
                 </span>
             </div>
 
