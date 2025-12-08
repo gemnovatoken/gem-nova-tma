@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
-// import { Header } from './components/Header'; 
 import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
 import { MarketDashboard } from './components/MarketDashboard';
@@ -21,12 +20,11 @@ const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json';
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
-    // Inicializamos en 0, pero la carga offline lo corregirá rápido
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     
-    // Referencias para tener siempre el valor real sin reiniciar efectos
+    // Referencias para el Auto-Save
     const energyRef = useRef(0);
     const scoreRef = useRef(0);
     
@@ -40,28 +38,31 @@ export default function App() {
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // Actualizamos referencias constantemente
+    // Sincronizar referencias
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // 🔥 FUNCIÓN CENTRALIZADA DE GUARDADO (La clave de la solución)
+    // 🔥 FUNCIÓN DE GUARDADO (Con reporte de errores)
     const saveProgress = useCallback(async () => {
         if (!user) return;
         
         const currentE = energyRef.current;
         const currentS = scoreRef.current;
 
-        // Guardamos Energía Y Score
-        await supabase.from('user_score').update({
+        const { error } = await supabase.from('user_score').update({
             energy: Math.floor(currentE),
-            score: currentS, // También guardamos el score por si acaso
+            score: currentS,
             last_energy_update: new Date().toISOString()
         }).eq('user_id', user.id);
         
-        // console.log("💾 Progress Saved:", Math.floor(currentE));
+        if (error) {
+            console.error("❌ Auto-Save Failed:", error.message);
+        } else {
+            // console.log("✅ Progress Saved"); // Descomentar para verificar
+        }
     }, [user]);
 
-    // 1. CARGA INICIAL + CÁLCULO OFFLINE
+    // 1. CARGA INICIAL
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -80,31 +81,24 @@ export default function App() {
                     setScore(data.score);
                     scoreRef.current = data.score;
                     
-                    // --- CÁLCULO DE REGENERACIÓN OFFLINE ---
-                    // 1. ¿Cuándo fue la última vez que guardamos?
+                    // CÁLCULO OFFLINE
                     const lastUpdate = data.last_energy_update ? new Date(data.last_energy_update).getTime() : new Date().getTime();
                     const now = new Date().getTime();
-                    
-                    // 2. ¿Cuántos segundos han pasado?
                     const secondsPassed = Math.max(0, Math.floor((now - lastUpdate) / 1000));
                     
-                    // 3. ¿Qué velocidad y tanque tiene el usuario?
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (data.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (data.limit_level || 1) - 1)];
                     
-                    // 4. Calculamos cuánto generó mientras dormía
                     const generatedOffline = secondsPassed * mySpeed;
-                    const storedEnergy = Number(data.energy) || 0; // Aseguramos que sea número
+                    const storedEnergy = Number(data.energy) || 0;
                     
-                    // 5. Energía Final = Lo que tenía + Lo generado (Sin pasarse del límite)
+                    // Lógica correcta: Energía Guardada + Generada (Tope Límite)
                     const totalEnergy = Math.min(myLimit, storedEnergy + generatedOffline);
-                    
-                    console.log(`🔌 Offline: Pasaron ${secondsPassed}s. Generado: ${generatedOffline}. Total: ${totalEnergy}`);
                     
                     setEnergy(totalEnergy);
                     energyRef.current = totalEnergy;
 
-                    // Actualizamos niveles y bot
+                    // Niveles y Bot
                     setLevels({ 
                         multitap: data.multitap_level || 1, 
                         limit: data.limit_level || 1, 
@@ -141,7 +135,7 @@ export default function App() {
         }
     }, [user, authLoading]);
 
-    // 2. LOOP VISUAL (Solo actualiza la pantalla)
+    // 2. GAME LOOP (Visual)
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -153,22 +147,21 @@ export default function App() {
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
 
-    // 3. 🔥 GUARDADO AUTOMÁTICO INTELIGENTE
+    // 3. AUTO-SAVE (10s + Salida)
     useEffect(() => {
         if (!user) return;
 
-        // A. Guardar cada 10 segundos (Respaldo)
         const intervalId = setInterval(saveProgress, 10000);
 
-        // B. Guardar INMEDIATAMENTE si el usuario cambia de app o cierra la pestaña
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden') {
-                saveProgress(); // ¡Guardar YA!
+                saveProgress(); 
             }
         };
 
         window.addEventListener('visibilitychange', handleVisibilityChange);
-        window.addEventListener('beforeunload', saveProgress); // Para navegadores de escritorio
+        // Para PC también capturamos beforeunload
+        window.addEventListener('beforeunload', saveProgress);
 
         return () => {
             clearInterval(intervalId);
