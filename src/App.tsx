@@ -17,18 +17,27 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
+// Interfaz para el objeto Telegram
+interface TelegramWebApp {
+    initDataUnsafe?: {
+        user?: {
+            username?: string;
+            first_name?: string;
+        };
+    };
+}
+
 export default function App() {
     const [currentTab, setCurrentTab] = useState('mine');
     
-    // Iniciamos visualmente en 0 para evitar saltos falsos mientras carga
+    // Iniciamos visualmente en 0 para evitar saltos falsos
     const [score, setScore] = useState(0);
     const [energy, setEnergy] = useState(0); 
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     
-    // 🔥 BLOQUEO DE SEGURIDAD: Impide guardar "0" al inicio
+    // 🔥 BLOQUEO DE SEGURIDAD
     const [canSave, setCanSave] = useState(false);
 
-    // Referencias para tener siempre el valor actual en el Auto-Save
     const energyRef = useRef(0);
     const scoreRef = useRef(0);
     
@@ -42,13 +51,11 @@ export default function App() {
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // Sincronizamos las referencias con el estado visual
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // 🔥 AUTO-SAVE (Guardado en Servidor)
+    // AUTO-SAVE
     const saveProgress = useCallback(async () => {
-        // Si no estamos listos (canSave=false), NO guardamos para evitar reiniciar a 0
         if (!user || !canSave) return; 
 
         const { error } = await supabase.rpc('save_game_progress', {
@@ -60,17 +67,17 @@ export default function App() {
         if (error) console.error("Save Error:", error);
     }, [user, canSave]);
 
-    // 1. CARGA INICIAL Y SINCRONIZACIÓN OFFLINE
+    // 1. CARGA INICIAL
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
-                // CORRECCIÓN: Acceso seguro a Telegram sin usar @ts-ignore
+                // CORRECCIÓN FINAL: Casting seguro sin @ts-ignore
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const tg = (window as any).Telegram?.WebApp;
+                const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
-                // Buscamos datos del usuario
+                // Intentamos buscar al usuario
                 const { data: userData, error: fetchError } = await supabase
                     .from('user_score')
                     .select('limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
@@ -82,9 +89,7 @@ export default function App() {
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
 
-                    // 🔥 SINCRONIZACIÓN MÁGICA
-                    // Esta función en SQL calcula cuánto tiempo estuviste fuera y suma la energía correspondiente.
-                    // Si estuviste fuera 1 hora, te suma 3600 puntos (hasta llenar el tanque).
+                    // Sincronización Server-Side (Calcula offline y actualiza)
                     const { data: syncData, error: syncError } = await supabase.rpc('sync_energy_on_load', { 
                         user_id_in: user.id,
                         my_regen_rate: mySpeed,
@@ -93,12 +98,10 @@ export default function App() {
 
                     if (!syncError && syncData && syncData.length > 0) {
                         const result = syncData[0];
-                        console.log("✅ Datos Sincronizados:", result.synced_energy);
+                        console.log("✅ Datos Cargados (Continuidad):", result.synced_energy);
                         
                         setScore(result.current_score);
                         setEnergy(result.synced_energy);
-                        
-                        // Actualizamos referencias para que el próximo guardado sea correcto
                         energyRef.current = result.synced_energy;
                         scoreRef.current = result.current_score;
 
@@ -108,11 +111,9 @@ export default function App() {
                             speed: userData.speed_level || 1 
                         });
 
-                        // Restaurar Tiempo del Bot (Si existe)
                         if (userData.bot_active_until) {
                             const botExpiry = new Date(userData.bot_active_until).getTime();
                             const now = new Date().getTime();
-                            // Calculamos cuánto falta para que expire
                             setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
                         }
 
@@ -120,29 +121,31 @@ export default function App() {
                         if (userData.last_bot_ad_date !== today) setAdsWatched(0); 
                         else setAdsWatched(userData.bot_ads_watched_today || 0);
 
-                        // Habilitar el guardado automático después de 2 segundos
-                        // Esto evita que sobrescribamos con "0" mientras carga la interfaz
+                        // Habilitar guardado tras 2s
                         setTimeout(() => setCanSave(true), 2000);
                     }
 
-                    // Actualizar nombre de usuario si cambió en Telegram
                     await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
                 } 
-                // CASO 2: ERROR DE CONEXIÓN
+                // CASO 2: ERROR REAL (NO ES USUARIO NUEVO, ES ERROR)
                 else if (fetchError && fetchError.code !== 'PGRST116') {
-                    console.error("❌ Error de Conexión:", fetchError);
+                    console.error("❌ Error Crítico BD:", fetchError);
                 }
-                // CASO 3: USUARIO NUEVO
+                // CASO 3: USUARIO REALMENTE NUEVO
                 else {
-                    console.log("🆕 Creando nuevo usuario...");
+                    console.log("🆕 Usuario Nuevo Detectado. Creando con 0 energía...");
+                    
                     const { error: insertError } = await supabase.from('user_score').insert([{
-                        user_id: user.id, score: 0, energy: 0, username: username,
+                        user_id: user.id, 
+                        score: 0, 
+                        energy: 0, 
+                        username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
                     
                     if (!insertError) {
-                        setEnergy(0);
+                        setEnergy(0); 
                         energyRef.current = 0;
                         setCanSave(true);
                     }
@@ -152,8 +155,7 @@ export default function App() {
         }
     }, [user, authLoading]);
 
-    // 2. GAME LOOP (Regeneración Visual)
-    // Esto hace que el número suba en pantalla mientras tienes la app abierta
+    // 2. GAME LOOP
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -165,14 +167,11 @@ export default function App() {
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
 
-    // 3. EJECUTAR AUTO-SAVE
+    // 3. AUTO-SAVE
     useEffect(() => {
         if (!user || !canSave) return;
 
-        // Guardar cada 5 segundos
         const intervalId = setInterval(saveProgress, 5000);
-        
-        // Guardar si el usuario minimiza la app
         const handleVisibilityChange = () => { if (document.visibilityState === 'hidden') saveProgress(); };
         
         window.addEventListener('visibilitychange', handleVisibilityChange);
