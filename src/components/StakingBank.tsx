@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { CheckCircle, Lock, Calendar, Info } from 'lucide-react';
@@ -13,54 +13,54 @@ interface StakeData {
 }
 
 const LOCK_OPTIONS = [
-    { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, // 5%
-    { days: 30, roi: 0.15, label: '30D', color: '#00F2FE' }, // 15%
-    { days: 60, roi: 0.35, label: '60D', color: '#FF0055' }, // 35%
-    { days: 90, roi: 0.60, label: '90D', color: '#FFD700' }  // 60%
+    { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, 
+    { days: 30, roi: 0.15, label: '30D', color: '#00F2FE' }, 
+    { days: 60, roi: 0.35, label: '60D', color: '#FF0055' }, 
+    { days: 90, roi: 0.60, label: '90D', color: '#FFD700' }  
 ];
 
 export const StakingBank = () => {
     const { user } = useAuth();
     
+    // Usamos el ID como referencia estable
+    const userId = user?.id; 
+
     const [stakes, setStakes] = useState<StakeData[]>([]);
     
     // Estados de Saldo
     const [totalScore, setTotalScore] = useState(0);
     const [purchasedPoints, setPurchasedPoints] = useState(0);
-    const [userLevel, setUserLevel] = useState(1); // Usamos limit_level como referencia
+    const [userLevel, setUserLevel] = useState(1);
     
     const [loading, setLoading] = useState(false);
     const [amountToStake, setAmountToStake] = useState('');
     const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[1]); 
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // 💰 LÓGICA PROGRESIVA DE NIVELES
+    // LÓGICA DE NIVELES
     const getUnlockPercentage = (level: number) => {
-        if (level >= 8) return 0.70; // 70%
-        if (level === 7) return 0.50; // 50%
-        if (level === 6) return 0.35; // 35%
-        if (level === 5) return 0.20; // 20%
-        return 0; // Nivel 1-4: 0%
+        if (level >= 8) return 0.70; 
+        if (level === 7) return 0.50; 
+        if (level === 6) return 0.35; 
+        if (level === 5) return 0.20; 
+        return 0; 
     };
 
     const unlockPct = getUnlockPercentage(userLevel);
     
-    // 1. Calculamos puntos jugados
+    // Matemática corregida
     const earnedPoints = Math.max(0, totalScore - purchasedPoints);
-    
-    // 2. Aplicamos el porcentaje según nivel
     const stakeableEarned = Math.floor(earnedPoints * unlockPct);
-    
-    // 3. Total disponible para Staking
     const maxStakeable = purchasedPoints + stakeableEarned;
 
-    const fetchData = async () => {
-        if(!user) return;
+    // Función estable para cargar datos
+    const fetchData = useCallback(async () => {
+        if(!userId) return;
         
         const { data: stakeData } = await supabase
             .from('stakes') 
             .select('*')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
             .eq('status', 'active')
             .order('end_at', { ascending: true });
         
@@ -68,22 +68,34 @@ export const StakingBank = () => {
 
         const { data: userData } = await supabase
             .from('user_score')
-            .select('score, purchased_points, limit_level')
-            .eq('user_id', user.id)
+            .select('score, total_bought_points, limit_level') 
+            .eq('user_id', userId)
             .single();
         
         if (userData) {
             setTotalScore(userData.score);
-            setPurchasedPoints(userData.purchased_points || 0);
+            setPurchasedPoints(userData.total_bought_points || 0); 
             setUserLevel(userData.limit_level || 1);
         }
-    };
+    }, [userId]);
 
+    // 🔥 CORRECCIÓN DEL ERROR: Usamos setTimeout para evitar "setState síncrono"
     useEffect(() => {
-        if (!user) return;
-        fetchData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user]);
+        if (!userId) return;
+        
+        // 1. Carga inicial "despegada" del renderizado para evitar el error
+        const initialLoad = setTimeout(() => {
+            fetchData();
+        }, 0);
+        
+        // 2. Intervalo para mantener sincronizado
+        const interval = setInterval(fetchData, 3000);
+        
+        return () => {
+            clearTimeout(initialLoad);
+            clearInterval(interval);
+        };
+    }, [userId, fetchData]); // Dependencias correctas
 
     const calculatedProfit = amountToStake 
         ? Math.floor(parseInt(amountToStake) * selectedOption.roi) 
@@ -96,21 +108,15 @@ export const StakingBank = () => {
     };
 
     const handleStake = async () => {
-        if (!user || !amountToStake) return;
+        if (!userId || !amountToStake) return;
         const amount = parseInt(amountToStake);
         
-        if (amount <= 0) {
-            alert("Enter a valid amount");
-            return;
-        }
+        if (amount <= 0) { alert("Enter a valid amount"); return; }
         if (amount > maxStakeable) {
-            alert(`⚠️ Limit Exceeded!\n\nMax Stakeable: ${maxStakeable.toLocaleString()}\n\nReason:\n- Purchased: 100% Unlocked\n- Gameplay: ${unlockPct * 100}% Unlocked (Lvl ${userLevel})`);
+            alert(`⚠️ Limit Exceeded!\n\nMax Stakeable: ${maxStakeable.toLocaleString()}`);
             return;
         }
-        if (amount > totalScore) {
-            alert("Insufficient balance.");
-            return;
-        }
+        if (amount > totalScore) { alert("Insufficient balance."); return; }
 
         setLoading(true);
 
@@ -118,7 +124,7 @@ export const StakingBank = () => {
         unlockDate.setDate(unlockDate.getDate() + selectedOption.days);
 
         const { error: stakeError } = await supabase.from('stakes').insert({
-            user_id: user.id,
+            user_id: userId,
             amount: amount,
             duration_days: selectedOption.days,
             roi_percent: selectedOption.roi,
@@ -127,19 +133,14 @@ export const StakingBank = () => {
         });
 
         if (!stakeError) {
-            await supabase.rpc('deduct_points', { 
-                user_id_in: user.id, 
-                amount_in: amount 
-            });
-            
-            await new Promise(r => setTimeout(r, 800));
+            await supabase.rpc('deduct_points', { user_id_in: userId, amount_in: amount });
+            await fetchData(); // Recargar datos
             setLoading(false);
             setAmountToStake('');
             setShowSuccess(true); 
-            fetchData();
         } else {
-            console.error("Error de Supabase:", stakeError); // Para ver en consola
-            alert(`Error creating stake: ${stakeError.message}`); // Para ver en pantalla
+            console.error(stakeError);
+            alert(`Error: ${stakeError.message}`);
             setLoading(false);
         }
     };
@@ -149,7 +150,6 @@ export const StakingBank = () => {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
-    // Color dinámico para el texto de porcentaje
     const getPctColor = () => {
         if (unlockPct === 0) return '#FF5252';
         if (unlockPct < 0.5) return '#FFD700';
@@ -162,7 +162,6 @@ export const StakingBank = () => {
                 <Lock size={20} color="#FFD700"/> Vault Staking
             </h3>
             
-            {/* --- PANEL DE REGLAS DE LIQUIDEZ --- */}
             <div style={{background:'rgba(0,0,0,0.3)', padding:'12px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #333'}}>
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#aaa', marginBottom:'8px'}}>
                     <span>Total Balance:</span>
@@ -177,9 +176,7 @@ export const StakingBank = () => {
                     <span>{purchasedPoints.toLocaleString()}</span>
                 </div>
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
-                    <span style={{color: getPctColor()}}>
-                        Gameplay ({unlockPct * 100}%):
-                    </span>
+                    <span style={{color: getPctColor()}}>Gameplay ({unlockPct * 100}%):</span>
                     <span>{stakeableEarned.toLocaleString()}</span>
                 </div>
 
@@ -189,36 +186,25 @@ export const StakingBank = () => {
                 </div>
             </div>
 
-            {/* --- SELECTOR DE DÍAS --- */}
             <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'8px', marginBottom:'15px'}}>
                 {LOCK_OPTIONS.map((opt) => (
-                    <button 
-                        key={opt.days}
-                        onClick={() => setSelectedOption(opt)}
+                    <button key={opt.days} onClick={() => setSelectedOption(opt)}
                         style={{
-                            padding: '8px 4px',
-                            borderRadius: '8px',
+                            padding: '8px 4px', borderRadius: '8px',
                             border: selectedOption.days === opt.days ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
                             background: selectedOption.days === opt.days ? `rgba(255,255,255,0.1)` : 'transparent',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            transition: 'all 0.2s',
+                            color: '#fff', cursor: 'pointer', transition: 'all 0.2s',
                             display: 'flex', flexDirection: 'column', alignItems: 'center'
-                        }}
-                    >
+                        }}>
                         <span style={{fontWeight:'bold', fontSize:'14px'}}>{opt.label}</span>
                         <span style={{fontSize:'10px', color: opt.color}}>+{opt.roi * 100}%</span>
                     </button>
                 ))}
             </div>
 
-            {/* --- INPUT --- */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                 <div style={{position:'relative', width:'100%'}}>
-                    <input 
-                        type="number" 
-                        placeholder="Amount"
-                        value={amountToStake}
+                    <input type="number" placeholder="Amount" value={amountToStake}
                         onChange={(e) => setAmountToStake(e.target.value)}
                         style={{ padding: '12px', borderRadius: '8px', border: 'none', width: '100%', background:'rgba(255,255,255,0.1)', color:'#fff', fontWeight:'bold', paddingRight:'50px' }}
                     />
@@ -229,7 +215,6 @@ export const StakingBank = () => {
                 </button>
             </div>
 
-            {/* --- PORCENTAJES --- */}
             <div style={{display:'flex', gap:'5px', marginBottom:'20px'}}>
                 {[0.25, 0.50, 0.75, 1].map((pct) => (
                     <button key={pct} onClick={() => setPercentage(pct)} style={{flex:1, padding:'6px', background:'rgba(255,255,255,0.05)', border:'none', borderRadius:'4px', color:'#aaa', fontSize:'10px', cursor:'pointer'}}>
@@ -238,7 +223,6 @@ export const StakingBank = () => {
                 ))}
             </div>
 
-            {/* Previsualización */}
             {parseInt(amountToStake) > 0 && (
                 <div style={{marginBottom:'25px', padding:'10px', background:'rgba(76, 175, 80, 0.1)', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid #4CAF50'}}>
                     <div style={{fontSize:'12px', color:'#aaa'}}>Profit in {selectedOption.days} days:</div>
@@ -246,7 +230,6 @@ export const StakingBank = () => {
                 </div>
             )}
 
-            {/* --- HISTORIAL --- */}
             <h4 style={{margin:'0 0 15px 0', fontSize:'12px', color:'#aaa', textTransform:'uppercase', letterSpacing:'1px', borderTop:'1px dashed #333', paddingTop:'15px'}}>
                 Active Vaults ({stakes.length})
             </h4>
@@ -275,7 +258,6 @@ export const StakingBank = () => {
                 </div>
             )}
 
-            {/* --- MODAL ÉXITO --- */}
             {showSuccess && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
