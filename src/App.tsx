@@ -24,7 +24,7 @@ interface TelegramWebApp {
             username?: string;
             first_name?: string;
         };
-        start_param?: string; // 🔥 AQUÍ LLEGA EL CÓDIGO DE REFERIDO
+        start_param?: string; 
     };
 }
 
@@ -67,24 +67,23 @@ export default function App() {
         if (error) console.error("Save Error:", error);
     }, [user, canSave]);
 
-    // 1. CARGA INICIAL + SISTEMA DE REFERIDOS
+    // 1. CARGA INICIAL
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
-                const startParam = tg?.initDataUnsafe?.start_param; // 🔥 CAPTURAMOS EL LINK
+                const startParam = tg?.initDataUnsafe?.start_param; 
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
-                // Buscar usuario existente
                 const { data: userData } = await supabase
                     .from('user_score')
                     .select('score, energy, limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
                     .eq('user_id', user.id)
                     .single();
                 
-                // CASO A: USUARIO EXISTE (CARGAR NORMAL)
+                // CASO A: USUARIO EXISTE
                 if (userData) {
                     setScore(userData.score);
                     setEnergy(userData.energy);
@@ -123,31 +122,25 @@ export default function App() {
                     await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
                 } 
-                // CASO B: USUARIO NUEVO (REGISTRAR CON REFERIDO)
+                // CASO B: USUARIO NUEVO
                 else {
-                    console.log("🆕 Usuario Nuevo. Referido por:", startParam);
-                    
                     let referrerId = null;
-                    // Si el link es "ref_12345", limpiamos el "ref_"
                     if (startParam && startParam.includes('_')) {
-                        referrerId = startParam.split('_')[1]; // Toma lo que está después del guion bajo
+                        referrerId = startParam.split('_')[1];
                     } else if (startParam && startParam.length > 10) {
-                        referrerId = startParam; // Toma el ID directo
+                        referrerId = startParam;
                     }
 
-                    // Llamamos a la función MAESTRA de SQL que da los bonos
                     const { error: insertError } = await supabase.rpc('register_new_user', {
                         p_user_id: user.id,
                         p_username: username,
-                        p_referral_code: referrerId // Pasamos el ID del padrino
+                        p_referral_code: referrerId
                     });
                     
                     if (!insertError) {
                         setEnergy(0); 
                         energyRef.current = 0;
                         setCanSave(true);
-                    } else {
-                        console.error("Error registro:", insertError);
                     }
                 }
             };
@@ -213,7 +206,18 @@ export default function App() {
                             </div>
                         </div>
                     )}
-                    {currentTab === 'market' && <div style={{ animation: 'fadeIn 0.3s' }}><BulkStore /></div>}
+                    
+                    {/* 🔥 AQUÍ ES DONDE CONECTAMOS LA TIENDA */}
+                    {currentTab === 'market' && (
+                        <div style={{ animation: 'fadeIn 0.3s' }}>
+                            <BulkStore onPurchaseSuccess={(newScore) => {
+                                console.log("💰 Compra detectada! Actualizando saldo a:", newScore);
+                                setScore(newScore); // Actualiza la pantalla
+                                scoreRef.current = newScore; // Actualiza el guardado automático
+                            }} />
+                        </div>
+                    )}
+
                     {currentTab === 'mission' && <div style={{ animation: 'fadeIn 0.3s' }}><MissionZone /></div>}
                     {currentTab === 'squad' && <div style={{ padding: '20px', animation: 'fadeIn 0.3s' }}><SquadZone /></div>}
                     {currentTab === 'wallet' && <div style={{ animation: 'fadeIn 0.3s' }}><WalletRoadmap /></div>}
