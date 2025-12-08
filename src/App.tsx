@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TonConnectUIProvider } from '@tonconnect/ui-react';
+// import { Header } from './components/Header'; 
 import { BottomNav } from './components/BottomNav';
 import { MyMainTMAComponent } from './components/MyMainTMAComponent';
 import { MarketDashboard } from './components/MarketDashboard';
@@ -24,7 +25,7 @@ export default function App() {
     const [energy, setEnergy] = useState(0);
     const [levels, setLevels] = useState({ multitap: 1, limit: 1, speed: 1 });
     
-    // Referencias para el Auto-Save
+    // Referencias para Auto-Save
     const energyRef = useRef(0);
     const scoreRef = useRef(0);
     
@@ -38,96 +39,90 @@ export default function App() {
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
 
-    // Sincronizar referencias
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-    // 🔥 FUNCIÓN DE GUARDADO (Con reporte de errores)
+    // 🔥 AUTO-SAVE CADA 5 SEGUNDOS (Más agresivo para evitar pérdidas)
     const saveProgress = useCallback(async () => {
         if (!user) return;
-        
-        const currentE = energyRef.current;
-        const currentS = scoreRef.current;
-
-        const { error } = await supabase.from('user_score').update({
-            energy: Math.floor(currentE),
-            score: currentS,
+        await supabase.from('user_score').update({
+            energy: Math.floor(energyRef.current),
+            score: scoreRef.current,
             last_energy_update: new Date().toISOString()
         }).eq('user_id', user.id);
-        
-        if (error) {
-            console.error("❌ Auto-Save Failed:", error.message);
-        } else {
-            // console.log("✅ Progress Saved"); // Descomentar para verificar
-        }
     }, [user]);
 
-    // 1. CARGA INICIAL
+    // 1. CARGA INICIAL SINCRONIZADA CON SERVIDOR
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
+                // Datos de Telegram
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tg = (window as any).Telegram?.WebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
-                const { data } = await supabase
+                // A. Primero obtenemos los niveles para saber la velocidad de cálculo
+                const { data: userData } = await supabase
                     .from('user_score')
-                    .select('*, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
+                    .select('limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
                     .eq('user_id', user.id)
                     .single();
                 
-                if (data) {
-                    setScore(data.score);
-                    scoreRef.current = data.score;
-                    
-                    // CÁLCULO OFFLINE
-                    const lastUpdate = data.last_energy_update ? new Date(data.last_energy_update).getTime() : new Date().getTime();
-                    const now = new Date().getTime();
-                    const secondsPassed = Math.max(0, Math.floor((now - lastUpdate) / 1000));
-                    
-                    const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (data.speed_level || 1) - 1)];
-                    const myLimit = GAME_CONFIG.limit.values[Math.max(0, (data.limit_level || 1) - 1)];
-                    
-                    const generatedOffline = secondsPassed * mySpeed;
-                    const storedEnergy = Number(data.energy) || 0;
-                    
-                    // Lógica correcta: Energía Guardada + Generada (Tope Límite)
-                    const totalEnergy = Math.min(myLimit, storedEnergy + generatedOffline);
-                    
-                    setEnergy(totalEnergy);
-                    energyRef.current = totalEnergy;
+                if (userData) {
+                    // Preparamos datos para la sincronización
+                    const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.speed_level || 1) - 1)];
+                    const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
 
-                    // Niveles y Bot
-                    setLevels({ 
-                        multitap: data.multitap_level || 1, 
-                        limit: data.limit_level || 1, 
-                        speed: data.speed_level || 1 
+                    // B. 🔥 LLAMADA MAESTRA DE SINCRONIZACIÓN (Server-Side)
+                    // Esto actualiza la BD y nos devuelve la energía REAL
+                    const { data: syncData, error: syncError } = await supabase.rpc('sync_energy_on_load', { 
+                        user_id_in: user.id,
+                        my_regen_rate: mySpeed,
+                        my_max_energy: myLimit
                     });
 
-                    if (data.bot_active_until) {
-                        const botExpiry = new Date(data.bot_active_until).getTime();
-                        const timeLeft = Math.max(0, Math.floor((botExpiry - now) / 1000));
-                        setBotTime(timeLeft);
-                    }
+                    if (!syncError && syncData && syncData.length > 0) {
+                        const result = syncData[0];
+                        
+                        console.log("✅ Synced with Server:", result);
+                        
+                        setScore(result.current_score);
+                        setEnergy(result.synced_energy); // Energía real calculada por Supabase
+                        energyRef.current = result.synced_energy;
 
-                    const today = new Date().toISOString().split('T')[0];
-                    if (data.last_bot_ad_date !== today) {
-                        setAdsWatched(0); 
+                        setLevels({ 
+                            multitap: userData.multitap_level || 1, 
+                            limit: userData.limit_level || 1, 
+                            speed: userData.speed_level || 1 
+                        });
+
+                        // Carga datos del Bot
+                        if (userData.bot_active_until) {
+                            const botExpiry = new Date(userData.bot_active_until).getTime();
+                            const now = new Date().getTime(); // Hora local para el contador visual
+                            const timeLeft = Math.max(0, Math.floor((botExpiry - now) / 1000));
+                            setBotTime(timeLeft);
+                        }
+
+                        const today = new Date().toISOString().split('T')[0];
+                        if (userData.last_bot_ad_date !== today) setAdsWatched(0); 
+                        else setAdsWatched(userData.bot_ads_watched_today || 0);
+
                     } else {
-                        setAdsWatched(data.bot_ads_watched_today || 0);
+                        console.error("Sync Error", syncError);
                     }
 
-                    if (data.username !== username) {
-                        await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
-                    }
+                    // Actualizar nombre si cambió
+                    await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
                 } else {
-                    // Nuevo Usuario
+                    // USUARIO NUEVO
                     await supabase.from('user_score').insert([{
                         user_id: user.id, score: 0, energy: 500, username: username,
                         last_energy_update: new Date().toISOString()
                     }]);
+                    setScore(0);
                     setEnergy(500);
                 }
             };
@@ -135,7 +130,7 @@ export default function App() {
         }
     }, [user, authLoading]);
 
-    // 2. GAME LOOP (Visual)
+    // 2. LOOP VISUAL
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(p => {
@@ -147,26 +142,19 @@ export default function App() {
         return () => clearInterval(timer);
     }, [maxEnergy, regenRate]);
 
-    // 3. AUTO-SAVE (10s + Salida)
+    // 3. AUTO-SAVE MÁS AGRESIVO (5s + Salida)
     useEffect(() => {
         if (!user) return;
-
-        const intervalId = setInterval(saveProgress, 10000);
-
+        const intervalId = setInterval(saveProgress, 5000); // 5 segundos
+        
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'hidden') {
-                saveProgress(); 
-            }
+            if (document.visibilityState === 'hidden') saveProgress(); 
         };
-
+        
         window.addEventListener('visibilitychange', handleVisibilityChange);
-        // Para PC también capturamos beforeunload
-        window.addEventListener('beforeunload', saveProgress);
-
         return () => {
             clearInterval(intervalId);
             window.removeEventListener('visibilitychange', handleVisibilityChange);
-            window.removeEventListener('beforeunload', saveProgress);
         };
     }, [user, saveProgress]);
 
