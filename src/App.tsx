@@ -166,24 +166,25 @@ export default function App() {
 
     // 3. GAME LOOP
     // 3. GAME LOOP (Ahora con Turbo)
-useEffect(() => {
-    const timer = setInterval(() => {
-        setEnergy(prevEnergy => {
-            if (prevEnergy >= maxEnergy) return prevEnergy;
+// 3. GAME LOOP (MOTOR CON TURBO)
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setEnergy(prevPoints => {
+                if (prevPoints >= maxEnergy) return prevPoints;
+                
+                // AQUÍ ESTÁ LA MAGIA: Si hay tiempo de turbo, multiplicamos x2
+                const currentSpeed = overclockTime > 0 ? (regenRate * 2) : regenRate;
+                
+                return Math.min(maxEnergy, prevPoints + currentSpeed);
+            });
 
-            // SI hay tiempo de Overclock, velocidad x2, si no, velocidad normal
-            const currentRate = overclockTime > 0 ? (regenRate * 2) : regenRate;
+            // Bajamos los contadores de tiempo (Bot y Turbo)
+            setBotTime(prev => Math.max(0, prev - 1));
+            setOverclockTime(prev => Math.max(0, prev - 1)); // <--- Restamos 1 seg al turbo
 
-            return Math.min(maxEnergy, prevEnergy + currentRate);
-        });
-
-        // Bajamos los contadores de tiempo
-        setBotTime(prev => Math.max(0, prev - 1));
-        setOverclockTime(prev => Math.max(0, prev - 1)); // Restamos 1 seg al turbo
-
-       }, 1000);
-       return () => clearInterval(timer);
-    }, [maxEnergy, regenRate, overclockTime]); // <--- Importante: agregar overclockTime aquí
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [maxEnergy, regenRate, overclockTime]);  // <--- Importante: agregar overclockTime aquí
 
     // 4. AUTO-SAVE
     useEffect(() => {

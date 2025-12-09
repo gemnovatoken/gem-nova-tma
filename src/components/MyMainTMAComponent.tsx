@@ -172,8 +172,8 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         // ... (Tu lógica de refill que ya tenías)
         if(!window.confirm("📺 Watch Ad to FILL tank?")) return;
         setEnergy(maxEnergy);
-        alert("🔋 Filled!");
     }
+    alert("🔋 Filled!");
     }, [maxEnergy, setEnergy, user, setOverclockTime]);
 
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
