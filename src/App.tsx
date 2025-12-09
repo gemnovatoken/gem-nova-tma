@@ -46,6 +46,8 @@ export default function App() {
     const [botTime, setBotTime] = useState(0);
     const [adsWatched, setAdsWatched] = useState(0);
 
+    const [overclockTime, setOverclockTime] = useState(0); // Tiempo restante del turbo
+
     const { user, loading: authLoading } = useAuth();
     
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
@@ -163,16 +165,25 @@ export default function App() {
     }, []);
 
     // 3. GAME LOOP
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setEnergy(p => {
-                if (p >= maxEnergy) return p;
-                return Math.min(maxEnergy, p + regenRate);
-            });
-            setBotTime(prev => Math.max(0, prev - 1));
-        }, 1000);
-        return () => clearInterval(timer);
-    }, [maxEnergy, regenRate]);
+    // 3. GAME LOOP (Ahora con Turbo)
+useEffect(() => {
+    const timer = setInterval(() => {
+        setEnergy(prevEnergy => {
+            if (prevEnergy >= maxEnergy) return prevEnergy;
+
+            // SI hay tiempo de Overclock, velocidad x2, si no, velocidad normal
+            const currentRate = overclockTime > 0 ? (regenRate * 2) : regenRate;
+
+            return Math.min(maxEnergy, prevEnergy + currentRate);
+        });
+
+        // Bajamos los contadores de tiempo
+        setBotTime(prev => Math.max(0, prev - 1));
+        setOverclockTime(prev => Math.max(0, prev - 1)); // Restamos 1 seg al turbo
+
+       }, 1000);
+       return () => clearInterval(timer);
+    }, [maxEnergy, regenRate, overclockTime]); // <--- Importante: agregar overclockTime aquí
 
     // 4. AUTO-SAVE
     useEffect(() => {
@@ -205,6 +216,8 @@ export default function App() {
                                     maxEnergy={maxEnergy} regenRate={regenRate}
                                     botTime={botTime} setBotTime={setBotTime}
                                     adsWatched={adsWatched} setAdsWatched={setAdsWatched}
+                                    overclockTime={overclockTime}       // <--- NUEVO
+                                    setOverclockTime={setOverclockTime} // <--- NUEVO
                                 />
                             </div>
                         </div>

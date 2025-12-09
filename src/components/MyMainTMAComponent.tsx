@@ -17,6 +17,8 @@ interface GameProps {
     setBotTime: Dispatch<SetStateAction<number>>;
     adsWatched: number; 
     setAdsWatched: Dispatch<SetStateAction<number>>;
+    overclockTime?: number; // Opcional para que no rompa si falta
+    setOverclockTime?: Dispatch<SetStateAction<number>>; // Opcional
 }
 
 interface DockButtonProps {
@@ -37,7 +39,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const { 
         score, setScore, energy, setEnergy, levels, setLevels, 
         maxEnergy, regenRate, botTime, setBotTime, 
-        adsWatched, setAdsWatched 
+        adsWatched, setAdsWatched,setOverclockTime // <--- Recíbela aquí
     } = props;
 
     const globalLevel = levels.limit; 
@@ -147,66 +149,32 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     };
 
     // --- 🔥 WATCH VIDEO (CORREGIDO PARA INSTAFILL) ---
-    // --- 🔥 WATCH VIDEO (CORREGIDO Y CONECTADO A BASE DE DATOS) ---
-    const watchVideo = useCallback(async (type: 'turbo' | 'refill') => {
-        // Texto dinámico según el tipo
-        const msg = type === 'turbo' 
-            ? "📺 Watch Ad to DOUBLE mining speed (1m)?" 
-            : "📺 Watch Ad to INSTANTLY fill tank?";
+        const watchVideo = useCallback(async (type: 'turbo' | 'refill') => {
+             if (type === 'turbo') {
+            if(!window.confirm("📺 Watch Ad to DOUBLE mining speed (60s)?")) return;
 
-        // Confirmación del usuario
-        if(!window.confirm(msg)) return;
-        
-        console.log("Watching ad for:", type);
-        
-        // Simulamos la espera del video (o aquí iría tu lógica de Ad real)
-        setTimeout(async () => {
-            if(!user) return;
+        // 1. Verificar límite en BD
+            if (!user) return;
+        const { data, error } = await supabase.rpc('watch_overclock_ad', { user_id_in: user.id });
 
-            // CASO 1: OVERCLOCK (TURBO) - Límite 3 veces al día
-            if (type === 'turbo') {
-                // Llamamos a la nueva función SQL
-                const { data, error } = await supabase.rpc('watch_overclock_ad', { user_id_in: user.id });
+             if (error) {
+            alert("Error: " + error.message);
+                 } else if (data && data[0].success) {
+            // 2. ACTIVAR EL TURBO REAL
+            if (setOverclockTime) setOverclockTime(60); // 60 segundos de turbo
 
-                if (error) {
-                    console.error("Overclock Error:", error);
-                    alert("System Error: " + error.message);
-                } 
-                else if (data && data[0].success) {
-                    // ÉXITO: El servidor aprobó el uso
-                    // Aquí activas tu lógica visual de velocidad (si tienes alguna variable de estado para eso)
-                    alert(`🚀 OVERCLOCK ACTIVATED! (Speed x2)\n\nUses today: ${data[0].new_count}/3`);
-                    
-                    // Log opcional
-                    await supabase.from('game_logs').insert({
-                        user_id: user.id, event_type: 'video_boost', metadata: { type: 'turbo' } 
-                    });
-                } 
-                else {
-                    // ERROR DE LÍMITE (Ya usó los 3)
-                    alert(data?.[0]?.message || "Limit reached");
-                }
-            } 
-            
-            // CASO 2: REFILL (INSTA-FILL) - Sin límite estricto en este código (o según tu lógica)
-            else if (type === 'refill') {
-                const { error } = await supabase.rpc('apply_refill', { user_id_in: user.id });
-                
-                if (error) {
-                    console.error("Refill Error:", error);
-                } else {
-                    setEnergy(maxEnergy); // Llenado visual instantáneo
-                    alert("🔋 Tank Filled Instantly!");
-                    
-                    // Log opcional
-                    await supabase.from('game_logs').insert({
-                        user_id: user.id, event_type: 'video_boost', metadata: { type: 'refill' } 
-                    });
-                }
-            }
-
-        }, 1000); // Simulación de 1 segundo de espera
-    }, [maxEnergy, setEnergy, user]);
+            alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 60 seconds.\nUses today: ${data[0].new_count}/3`);
+        } else {
+            alert(data?.[0]?.message || "Limit reached");
+        }
+    } 
+    else if (type === 'refill') {
+        // ... (Tu lógica de refill que ya tenías)
+        if(!window.confirm("📺 Watch Ad to FILL tank?")) return;
+        setEnergy(maxEnergy);
+        alert("🔋 Filled!");
+    }
+    }, [maxEnergy, setEnergy, user, setOverclockTime]);
 
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
         if (loading || !user) return; setLoading(true);
