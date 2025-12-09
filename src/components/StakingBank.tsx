@@ -48,10 +48,19 @@ export const StakingBank = () => {
 
     const unlockPct = getUnlockPercentage(userLevel);
     
-    // Matemática corregida
+    // 🔥 CORRECCIÓN MATEMÁTICA 🔥
+    // 1. Calculamos cuántos puntos comprados REALMENTE tienes disponibles en tu saldo actual.
+    // Nunca puede ser mayor que tu saldo total (totalScore).
+    const effectivePurchased = Math.min(totalScore, purchasedPoints);
+
+    // 2. El resto son puntos ganados (si totalScore es mayor que purchasedPoints)
     const earnedPoints = Math.max(0, totalScore - purchasedPoints);
+
+    // 3. Aplicamos el % de desbloqueo solo a los puntos ganados
     const stakeableEarned = Math.floor(earnedPoints * unlockPct);
-    const maxStakeable = purchasedPoints + stakeableEarned;
+
+    // 4. El máximo disponible para Staking es la suma de los dos
+    const maxStakeable = effectivePurchased + stakeableEarned;
 
     // Función estable para cargar datos
     const fetchData = useCallback(async () => {
@@ -79,23 +88,20 @@ export const StakingBank = () => {
         }
     }, [userId]);
 
-    // 🔥 CORRECCIÓN DEL ERROR: Usamos setTimeout para evitar "setState síncrono"
     useEffect(() => {
         if (!userId) return;
         
-        // 1. Carga inicial "despegada" del renderizado para evitar el error
         const initialLoad = setTimeout(() => {
             fetchData();
         }, 0);
         
-        // 2. Intervalo para mantener sincronizado
         const interval = setInterval(fetchData, 3000);
         
         return () => {
             clearTimeout(initialLoad);
             clearInterval(interval);
         };
-    }, [userId, fetchData]); // Dependencias correctas
+    }, [userId, fetchData]);
 
     const calculatedProfit = amountToStake 
         ? Math.floor(parseInt(amountToStake) * selectedOption.roi) 
@@ -116,6 +122,7 @@ export const StakingBank = () => {
             alert(`⚠️ Limit Exceeded!\n\nMax Stakeable: ${maxStakeable.toLocaleString()}`);
             return;
         }
+        // Doble verificación: tampoco puede superar el saldo total
         if (amount > totalScore) { alert("Insufficient balance."); return; }
 
         setLoading(true);
@@ -134,7 +141,7 @@ export const StakingBank = () => {
 
         if (!stakeError) {
             await supabase.rpc('deduct_points', { user_id_in: userId, amount_in: amount });
-            await fetchData(); // Recargar datos
+            await fetchData(); 
             setLoading(false);
             setAmountToStake('');
             setShowSuccess(true); 
@@ -171,9 +178,10 @@ export const StakingBank = () => {
                 <div style={{fontSize:'11px', color:'#666', marginBottom:'5px', display:'flex', gap:'5px', alignItems:'center'}}>
                     <Info size={10}/> ALLOWANCE (Lvl {userLevel}):
                 </div>
+                {/* AQUI SE VEIA EL ERROR: Ahora mostramos effectivePurchased en lugar de purchasedPoints */}
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'2px'}}>
                     <span style={{color:'#00F2FE'}}>Purchased (100%):</span>
-                    <span>{purchasedPoints.toLocaleString()}</span>
+                    <span>{effectivePurchased.toLocaleString()}</span>
                 </div>
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
                     <span style={{color: getPctColor()}}>Gameplay ({unlockPct * 100}%):</span>
