@@ -93,7 +93,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
         if (isGodMode) {
             if(window.confirm("🌌 QUANTUM SUPERVISOR\n\nActivate for 5 DAYS (120 Hours)?")) {
-                activateBot(432000); 
+                await activateBot(432000); 
                 alert("✅ Bot deployed for 5 days.");
             }
             return;
@@ -101,7 +101,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
         if (isEliteMode) {
             if(window.confirm("🌋 ELITE SUPERVISOR\n\nActivate for 2 DAYS (48 Hours)?")) {
-                activateBot(172800); 
+                await activateBot(172800); 
                 alert("✅ Bot deployed for 48 hours.");
             }
             return;
@@ -116,10 +116,18 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             if(window.confirm(`📺 Hire Supervisor for 30m?\n\nWatch Ad (${2 - adsWatched} left today)`)) {
                 console.log("Watching Ad...");
                 if (!user) return;
+                
+                // LLAMADA A SUPABASE
                 const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
                 
-                // LOG PARA DASHBOARD (BOT)
-                if (!error && data && data[0].success) {
+                // 🔍 DEBUGGING MEJORADO:
+                if (error) {
+                    // Si Supabase falló (error de conexión, función no existe, permisos, etc.)
+                    console.error("Supabase Error:", error);
+                    alert("SYSTEM ERROR:\n" + error.message); // <--- ESTO TE DIRÁ LA VERDAD
+                } 
+                else if (data && data[0] && data[0].success) {
+                    // ÉXITO
                     await supabase.from('game_logs').insert({
                         user_id: user.id,
                         event_type: 'video_bot',
@@ -129,9 +137,10 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     setAdsWatched(data[0].new_count); 
                     activateBot(1800); 
                     alert("✅ Bot Activated for 30m!");
-                } else {
-                    console.error(error);
-                    alert(data?.[0]?.message || "Error watching ad.");
+                } 
+                else {
+                    // Si la lógica de negocio falló (ej: límite alcanzado)
+                    alert(data?.[0]?.message || "Unknown error occurred.");
                 }
             }
         }
