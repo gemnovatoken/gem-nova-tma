@@ -17,8 +17,8 @@ interface GameProps {
     setBotTime: Dispatch<SetStateAction<number>>;
     adsWatched: number; 
     setAdsWatched: Dispatch<SetStateAction<number>>;
-    overclockTime?: number; // Opcional para que no rompa si falta
-    setOverclockTime?: Dispatch<SetStateAction<number>>; // Opcional
+    overclockTime?: number; 
+    setOverclockTime?: Dispatch<SetStateAction<number>>; 
 }
 
 interface DockButtonProps {
@@ -39,7 +39,9 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const { 
         score, setScore, energy, setEnergy, levels, setLevels, 
         maxEnergy, regenRate, botTime, setBotTime, 
-        adsWatched, setAdsWatched,setOverclockTime // <--- Recíbela aquí
+        adsWatched, setAdsWatched, 
+        setOverclockTime, 
+        overclockTime     
     } = props;
 
     const globalLevel = levels.limit; 
@@ -119,17 +121,13 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 console.log("Watching Ad...");
                 if (!user) return;
                 
-                // LLAMADA A SUPABASE
                 const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
                 
-                // 🔍 DEBUGGING MEJORADO:
                 if (error) {
-                    // Si Supabase falló (error de conexión, función no existe, permisos, etc.)
                     console.error("Supabase Error:", error);
-                    alert("SYSTEM ERROR:\n" + error.message); // <--- ESTO TE DIRÁ LA VERDAD
+                    alert("SYSTEM ERROR:\n" + error.message); 
                 } 
                 else if (data && data[0] && data[0].success) {
-                    // ÉXITO
                     await supabase.from('game_logs').insert({
                         user_id: user.id,
                         event_type: 'video_bot',
@@ -141,39 +139,44 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     alert("✅ Bot Activated for 30m!");
                 } 
                 else {
-                    // Si la lógica de negocio falló (ej: límite alcanzado)
                     alert(data?.[0]?.message || "Unknown error occurred.");
                 }
             }
         }
     };
 
-    // --- 🔥 WATCH VIDEO (CORREGIDO PARA INSTAFILL) ---
-        const watchVideo = useCallback(async (type: 'turbo' | 'refill') => {
-             if (type === 'turbo') {
+    // --- 🔥 WATCH VIDEO (CORREGIDO: ERROR DE TYPE SCRIPT SOLUCIONADO) ---
+    const watchVideo = useCallback(async (type: 'turbo' | 'refill') => {
+        // 🔒 PROTECCIÓN GLOBAL: Si no hay usuario, detenemos todo aquí.
+        // Esto elimina el error "user is possibly null" en las líneas de abajo.
+        if (!user) return; 
+
+        if (type === 'turbo') {
             if(!window.confirm("📺 Watch Ad to DOUBLE mining speed (60s)?")) return;
 
-        // 1. Verificar límite en BD
-            if (!user) return;
-        const { data, error } = await supabase.rpc('watch_overclock_ad', { user_id_in: user.id });
+            // Ahora TypeScript sabe que 'user' existe 100% seguro aquí
+            const { data, error } = await supabase.rpc('watch_overclock_ad', { user_id_in: user.id });
 
-             if (error) {
-            alert("Error: " + error.message);
-                 } else if (data && data[0].success) {
-            // 2. ACTIVAR EL TURBO REAL
-            if (setOverclockTime) setOverclockTime(60); // 60 segundos de turbo
+            if (error) {
+                alert("Error: " + error.message);
+            } else if (data && data[0].success) {
+                if (setOverclockTime) setOverclockTime(60); 
 
-            alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 60 seconds.\nUses today: ${data[0].new_count}/3`);
-        } else {
-            alert(data?.[0]?.message || "Limit reached");
+                alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 60 seconds.\nUses today: ${data[0].new_count}/3`);
+            } else {
+                alert(data?.[0]?.message || "Limit reached");
+            }
+        } 
+        else if (type === 'refill') {
+            if(!window.confirm("📺 Watch Ad to FILL tank?")) return;
+            
+            // Ahora TypeScript sabe que 'user' existe 100% seguro aquí también
+            const { error } = await supabase.rpc('apply_refill', { user_id_in: user.id });
+            if (error) console.error(error);
+             
+            setEnergy(maxEnergy);
+            alert("🔋 Filled!");
         }
-    } 
-    else if (type === 'refill') {
-        // ... (Tu lógica de refill que ya tenías)
-        if(!window.confirm("📺 Watch Ad to FILL tank?")) return;
-        setEnergy(maxEnergy);
-    }
-    alert("🔋 Filled!");
     }, [maxEnergy, setEnergy, user, setOverclockTime]);
 
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
@@ -192,7 +195,10 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const circumference = 2 * Math.PI * radius;
     const fillPercent = Math.min(100, (energy / maxEnergy) * 100);
     const strokeDashoffset = circumference - (fillPercent / 100) * circumference;
-    const ringColor = fillPercent < 50 ? '#00F2FE' : (fillPercent < 90 ? '#FFD700' : '#FF512F');
+    
+    const ringColor = (overclockTime && overclockTime > 0) 
+        ? '#FF0055' 
+        : (fillPercent < 50 ? '#00F2FE' : (fillPercent < 90 ? '#FFD700' : '#FF512F'));
 
     const getBotLabel = () => {
         if (botTime > 0) return "ACTIVE";
@@ -233,12 +239,14 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             </div>
 
             <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '260px', height: '260px' }}>
+                {/* Animación de fondo */}
                 <div style={{ 
                     position: 'absolute', width: '100%', height: '100%', 
                     borderRadius: '50%', border: '1px dashed rgba(255,255,255,0.1)',
                     animation: 'spin 20s linear infinite' 
                 }}></div>
 
+                {/* Círculo SVG */}
                 <div style={{ position: 'absolute', width: '260px', height: '260px', zIndex: 0, transform: 'rotate(-90deg)' }}>
                     <svg width="260" height="260">
                         <circle cx="130" cy="130" r={radius} stroke="#1a1a1a" strokeWidth="12" fill="transparent" />
@@ -249,6 +257,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     </svg>
                 </div>
 
+                {/* BOTÓN CENTRAL */}
                 <button onClick={handleClaim} disabled={energy < 1}
                     style={{
                         width: '170px', height: '170px', borderRadius: '50%', zIndex: 2, border: 'none',
@@ -263,14 +272,28 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     ) : (
                         <>
                             <div style={{fontSize:'24px', filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))'}}>
-                                {fillPercent >= 100 ? '⚠️' : '⚡'}
+                                {(overclockTime && overclockTime > 0) ? '🔥' : (fillPercent >= 100 ? '⚠️' : '⚡')}
                             </div>
+                            
                             <div style={{fontSize:'18px', fontWeight:'900', color:'#fff', textShadow:'0 0 5px #000'}}>
                                 +{Math.floor(energy)}
                             </div>
-                            <div style={{fontSize:'8px', color:'rgba(255,255,255,0.8)', marginTop:'2px'}}>
-                                {fillPercent.toFixed(0)}% FULL
-                            </div>
+
+                            {(overclockTime && overclockTime > 0) ? (
+                                <div style={{
+                                    color: '#FF0055', 
+                                    fontWeight: '900', 
+                                    fontSize: '14px', 
+                                    marginTop: '2px',
+                                    animation: 'pulse 0.8s infinite alternate' 
+                                }}>
+                                    TURBO {overclockTime}s
+                                </div>
+                            ) : (
+                                <div style={{fontSize:'8px', color:'rgba(255,255,255,0.8)', marginTop:'2px'}}>
+                                    {fillPercent.toFixed(0)}% FULL
+                                </div>
+                            )}
                         </>
                     )}
                 </button>
@@ -278,7 +301,9 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
             <div style={{ width: '100%', padding: '0 15px', zIndex: 10 }}>
                 <div style={{ marginBottom:'2px', display:'flex', justifyContent:'center', fontSize:'9px', color: ringColor, fontWeight:'bold' }}>
-                    <span>PRODUCTION: {regenRate * 3600} PTS/HOUR</span>
+                    <span>
+                        PRODUCTION: {(overclockTime && overclockTime > 0) ? (regenRate * 3600 * 2) : (regenRate * 3600)} PTS/HOUR
+                    </span>
                 </div>
 
                 <div className="glass-card" style={{ 
@@ -314,7 +339,13 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} onUpdateScore={setScore} />}
             {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} />}
             
-            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+            <style>{`
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                @keyframes pulse { 
+                    0% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px #FF0055; } 
+                    100% { transform: scale(1.1); opacity: 0.8; text-shadow: 0 0 20px #FF0055; } 
+                }
+            `}</style>
         </div>
     );
 };

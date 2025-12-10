@@ -82,7 +82,7 @@ export default function App() {
 
                 const { data: userData } = await supabase
                     .from('user_score')
-                    .select('score, energy, limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date') 
+                    .select('score, energy, limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date, overclock_active_until') 
                     .eq('user_id', user.id)
                     .single();
                 
@@ -101,6 +101,15 @@ export default function App() {
                         const botExpiry = new Date(userData.bot_active_until).getTime();
                         const now = new Date().getTime();
                         setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
+                    }
+                    // --- AGREGAR ESTO PARA EL TURBO ---
+                    if (userData.overclock_active_until) {
+                        const turboExpiry = new Date(userData.overclock_active_until).getTime();
+                        const now = new Date().getTime();
+                        const remainingTurbo = Math.max(0, Math.floor((turboExpiry - now) / 1000));
+    
+                      // Si queda tiempo, lo restauramos
+                        setOverclockTime(remainingTurbo);
                     }
                     const today = new Date().toISOString().split('T')[0];
                     setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
