@@ -81,7 +81,7 @@ const SunRaid = () => {
                 <span style={{ fontSize: '9px', color: '#FF512F', fontWeight: 'bold', letterSpacing: '1px' }}>TARGET LOCKED</span>
             </div>
             <div style={{ position: 'absolute', top: 8, right: 12, fontSize: '9px', color: '#aaa' }}>
-                DMG: <span style={{color:'#fff'}}>{damageDealt.toLocaleString()}</span>
+                 DMG: <span style={{color:'#fff'}}>{damageDealt.toLocaleString()}</span>
             </div>
 
             <div style={{
@@ -135,8 +135,15 @@ export const SquadZone: React.FC = () => {
     const [showMilestones, setShowMilestones] = useState(false);
     const [tonEarnings, setTonEarnings] = useState(0);
 
-    const BOT_USERNAME = "GemNova_GameBot"; 
-    const inviteLink = `https://t.me/${BOT_USERNAME}?start=ref_${user?.id}`;
+    // 🔴 IMPORTANTE: CAMBIA ESTO POR EL NOMBRE REAL DE TU BOT (Sin @)
+    // Ejemplo: Si tu bot es t.me/GnovaBot, pon "GnovaBot"
+    const BOT_USERNAME = "@Gnovatoken_bot"; 
+
+    // 🔥 CORRECCIÓN 1: Eliminamos "ref_" para enviar solo el UUID limpio
+    // Esto hace que la base de datos (SQL) pueda leerlo sin errores.
+    const inviteLink = user 
+        ? `https://t.me/${BOT_USERNAME}?start=${user.id}` 
+        : "Loading...";
 
     useEffect(() => {
         if(user) {
@@ -152,8 +159,9 @@ export const SquadZone: React.FC = () => {
     }, [user]);
 
     const handleCopy = () => {
+        if (!user) return; // Protección
         navigator.clipboard.writeText(inviteLink);
-        alert("Link Copied!");
+        alert("✅ Link Copied!\n\nSend this to your friends.");
     };
 
     return (
@@ -192,7 +200,11 @@ export const SquadZone: React.FC = () => {
                     }}>
                         <Copy size={14} />
                     </button>
-                    <button onClick={() => window.open(`https://t.me/share/url?url=${inviteLink}&text=🔥 Join Gem Nova!`, '_blank')} 
+                    <button onClick={() => {
+                        if (user) {
+                            window.open(`https://t.me/share/url?url=${inviteLink}&text=🔥 Join Gem Nova! Mine crypto before launch! 🚀`, '_blank');
+                        }
+                    }} 
                         className="btn-neon" style={{ 
                             padding: '8px 12px', fontSize: '10px', background: '#00F2FE', color: '#000', height: 'auto',
                             display:'flex', alignItems:'center', gap:'4px'
@@ -240,7 +252,6 @@ export const SquadZone: React.FC = () => {
                 background: 'rgba(255,255,255,0.03)', border: '1px solid #333', cursor: 'pointer'
             }}>
                 <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-                    {/* ✅ AQUÍ USAMOS CROWN DIRECTAMENTE */}
                     <Crown size={18} color="#FFD700" />
                     <span style={{ fontWeight: 'bold', color: '#aaa', fontSize:'12px' }}>VIEW ALL MILESTONES</span>
                 </div>
