@@ -145,16 +145,13 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     };
 
-    // --- 🔥 WATCH VIDEO (CORREGIDO: ERROR DE TYPE SCRIPT SOLUCIONADO) ---
+    // --- 🔥 WATCH VIDEO (AHORA CON SMART FILL 🧠💰) ---
     const watchVideo = useCallback(async (type: 'turbo' | 'refill') => {
-        // 🔒 PROTECCIÓN GLOBAL: Si no hay usuario, detenemos todo aquí.
-        // Esto elimina el error "user is possibly null" en las líneas de abajo.
         if (!user) return; 
 
         if (type === 'turbo') {
             if(!window.confirm("📺 Watch Ad to DOUBLE mining speed (60s)?")) return;
 
-            // Ahora TypeScript sabe que 'user' existe 100% seguro aquí
             const { data, error } = await supabase.rpc('watch_overclock_ad', { user_id_in: user.id });
 
             if (error) {
@@ -170,14 +167,24 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         else if (type === 'refill') {
             if(!window.confirm("📺 Watch Ad to FILL tank?")) return;
             
-            // Ahora TypeScript sabe que 'user' existe 100% seguro aquí también
+            // 🧠 SMART FILL: Si tiene energía acumulada, ¡la cobramos primero!
+            if (energy > 0) {
+                const collected = Math.floor(energy);
+                setScore(prev => prev + collected); // Sumamos al saldo del usuario
+                console.log(`Smart Fill: Auto-collected ${collected} points before refill.`);
+                
+                // Opcional: Llamar a claim_mining para sincronizar backend si es necesario
+                supabase.rpc('claim_mining', { user_id_in: user.id });
+            }
+
+            // Después llenamos el tanque a tope
             const { error } = await supabase.rpc('apply_refill', { user_id_in: user.id });
             if (error) console.error(error);
              
             setEnergy(maxEnergy);
-            alert("🔋 Filled!");
+            alert("🔋 Smart Refill!\nCollected pending points & Filled Tank 100%");
         }
-    }, [maxEnergy, setEnergy, user, setOverclockTime]);
+    }, [maxEnergy, setEnergy, user, setOverclockTime, energy, setScore]); // Agregamos 'energy' y 'setScore' a las dependencias
 
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
         if (loading || !user) return; setLoading(true);
