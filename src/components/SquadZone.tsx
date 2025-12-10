@@ -137,7 +137,7 @@ export const SquadZone: React.FC = () => {
 
     // 🔴 IMPORTANTE: CAMBIA ESTO POR EL NOMBRE REAL DE TU BOT (Sin @)
     // Ejemplo: Si tu bot es t.me/GnovaBot, pon "GnovaBot"
-    const BOT_USERNAME = "@Gnovatoken_bot"; 
+    const BOT_USERNAME = "Gnovatoken_bot"; 
 
     // 🔥 CORRECCIÓN 1: Eliminamos "ref_" para enviar solo el UUID limpio
     // Esto hace que la base de datos (SQL) pueda leerlo sin errores.
