@@ -104,10 +104,7 @@ export const StakingBank = () => {
         const amount = parseInt(amountToStake);
         
         if (amount <= 0) { alert("Enter a valid amount"); return; }
-        if (amount > maxStakeable) {
-            alert(`⚠️ Limit Exceeded!\n\nMax Stakeable: ${maxStakeable.toLocaleString()}`);
-            return;
-        }
+        if (amount > maxStakeable) { alert("Limit Exceeded!"); return; }
         if (amount > totalScore) { alert("Insufficient balance."); return; }
 
         setLoading(true);
@@ -115,7 +112,6 @@ export const StakingBank = () => {
         const unlockDate = new Date();
         unlockDate.setDate(unlockDate.getDate() + selectedOption.days);
 
-        // Llamamos a la Transacción Atómica
         const { data, error } = await supabase.rpc('create_stake_transaction', {
             p_user_id: userId,
             p_amount: amount,
@@ -130,12 +126,19 @@ export const StakingBank = () => {
             alert(`System Error: ${error.message}`);
         } 
         else if (data && data[0].success) {
-            // 🔥 ACTUALIZACIÓN INMEDIATA DEL SALDO 🔥
-            setTotalScore(data[0].new_balance); 
+            // ✅ PASO 1: Actualizar visualmente DE INMEDIATO con el dato real
+            const realNewBalance = data[0].new_balance;
+            setTotalScore(realNewBalance); 
             
+            // Limpiar formulario
             setAmountToStake('');
             setShowSuccess(true);
-            fetchData(); 
+
+            // ✅ PASO 2: Esperar 2 segundos antes de refrescar la lista
+            // Esto evita que leamos datos viejos mientras la DB termina de escribir
+            setTimeout(() => {
+                fetchData();
+            }, 2000); 
         } 
         else {
             alert(data?.[0]?.message || "Transaction Failed");
@@ -157,10 +160,13 @@ export const StakingBank = () => {
         } else if (data && data[0].success) {
             alert(data[0].message); 
             
-            // 🔥 ACTUALIZACIÓN INMEDIATA 🔥
+            // ✅ Actualizar saldo inmediatamente
             setTotalScore(data[0].new_balance);
             
-            await fetchData(); 
+            // ✅ Esperar un poco antes de recargar la lista
+            setTimeout(() => {
+                fetchData(); 
+            }, 2000);
         } else {
             alert(data?.[0]?.message || "Cannot claim yet");
         }
