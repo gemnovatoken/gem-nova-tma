@@ -51,7 +51,7 @@ export default function App() {
     const { user, loading: authLoading } = useAuth();
     
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
-// FORZAMOS QUE LA VELOCIDAD USE EL MISMO NIVEL QUE EL LIMITE
+    // FORZAMOS QUE LA VELOCIDAD USE EL MISMO NIVEL QUE EL LIMITE
     const speedIdx = Math.min(Math.max(0, levels.limit - 1), 7);
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
@@ -115,8 +115,7 @@ export default function App() {
                     setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
 
                     // Sincronizar offline
-                    // Sincronizar offline
-// AHORA CALCULAMOS LA VELOCIDAD BASADA EN EL NIVEL DE LIMITE (userData.limit_level)
+                    // AHORA CALCULAMOS LA VELOCIDAD BASADA EN EL NIVEL DE LIMITE (userData.limit_level)
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.limit_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
                     const { data: syncData } = await supabase.rpc('sync_energy_on_load', { 
@@ -148,7 +147,7 @@ export default function App() {
                     const { error: insertError } = await supabase.rpc('register_new_user', {
                         p_user_id: user.id,
                         p_username: username,
-                        p_referral_code: referrerId
+                        p_referral_code_text: referrerId // IMPORTANTE: Usa p_referral_code_text si actualizaste el SQL
                     });
                     
                     if (!insertError) {
@@ -173,9 +172,7 @@ export default function App() {
         return () => clearInterval(interval);
     }, []);
 
-    // 3. GAME LOOP
-    // 3. GAME LOOP (Ahora con Turbo)
-// 3. GAME LOOP (MOTOR CON TURBO)
+    // 3. GAME LOOP (MOTOR CON TURBO)
     useEffect(() => {
         const timer = setInterval(() => {
             setEnergy(prevPoints => {
@@ -233,14 +230,19 @@ export default function App() {
                         </div>
                     )}
                     
-                    {/* 🔥 AQUÍ ES DONDE CONECTAMOS LA TIENDA */}
+                    {/* 🔥 AQUÍ ESTÁ LA CORRECCIÓN CLAVE EN BULKSTORE */}
                     {currentTab === 'market' && (
                         <div style={{ animation: 'fadeIn 0.3s' }}>
-                            <BulkStore onPurchaseSuccess={(newScore) => {
-                                console.log("💰 Compra detectada! Actualizando saldo a:", newScore);
-                                setScore(newScore); // Actualiza la pantalla
-                                scoreRef.current = newScore; // Actualiza el guardado automático
-                            }} />
+                            <BulkStore 
+                                onPurchaseSuccess={(newScore) => {
+                                    console.log("💰 Compra detectada! Actualizando saldo a:", newScore);
+                                    setScore(newScore); // Actualiza la pantalla
+                                    scoreRef.current = newScore; // Actualiza el guardado automático
+                                }} 
+                                // 👇 AQUI ESTÁN LAS PROPS FALTANTES (AFUERA DE LA FUNCIÓN)
+                                score={score} 
+                                setScore={setScore}
+                            />
                         </div>
                     )}
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { CheckCircle, Lock, Calendar, Info, Unlock } from 'lucide-react';
@@ -12,8 +12,13 @@ interface StakeData {
     end_at: string;
 }
 
+// Interfaz para recibir el control del saldo desde el Padre
+interface Props {
+    globalScore: number; 
+    setGlobalScore: (val: number) => void; 
+}
+
 const LOCK_OPTIONS = [
-    // 👇 OPCIÓN DE PRUEBA
     { days: 1, roi: 0.02, label: 'TEST 1D', color: '#FFFFFF' }, 
     { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, 
     { days: 30, roi: 0.15, label: '30D', color: '#00F2FE' }, 
@@ -21,14 +26,13 @@ const LOCK_OPTIONS = [
     { days: 90, roi: 0.60, label: '90D', color: '#FFD700' }  
 ];
 
-export const StakingBank = () => {
+export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) => {
     const { user } = useAuth();
     const userId = user?.id; 
 
     const [stakes, setStakes] = useState<StakeData[]>([]);
     
-    // Estados de Saldo
-    const [totalScore, setTotalScore] = useState(0);
+    // Solo manejamos localmente los datos que NO son el saldo
     const [purchasedPoints, setPurchasedPoints] = useState(0);
     const [userLevel, setUserLevel] = useState(1);
     
@@ -49,16 +53,18 @@ export const StakingBank = () => {
 
     const unlockPct = getUnlockPercentage(userLevel);
     
-    // Matemática
-    const effectivePurchased = Math.min(totalScore, purchasedPoints);
-    const earnedPoints = Math.max(0, totalScore - purchasedPoints);
+    // Matemática (Usamos globalScore directamente)
+    const effectivePurchased = Math.min(globalScore, purchasedPoints);
+    const earnedPoints = Math.max(0, globalScore - purchasedPoints);
     const stakeableEarned = Math.floor(earnedPoints * unlockPct);
     const maxStakeable = effectivePurchased + stakeableEarned;
 
-    // Cargar datos
+    // Cargar datos (Stakes, Nivel y Compras Solamente)
+    // ⚠️ NO cargamos el score aquí para evitar conflictos con el padre
     const fetchData = useCallback(async () => {
         if(!userId) return;
         
+        // 1. Cargar Stakes
         const { data: stakeData } = await supabase
             .from('stakes') 
             .select('*')
@@ -68,14 +74,14 @@ export const StakingBank = () => {
         
         if (stakeData) setStakes(stakeData as StakeData[]);
 
+        // 2. Cargar Datos de Límite
         const { data: userData } = await supabase
             .from('user_score')
-            .select('score, total_bought_points, limit_level') 
+            .select('total_bought_points, limit_level') 
             .eq('user_id', userId)
             .single();
         
         if (userData) {
-            setTotalScore(userData.score);
             setPurchasedPoints(userData.total_bought_points || 0); 
             setUserLevel(userData.limit_level || 1);
         }
@@ -83,9 +89,20 @@ export const StakingBank = () => {
 
     useEffect(() => {
         if (!userId) return;
-        const initialLoad = setTimeout(() => fetchData(), 0);
-        const interval = setInterval(fetchData, 5000); 
-        return () => { clearTimeout(initialLoad); clearInterval(interval); };
+        
+        // 🛠️ FIX: Usamos setTimeout para evitar el error de "setState sincrónico"
+        // Esto mueve la ejecución al final de la cola de eventos.
+        const timer = setTimeout(() => {
+            fetchData();
+        }, 0);
+
+        // Recargar lista de stakes cada 10s
+        const interval = setInterval(fetchData, 10000); 
+        
+        return () => {
+            clearTimeout(timer);
+            clearInterval(interval);
+        };
     }, [userId, fetchData]);
 
     const calculatedProfit = amountToStake 
@@ -98,14 +115,14 @@ export const StakingBank = () => {
         setAmountToStake(val.toString());
     };
 
-    // --- FUNCIÓN DE STAKING SEGURA (TRANSACTION) ---
+    // --- FUNCIÓN DE STAKING ---
     const handleStake = async () => {
         if (!userId || !amountToStake) return;
         const amount = parseInt(amountToStake);
         
         if (amount <= 0) { alert("Enter a valid amount"); return; }
         if (amount > maxStakeable) { alert("Limit Exceeded!"); return; }
-        if (amount > totalScore) { alert("Insufficient balance."); return; }
+        if (amount > globalScore) { alert("Insufficient balance."); return; }
 
         setLoading(true);
 
@@ -126,19 +143,14 @@ export const StakingBank = () => {
             alert(`System Error: ${error.message}`);
         } 
         else if (data && data[0].success) {
-            // ✅ PASO 1: Actualizar visualmente DE INMEDIATO con el dato real
-            const realNewBalance = data[0].new_balance;
-            setTotalScore(realNewBalance); 
+            // 🔥 Notificar al Padre el nuevo saldo real
+            setGlobalScore(data[0].new_balance); 
             
-            // Limpiar formulario
             setAmountToStake('');
             setShowSuccess(true);
-
-            // ✅ PASO 2: Esperar 2 segundos antes de refrescar la lista
-            // Esto evita que leamos datos viejos mientras la DB termina de escribir
-            setTimeout(() => {
-                fetchData();
-            }, 2000); 
+            
+            // Pequeña pausa antes de recargar la lista visual
+            setTimeout(() => fetchData(), 500); 
         } 
         else {
             alert(data?.[0]?.message || "Transaction Failed");
@@ -147,10 +159,9 @@ export const StakingBank = () => {
         setLoading(false);
     };
 
-    // --- FUNCIÓN DE CLAIM (COBRAR) ---
+    // --- FUNCIÓN DE CLAIM ---
     const handleClaimStake = async (stakeId: string) => {
         if (!window.confirm("Unlock and Claim this Vault?")) return;
-        
         setClaimingId(stakeId);
         
         const { data, error } = await supabase.rpc('claim_stake', { stake_id_in: stakeId });
@@ -160,13 +171,10 @@ export const StakingBank = () => {
         } else if (data && data[0].success) {
             alert(data[0].message); 
             
-            // ✅ Actualizar saldo inmediatamente
-            setTotalScore(data[0].new_balance);
+            // 🔥 Notificar al Padre el nuevo saldo real
+            setGlobalScore(data[0].new_balance);
             
-            // ✅ Esperar un poco antes de recargar la lista
-            setTimeout(() => {
-                fetchData(); 
-            }, 2000);
+            setTimeout(() => fetchData(), 500); 
         } else {
             alert(data?.[0]?.message || "Cannot claim yet");
         }
@@ -193,7 +201,8 @@ export const StakingBank = () => {
             <div style={{background:'rgba(0,0,0,0.3)', padding:'12px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #333'}}>
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#aaa', marginBottom:'8px'}}>
                     <span>Total Balance:</span>
-                    <span style={{color:'#fff'}}>{totalScore.toLocaleString()}</span>
+                    {/* Visualizamos el saldo global que viene del padre */}
+                    <span style={{color:'#fff'}}>{globalScore.toLocaleString()}</span>
                 </div>
                 
                 <div style={{fontSize:'11px', color:'#666', marginBottom:'5px', display:'flex', gap:'5px', alignItems:'center'}}>
@@ -271,9 +280,7 @@ export const StakingBank = () => {
             ) : (
                 <div style={{display:'flex', flexDirection:'column', gap:'10px', maxHeight:'200px', overflowY:'auto'}}>
                     {stakes.map((stake) => {
-                        // Verificamos si ya pasó el tiempo
                         const isReady = new Date(stake.end_at) < new Date();
-                        
                         return (
                             <div key={stake.id} style={{ padding: '12px', background:'rgba(255,255,255,0.03)', borderRadius:'10px', borderLeft:`3px solid ${isReady ? '#4CAF50' : '#00F2FE'}` }}>
                                 <div style={{display:'flex', justifyContent:'space-between', marginBottom:'5px'}}>
@@ -281,9 +288,7 @@ export const StakingBank = () => {
                                     <span style={{color:'#4CAF50', fontSize:'12px', fontWeight:'bold'}}>+{stake.estimated_return.toLocaleString()}</span>
                                 </div>
                                 <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'11px', color:'#888'}}>
-                                    
                                     {isReady ? (
-                                        // BOTÓN DE COBRO
                                         <button 
                                             onClick={() => handleClaimStake(stake.id)}
                                             disabled={claimingId === stake.id}
@@ -296,12 +301,10 @@ export const StakingBank = () => {
                                             {claimingId === stake.id ? '...' : <><Unlock size={12}/> CLAIM NOW</>}
                                         </button>
                                     ) : (
-                                        // RELOJ DE CUENTA REGRESIVA
                                         <div style={{display:'flex', alignItems:'center', gap:'4px'}}>
                                             <Calendar size={10}/> Unlocks: {formatDate(stake.end_at)}
                                         </div>
                                     )}
-
                                     <div>{stake.duration_days} Days ({stake.roi_percent * 100}%)</div>
                                 </div>
                             </div>
@@ -322,8 +325,7 @@ export const StakingBank = () => {
                         </div>
                         <h2 style={{margin: '0 0 10px 0', color:'#fff'}}>Success!</h2>
                         <p style={{color: '#ccc', fontSize: '14px', marginBottom:'20px'}}>
-                            You locked <strong>{amountToStake} PTS</strong> for {selectedOption.days} days.<br/>
-                            Estimated Return: <span style={{color:'#4CAF50'}}>+{calculatedProfit} PTS</span>
+                            You locked <strong>{amountToStake} PTS</strong> for {selectedOption.days} days.
                         </p>
                         <button className="btn-neon" onClick={() => setShowSuccess(false)} style={{width:'100%'}}>CLOSE</button>
                     </div>

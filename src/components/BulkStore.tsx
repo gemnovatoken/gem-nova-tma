@@ -16,9 +16,11 @@ interface PackNodeProps {
     side: 'left' | 'right';
 }
 
-// Recibimos la función para avisar a la App principal
+// 👇 MODIFICACIÓN 1: Agregamos score y setScore para poder pasárselos al Banco
 interface BulkStoreProps {
     onPurchaseSuccess?: (newScore: number) => void;
+    score: number;
+    setScore: (val: number) => void;
 }
 
 const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
@@ -30,7 +32,8 @@ const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
     'blackhole': { ton: 100.0, pts: 70000000, label: "⚠️ GOD MODE" }
 };
 
-export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
+// 👇 MODIFICACIÓN 2: Recibimos score y setScore
+export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, setScore }) => {
     const { user } = useAuth();
     
     // 🔥 ESTADO MAGICO: Cada vez que cambie, el banco se recarga
@@ -58,6 +61,8 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
             if (onPurchaseSuccess) {
                 onPurchaseSuccess(data.new_score); 
             }
+            // También actualizamos directo por si acaso
+            setScore(data.new_score);
 
             // 2. 🔥 ACTUALIZAR EL VAULT (Abajo / Purchased)
             // Al sumar 1, la 'key' cambia y StakingBank se reinicia
@@ -160,8 +165,12 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess }) => {
                 <div className="circuit-vault" style={{ borderRadius: '20px', padding: '4px' }}>
                     <div style={{ background: 'rgba(0,0,0,0.95)', borderRadius: '16px', overflow: 'hidden', padding:'10px' }}>
                         
-                        {/* 🔥 AQUÍ ESTÁ EL TRUCO: Pasamos la key dinámica */}
-                        <StakingBank key={refreshTrigger} />
+                        {/* 👇 MODIFICACIÓN 3: Conectamos los cables al Banco */}
+                        <StakingBank 
+                            key={refreshTrigger} 
+                            globalScore={score} 
+                            setGlobalScore={setScore} 
+                        />
                         
                     </div>
                     <div style={{position:'absolute', bottom:'10px', left:'20px', width:'40px', height:'4px', background:'#00F2FE', boxShadow:'0 0 10px #00F2FE'}}></div>
