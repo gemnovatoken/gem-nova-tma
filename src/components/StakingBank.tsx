@@ -98,11 +98,12 @@ export const StakingBank = () => {
         setAmountToStake(val.toString());
     };
 
-    // --- FUNCIÓN DE STAKING (DEPOSITAR) ---
+    // --- FUNCIÓN DE STAKING SEGURA (TRANSACTION) ---
     const handleStake = async () => {
         if (!userId || !amountToStake) return;
         const amount = parseInt(amountToStake);
         
+        // Validaciones visuales (Frontend)
         if (amount <= 0) { alert("Enter a valid amount"); return; }
         if (amount > maxStakeable) {
             alert(`⚠️ Limit Exceeded!\n\nMax Stakeable: ${maxStakeable.toLocaleString()}`);
@@ -112,29 +113,36 @@ export const StakingBank = () => {
 
         setLoading(true);
 
+        // Calcular fecha de vencimiento
         const unlockDate = new Date();
-        unlockDate.setDate(unlockDate.getDate() + selectedOption.days); // Sumamos los días
+        unlockDate.setDate(unlockDate.getDate() + selectedOption.days);
 
-        const { error: stakeError } = await supabase.from('stakes').insert({
-            user_id: userId,
-            amount: amount,
-            duration_days: selectedOption.days,
-            roi_percent: selectedOption.roi,
-            estimated_return: calculatedProfit,
-            end_at: unlockDate.toISOString()
+        // 🔥 AQUÍ ESTÁ EL CAMBIO: Llamamos a la Transacción Atómica
+        const { data, error } = await supabase.rpc('create_stake_transaction', {
+            p_user_id: userId,
+            p_amount: amount,
+            p_duration: selectedOption.days,
+            p_roi: selectedOption.roi,
+            p_estimated_return: calculatedProfit,
+            p_end_at: unlockDate.toISOString()
         });
 
-        if (!stakeError) {
-            await supabase.rpc('deduct_points', { user_id_in: userId, amount_in: amount });
-            await fetchData(); 
-            setLoading(false);
+        if (error) {
+            console.error("Stake Error:", error);
+            alert(`System Error: ${error.message}`);
+        } 
+        else if (data && data[0].success) {
+            // Si todo salió bien en el servidor:
+            await fetchData(); // Recargamos los datos (El saldo ya vendrá descontado)
             setAmountToStake('');
-            setShowSuccess(true); 
-        } else {
-            console.error(stakeError);
-            alert(`Error: ${stakeError.message}`);
-            setLoading(false);
+            setShowSuccess(true);
+        } 
+        else {
+            // Si el servidor rechazó (ej: saldo insuficiente real)
+            alert(data?.[0]?.message || "Transaction Failed");
         }
+        
+        setLoading(false);
     };
 
     // --- FUNCIÓN DE CLAIM (COBRAR) ---
