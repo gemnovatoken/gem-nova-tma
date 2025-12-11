@@ -13,7 +13,7 @@ interface StakeData {
 }
 
 const LOCK_OPTIONS = [
-    // 👇 OPCIÓN DE PRUEBA AÑADIDA
+    // 👇 OPCIÓN DE PRUEBA
     { days: 1, roi: 0.02, label: 'TEST 1D', color: '#FFFFFF' }, 
     { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, 
     { days: 30, roi: 0.15, label: '30D', color: '#00F2FE' }, 
@@ -33,9 +33,9 @@ export const StakingBank = () => {
     const [userLevel, setUserLevel] = useState(1);
     
     const [loading, setLoading] = useState(false);
-    const [claimingId, setClaimingId] = useState<string | null>(null); // Estado para loading de cobro individual
+    const [claimingId, setClaimingId] = useState<string | null>(null);
     const [amountToStake, setAmountToStake] = useState('');
-    const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[0]); // Selecciona TEST por defecto 
+    const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[0]); 
     const [showSuccess, setShowSuccess] = useState(false);
 
     // LÓGICA DE NIVELES
@@ -49,7 +49,7 @@ export const StakingBank = () => {
 
     const unlockPct = getUnlockPercentage(userLevel);
     
-    // Matemática corregida
+    // Matemática
     const effectivePurchased = Math.min(totalScore, purchasedPoints);
     const earnedPoints = Math.max(0, totalScore - purchasedPoints);
     const stakeableEarned = Math.floor(earnedPoints * unlockPct);
@@ -63,7 +63,7 @@ export const StakingBank = () => {
             .from('stakes') 
             .select('*')
             .eq('user_id', userId)
-            .eq('status', 'active') // Solo mostramos los activos
+            .eq('status', 'active') 
             .order('end_at', { ascending: true });
         
         if (stakeData) setStakes(stakeData as StakeData[]);
@@ -84,7 +84,7 @@ export const StakingBank = () => {
     useEffect(() => {
         if (!userId) return;
         const initialLoad = setTimeout(() => fetchData(), 0);
-        const interval = setInterval(fetchData, 5000); // 5 segundos para no saturar
+        const interval = setInterval(fetchData, 5000); 
         return () => { clearTimeout(initialLoad); clearInterval(interval); };
     }, [userId, fetchData]);
 
@@ -103,7 +103,6 @@ export const StakingBank = () => {
         if (!userId || !amountToStake) return;
         const amount = parseInt(amountToStake);
         
-        // Validaciones visuales (Frontend)
         if (amount <= 0) { alert("Enter a valid amount"); return; }
         if (amount > maxStakeable) {
             alert(`⚠️ Limit Exceeded!\n\nMax Stakeable: ${maxStakeable.toLocaleString()}`);
@@ -113,11 +112,10 @@ export const StakingBank = () => {
 
         setLoading(true);
 
-        // Calcular fecha de vencimiento
         const unlockDate = new Date();
         unlockDate.setDate(unlockDate.getDate() + selectedOption.days);
 
-        // 🔥 AQUÍ ESTÁ EL CAMBIO: Llamamos a la Transacción Atómica
+        // Llamamos a la Transacción Atómica
         const { data, error } = await supabase.rpc('create_stake_transaction', {
             p_user_id: userId,
             p_amount: amount,
@@ -132,13 +130,14 @@ export const StakingBank = () => {
             alert(`System Error: ${error.message}`);
         } 
         else if (data && data[0].success) {
-            // Si todo salió bien en el servidor:
-            await fetchData(); // Recargamos los datos (El saldo ya vendrá descontado)
+            // 🔥 ACTUALIZACIÓN INMEDIATA DEL SALDO 🔥
+            setTotalScore(data[0].new_balance); 
+            
             setAmountToStake('');
             setShowSuccess(true);
+            fetchData(); 
         } 
         else {
-            // Si el servidor rechazó (ej: saldo insuficiente real)
             alert(data?.[0]?.message || "Transaction Failed");
         }
         
@@ -156,8 +155,12 @@ export const StakingBank = () => {
         if (error) {
             alert("Error: " + error.message);
         } else if (data && data[0].success) {
-            alert(data[0].message); // Mensaje de éxito
-            await fetchData(); // Recargar para que desaparezca de la lista y se sume el saldo
+            alert(data[0].message); 
+            
+            // 🔥 ACTUALIZACIÓN INMEDIATA 🔥
+            setTotalScore(data[0].new_balance);
+            
+            await fetchData(); 
         } else {
             alert(data?.[0]?.message || "Cannot claim yet");
         }
