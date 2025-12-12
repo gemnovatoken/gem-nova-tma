@@ -12,10 +12,9 @@ interface StakeData {
     end_at: string;
 }
 
-// Interfaz para recibir el control del saldo desde el Padre
 interface Props {
     globalScore: number; 
-    setGlobalScore: (val: number) => void; 
+    setGlobalScore: (val: number) => void;
 }
 
 const LOCK_OPTIONS = [
@@ -32,12 +31,9 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
 
     const [stakes, setStakes] = useState<StakeData[]>([]);
     
-    // --- NUEVOS ESTADOS PARA LA LÓGICA DE CÁLCULO ---
+    // Estados sincronizados con Base de Datos
     const [lifetimePurchased, setLifetimePurchased] = useState(0);
-    // (El globalScore ya viene por props, así que no necesitamos currentScore local)
-
-    // Solo para visualizar el nivel (aunque el cálculo lo haremos directo)
-    const [userLevel, setUserLevel] = useState(1);
+    const [realLevel, setRealLevel] = useState(1); 
     
     const [loading, setLoading] = useState(false);
     const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -45,35 +41,52 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
     const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[0]); 
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // LÓGICA DE NIVELES (Allowance)
-    const getUnlockPercentage = (level: number) => {
-        if (level >= 8) return 0.70; 
-        if (level === 7) return 0.50; 
-        if (level === 6) return 0.35; 
-        if (level === 5) return 0.20; 
-        return 0; // Niveles bajos no pueden stakear gameplay
+    // 🔥 LÓGICA DE NIVELES CORREGIDA
+    // Regla: Nivel 1-3 tope 10k. Nivel 4+ porcentajes.
+    const getGameplayAllowance = (earnedPts: number, level: number) => {
+        // Nivel 1 al 3: Tope fijo de 10,000 puntos
+        if (level <= 3) {
+            return Math.min(earnedPts, 10000);
+        }
+        
+        // Niveles superiores: Porcentajes
+        let pct = 0;
+        if (level === 4) pct = 0.10;      // 10%
+        else if (level === 5) pct = 0.20; // 20%
+        else if (level === 6) pct = 0.35; // 35%
+        else if (level === 7) pct = 0.50; // 50%
+        else if (level >= 8) pct = 0.70;  // 70%
+
+        return Math.floor(earnedPts * pct);
     };
 
-    const unlockPct = getUnlockPercentage(userLevel);
+    // Texto para la UI
+    const getDisplayPercent = (level: number) => {
+        if (level <= 3) return "Max 10k";
+        if (level === 4) return "10%";
+        if (level === 5) return "20%";
+        if (level === 6) return "35%";
+        if (level === 7) return "50%";
+        return "70%";
+    };
     
-    // --- 🔥 MATEMÁTICA CORREGIDA (INTEGRACIÓN) ---
-    // 1. Puntos Comprados Reales (Nunca mayor al saldo actual)
+    // 🔥 CÁLCULOS FINANCIEROS
+    // 1. Purchased: Mínimo entre lo que tienes hoy y lo que has comprado en total.
     const effectivePurchased = Math.min(globalScore, lifetimePurchased);
     
-    // 2. Puntos de Gameplay (El resto)
+    // 2. Gameplay: Lo que sobra (Saldo total - Purchased).
     const earnedPoints = Math.max(0, globalScore - effectivePurchased);
     
-    // 3. Cálculo de Staking Permitido
+    // 3. Staking Permitido
     const allowancePurchased = effectivePurchased; // 100% de lo comprado
-    const stakeableEarned = Math.floor(earnedPoints * unlockPct); // % según nivel
+    const stakeableEarned = getGameplayAllowance(earnedPoints, realLevel); // Lógica nueva
     const maxStakeable = allowancePurchased + stakeableEarned;
 
-
-    // --- CARGA DE DATOS (FUSIONADA) ---
+    // --- CARGA DE DATOS ---
     const fetchData = useCallback(async () => {
         if(!userId) return;
         
-        // 1. Cargar Stakes Activos (Igual que antes)
+        // 1. Cargar Stakes Activos
         const { data: stakeData } = await supabase
             .from('stakes') 
             .select('*')
@@ -83,64 +96,55 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
         
         if (stakeData) setStakes(stakeData as StakeData[]);
 
-        // 2. 🔥 NUEVA CARGA INTELIGENTE (Usando la función SQL nueva)
-        // Esto nos da el total histórico comprado y el nivel
-        const { data: smartData } = await supabase
+        // 2. Carga Inteligente (Función SQL)
+        // Obtenemos nivel y compras históricas
+        const { data: smartData, error } = await supabase
             .rpc('get_staking_calculations', { user_id_input: userId });
         
-        if (smartData) {
+        if (!error && smartData) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const d = smartData as any;
+            
             setLifetimePurchased(Number(d.lifetime_purchased));
+            setRealLevel(Number(d.user_level));
             
-            // Si tu función SQL no devuelve el nivel, lo sacamos de user_score aparte
-            // (O podemos asumir nivel 8 para pruebas si prefieres)
-            const { data: levelData } = await supabase
-                .from('user_score')
-                .select('limit_level')
-                .eq('user_id', userId)
-                .single();
-            
-            if (levelData) setUserLevel(levelData.limit_level || 1);
+            // NOTA: No actualizamos globalScore aquí para evitar el bucle infinito
         }
 
-    }, [userId]);
+    }, [userId]); // ⚠️ SOLUCIÓN DEL ERROR: 'globalScore' eliminado de aquí
 
     useEffect(() => {
         if (!userId) return;
         
+        // Ejecución inicial segura
         const timer = setTimeout(() => {
             fetchData();
         }, 0);
 
         const interval = setInterval(fetchData, 10000); 
-        
         return () => {
             clearTimeout(timer);
             clearInterval(interval);
         };
     }, [userId, fetchData]);
 
-    // Calcular ganancia estimada visual
+    // Calcular ganancia estimada
     const calculatedProfit = amountToStake 
         ? Math.floor(parseInt(amountToStake) * selectedOption.roi) 
         : 0;
 
-    // Botones de porcentaje rápido
     const setPercentage = (pct: number) => {
         if (maxStakeable <= 0) return;
         const val = Math.floor(maxStakeable * pct);
         setAmountToStake(val.toString());
     };
 
-    // --- FUNCIÓN DE STAKING (ACTUALIZADA) ---
+    // --- STAKE ---
     const handleStake = async () => {
         if (!userId || !amountToStake) return;
         const amount = parseInt(amountToStake);
         
         if (amount <= 0) { alert("Enter a valid amount"); return; }
-        
-        // Validaciones de seguridad
         if (amount > maxStakeable) { 
             alert(`Limit Exceeded! Your max stakeable allowance is ${maxStakeable.toLocaleString()}`); 
             return; 
@@ -169,12 +173,9 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
             alert(`System Error: ${error.message}`);
         } 
         else if (data && data[0].success) {
-            // 🔥 Notificar al Padre el nuevo saldo real
             setGlobalScore(data[0].new_balance); 
-            
             setAmountToStake('');
             setShowSuccess(true);
-            
             setTimeout(() => fetchData(), 500); 
         } 
         else {
@@ -184,7 +185,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
         setLoading(false);
     };
 
-    // --- FUNCIÓN DE CLAIM ---
+    // --- CLAIM ---
     const handleClaimStake = async (stakeId: string) => {
         if (!window.confirm("Unlock and Claim this Vault?")) return;
         setClaimingId(stakeId);
@@ -195,10 +196,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
             alert("Error: " + error.message);
         } else if (data && data[0].success) {
             alert(data[0].message); 
-            
-            // 🔥 Notificar al Padre el nuevo saldo real
             setGlobalScore(data[0].new_balance);
-            
             setTimeout(() => fetchData(), 500); 
         } else {
             alert(data?.[0]?.message || "Cannot claim yet");
@@ -212,9 +210,9 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
     };
 
     const getPctColor = () => {
-        if (unlockPct === 0) return '#FF5252';
-        if (unlockPct < 0.5) return '#FFD700';
-        return '#4CAF50';
+        if (realLevel <= 3) return '#FF5252'; 
+        if (realLevel < 8) return '#FFD700'; 
+        return '#4CAF50'; 
     };
 
     return (
@@ -226,20 +224,27 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
             <div style={{background:'rgba(0,0,0,0.3)', padding:'12px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #333'}}>
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#aaa', marginBottom:'8px'}}>
                     <span>Total Balance:</span>
-                    {/* Visualizamos el saldo global que viene del padre */}
                     <span style={{color:'#fff'}}>{globalScore.toLocaleString()}</span>
                 </div>
                 
                 <div style={{fontSize:'11px', color:'#666', marginBottom:'5px', display:'flex', gap:'5px', alignItems:'center'}}>
-                    <Info size={10}/> ALLOWANCE (Lvl {userLevel}):
+                    <Info size={10}/> ALLOWANCE (Lvl {realLevel}):
                 </div>
+                
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'2px'}}>
                     <span style={{color:'#00F2FE'}}>Purchased (100%):</span>
                     <span>{effectivePurchased.toLocaleString()}</span>
                 </div>
+                
+                {/* Visualización dinámica (Max 10k o Porcentaje) */}
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
-                    <span style={{color: getPctColor()}}>Gameplay ({unlockPct * 100}%):</span>
-                    <span>{stakeableEarned.toLocaleString()} <span style={{color:'#555', fontSize:'9px'}}>({earnedPoints.toLocaleString()} Total)</span></span>
+                    <span style={{color: getPctColor()}}>
+                        Gameplay ({getDisplayPercent(realLevel)}):
+                    </span>
+                    <span>
+                        {stakeableEarned.toLocaleString()} 
+                        <span style={{color:'#555', fontSize:'9px'}}> ({earnedPoints.toLocaleString()} Total)</span>
+                    </span>
                 </div>
 
                 <div style={{borderTop:'1px dashed #444', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold'}}>
