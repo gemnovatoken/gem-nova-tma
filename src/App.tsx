@@ -102,20 +102,17 @@ export default function App() {
                         const now = new Date().getTime();
                         setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
                     }
-                    // --- AGREGAR ESTO PARA EL TURBO ---
+                    
                     if (userData.overclock_active_until) {
                         const turboExpiry = new Date(userData.overclock_active_until).getTime();
                         const now = new Date().getTime();
                         const remainingTurbo = Math.max(0, Math.floor((turboExpiry - now) / 1000));
-    
-                      // Si queda tiempo, lo restauramos
                         setOverclockTime(remainingTurbo);
                     }
                     const today = new Date().toISOString().split('T')[0];
                     setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
 
                     // Sincronizar offline
-                    // AHORA CALCULAMOS LA VELOCIDAD BASADA EN EL NIVEL DE LIMITE (userData.limit_level)
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.limit_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
                     const { data: syncData } = await supabase.rpc('sync_energy_on_load', { 
@@ -135,25 +132,39 @@ export default function App() {
                     await supabase.from('user_score').update({ username: username }).eq('user_id', user.id);
 
                 } 
-                // CASO B: USUARIO NUEVO
+                // ==========================================
+                // CASO B: USUARIO NUEVO (CORREGIDO)
+                // ==========================================
                 else {
+                    console.log("🆕 Usuario Nuevo detectado. Start Param:", startParam);
+                    
                     let referrerId = null;
-                    if (startParam && startParam.includes('_')) {
-                        referrerId = startParam.split('_')[1];
-                    } else if (startParam && startParam.length > 10) {
-                        referrerId = startParam;
+
+                    // Lógica robusta para capturar el referido
+                    if (startParam) {
+                        if (startParam.includes('_')) {
+                            // Si el link es tipo: t.me/bot?start=ref_12345
+                            referrerId = startParam.split('_')[1]; 
+                        } else {
+                            // Si el link es tipo: t.me/bot?start=12345 (Directo)
+                            referrerId = startParam; 
+                        }
                     }
+
+                    console.log("🔗 ID de Referido capturado:", referrerId);
 
                     const { error: insertError } = await supabase.rpc('register_new_user', {
                         p_user_id: user.id,
                         p_username: username,
-                        p_referral_code_text: referrerId // IMPORTANTE: Usa p_referral_code_text si actualizaste el SQL
+                        p_referral_code_text: referrerId // ID capturado correctamente
                     });
                     
                     if (!insertError) {
                         setEnergy(0); 
                         energyRef.current = 0;
                         setCanSave(true);
+                    } else {
+                        console.error("❌ Error registrando usuario:", insertError);
                     }
                 }
             };
@@ -178,19 +189,17 @@ export default function App() {
             setEnergy(prevPoints => {
                 if (prevPoints >= maxEnergy) return prevPoints;
                 
-                // AQUÍ ESTÁ LA MAGIA: Si hay tiempo de turbo, multiplicamos x2
                 const currentSpeed = overclockTime > 0 ? (regenRate * 2) : regenRate;
                 
                 return Math.min(maxEnergy, prevPoints + currentSpeed);
             });
 
-            // Bajamos los contadores de tiempo (Bot y Turbo)
             setBotTime(prev => Math.max(0, prev - 1));
-            setOverclockTime(prev => Math.max(0, prev - 1)); // <--- Restamos 1 seg al turbo
+            setOverclockTime(prev => Math.max(0, prev - 1)); 
 
         }, 1000);
         return () => clearInterval(timer);
-    }, [maxEnergy, regenRate, overclockTime]);  // <--- Importante: agregar overclockTime aquí
+    }, [maxEnergy, regenRate, overclockTime]); 
 
     // 4. AUTO-SAVE
     useEffect(() => {
@@ -223,23 +232,21 @@ export default function App() {
                                     maxEnergy={maxEnergy} regenRate={regenRate}
                                     botTime={botTime} setBotTime={setBotTime}
                                     adsWatched={adsWatched} setAdsWatched={setAdsWatched}
-                                    overclockTime={overclockTime}       // <--- NUEVO
-                                    setOverclockTime={setOverclockTime} // <--- NUEVO
+                                    overclockTime={overclockTime}       
+                                    setOverclockTime={setOverclockTime} 
                                 />
                             </div>
                         </div>
                     )}
                     
-                    {/* 🔥 AQUÍ ESTÁ LA CORRECCIÓN CLAVE EN BULKSTORE */}
                     {currentTab === 'market' && (
                         <div style={{ animation: 'fadeIn 0.3s' }}>
                             <BulkStore 
                                 onPurchaseSuccess={(newScore) => {
                                     console.log("💰 Compra detectada! Actualizando saldo a:", newScore);
-                                    setScore(newScore); // Actualiza la pantalla
-                                    scoreRef.current = newScore; // Actualiza el guardado automático
+                                    setScore(newScore); 
+                                    scoreRef.current = newScore; 
                                 }} 
-                                // 👇 AQUI ESTÁN LAS PROPS FALTANTES (AFUERA DE LA FUNCIÓN)
                                 score={score} 
                                 setScore={setScore}
                             />
