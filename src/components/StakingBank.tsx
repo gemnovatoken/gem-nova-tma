@@ -32,8 +32,11 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
 
     const [stakes, setStakes] = useState<StakeData[]>([]);
     
-    // Solo manejamos localmente los datos que NO son el saldo
-    const [purchasedPoints, setPurchasedPoints] = useState(0);
+    // --- NUEVOS ESTADOS PARA LA LÓGICA DE CÁLCULO ---
+    const [lifetimePurchased, setLifetimePurchased] = useState(0);
+    // (El globalScore ya viene por props, así que no necesitamos currentScore local)
+
+    // Solo para visualizar el nivel (aunque el cálculo lo haremos directo)
     const [userLevel, setUserLevel] = useState(1);
     
     const [loading, setLoading] = useState(false);
@@ -42,29 +45,35 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
     const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[0]); 
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // LÓGICA DE NIVELES
+    // LÓGICA DE NIVELES (Allowance)
     const getUnlockPercentage = (level: number) => {
         if (level >= 8) return 0.70; 
         if (level === 7) return 0.50; 
         if (level === 6) return 0.35; 
         if (level === 5) return 0.20; 
-        return 0; 
+        return 0; // Niveles bajos no pueden stakear gameplay
     };
 
     const unlockPct = getUnlockPercentage(userLevel);
     
-    // Matemática (Usamos globalScore directamente)
-    const effectivePurchased = Math.min(globalScore, purchasedPoints);
-    const earnedPoints = Math.max(0, globalScore - purchasedPoints);
-    const stakeableEarned = Math.floor(earnedPoints * unlockPct);
-    const maxStakeable = effectivePurchased + stakeableEarned;
+    // --- 🔥 MATEMÁTICA CORREGIDA (INTEGRACIÓN) ---
+    // 1. Puntos Comprados Reales (Nunca mayor al saldo actual)
+    const effectivePurchased = Math.min(globalScore, lifetimePurchased);
+    
+    // 2. Puntos de Gameplay (El resto)
+    const earnedPoints = Math.max(0, globalScore - effectivePurchased);
+    
+    // 3. Cálculo de Staking Permitido
+    const allowancePurchased = effectivePurchased; // 100% de lo comprado
+    const stakeableEarned = Math.floor(earnedPoints * unlockPct); // % según nivel
+    const maxStakeable = allowancePurchased + stakeableEarned;
 
-    // Cargar datos (Stakes, Nivel y Compras Solamente)
-    // ⚠️ NO cargamos el score aquí para evitar conflictos con el padre
+
+    // --- CARGA DE DATOS (FUSIONADA) ---
     const fetchData = useCallback(async () => {
         if(!userId) return;
         
-        // 1. Cargar Stakes
+        // 1. Cargar Stakes Activos (Igual que antes)
         const { data: stakeData } = await supabase
             .from('stakes') 
             .select('*')
@@ -74,29 +83,36 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
         
         if (stakeData) setStakes(stakeData as StakeData[]);
 
-        // 2. Cargar Datos de Límite
-        const { data: userData } = await supabase
-            .from('user_score')
-            .select('total_bought_points, limit_level') 
-            .eq('user_id', userId)
-            .single();
+        // 2. 🔥 NUEVA CARGA INTELIGENTE (Usando la función SQL nueva)
+        // Esto nos da el total histórico comprado y el nivel
+        const { data: smartData } = await supabase
+            .rpc('get_staking_calculations', { user_id_input: userId });
         
-        if (userData) {
-            setPurchasedPoints(userData.total_bought_points || 0); 
-            setUserLevel(userData.limit_level || 1);
+        if (smartData) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const d = smartData as any;
+            setLifetimePurchased(Number(d.lifetime_purchased));
+            
+            // Si tu función SQL no devuelve el nivel, lo sacamos de user_score aparte
+            // (O podemos asumir nivel 8 para pruebas si prefieres)
+            const { data: levelData } = await supabase
+                .from('user_score')
+                .select('limit_level')
+                .eq('user_id', userId)
+                .single();
+            
+            if (levelData) setUserLevel(levelData.limit_level || 1);
         }
+
     }, [userId]);
 
     useEffect(() => {
         if (!userId) return;
         
-        // 🛠️ FIX: Usamos setTimeout para evitar el error de "setState sincrónico"
-        // Esto mueve la ejecución al final de la cola de eventos.
         const timer = setTimeout(() => {
             fetchData();
         }, 0);
 
-        // Recargar lista de stakes cada 10s
         const interval = setInterval(fetchData, 10000); 
         
         return () => {
@@ -105,24 +121,34 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
         };
     }, [userId, fetchData]);
 
+    // Calcular ganancia estimada visual
     const calculatedProfit = amountToStake 
         ? Math.floor(parseInt(amountToStake) * selectedOption.roi) 
         : 0;
 
+    // Botones de porcentaje rápido
     const setPercentage = (pct: number) => {
         if (maxStakeable <= 0) return;
         const val = Math.floor(maxStakeable * pct);
         setAmountToStake(val.toString());
     };
 
-    // --- FUNCIÓN DE STAKING ---
+    // --- FUNCIÓN DE STAKING (ACTUALIZADA) ---
     const handleStake = async () => {
         if (!userId || !amountToStake) return;
         const amount = parseInt(amountToStake);
         
         if (amount <= 0) { alert("Enter a valid amount"); return; }
-        if (amount > maxStakeable) { alert("Limit Exceeded!"); return; }
-        if (amount > globalScore) { alert("Insufficient balance."); return; }
+        
+        // Validaciones de seguridad
+        if (amount > maxStakeable) { 
+            alert(`Limit Exceeded! Your max stakeable allowance is ${maxStakeable.toLocaleString()}`); 
+            return; 
+        }
+        if (amount > globalScore) { 
+            alert("Insufficient balance."); 
+            return; 
+        }
 
         setLoading(true);
 
@@ -149,7 +175,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
             setAmountToStake('');
             setShowSuccess(true);
             
-            // Pequeña pausa antes de recargar la lista visual
             setTimeout(() => fetchData(), 500); 
         } 
         else {
@@ -214,7 +239,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
                 </div>
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
                     <span style={{color: getPctColor()}}>Gameplay ({unlockPct * 100}%):</span>
-                    <span>{stakeableEarned.toLocaleString()}</span>
+                    <span>{stakeableEarned.toLocaleString()} <span style={{color:'#555', fontSize:'9px'}}>({earnedPoints.toLocaleString()} Total)</span></span>
                 </div>
 
                 <div style={{borderTop:'1px dashed #444', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold'}}>
