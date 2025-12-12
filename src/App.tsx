@@ -249,6 +249,7 @@ export default function App() {
                                 }} 
                                 score={score} 
                                 setScore={setScore}
+                                userLevel={levels.limit}
                             />
                         </div>
                     )}

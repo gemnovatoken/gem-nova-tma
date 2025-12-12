@@ -25,6 +25,7 @@ interface BulkStoreProps {
     onPurchaseSuccess?: (newScore: number) => void;
     score: number;
     setScore: (val: number) => void;
+    userLevel: number; // <--- NUEVO
 }
 
 // Datos de los paquetes (Precios reales en TON)
