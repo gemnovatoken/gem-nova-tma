@@ -19,10 +19,10 @@ interface MilestoneRowProps {
     isBig?: boolean;
 }
 
-// Interfaz para los datos que vienen de la base de datos
+// Interfaz para la respuesta de la base de datos
 interface UserScoreData {
-    referral_count: number;
     referral_ton_earnings: number;
+    referral_count: number;
 }
 
 // --- 1. EL SOL (RAID CORE) ---
@@ -147,48 +147,47 @@ export const SquadZone: React.FC = () => {
         ? `https://t.me/${BOT_USERNAME}?start=${user.id}` 
         : "Loading...";
 
-    // 🔥 LÓGICA DE CARGA DE REFERIDOS
+    // 🔥 LÓGICA DE REFERIDOS LIMPIA Y SEGURA
     useEffect(() => {
         if (!user) return;
 
         const loadData = async () => {
             try {
-                // 1. Cargar ganancias TON (Dato estático)
+                // 1. Obtener ganancias TON (Dato estático)
                 const { data: scoreData } = await supabase
                     .from('user_score')
                     .select('referral_ton_earnings, referral_count')
                     .eq('user_id', user.id)
                     .single();
                 
-                // Hacemos cast seguro a la interfaz definida arriba
+                // Tipamos la respuesta para evitar 'any'
                 const userData = scoreData as unknown as UserScoreData;
 
                 if (userData) {
                     setTonEarnings(userData.referral_ton_earnings || 0);
                 }
 
-                // 2. Cargar Conteo Real de Referidos (Función Segura RPC)
+                // 2. CONTAR REFERIDOS REALES (Función RPC SQL)
                 const { data: count, error: rpcError } = await supabase
-                    .rpc('get_my_referrals', { ref_id: user.id });
+                    .rpc('get_my_referrals', { my_id: user.id });
 
-                if (!rpcError && typeof count === 'number') {
-                    // Si RPC funciona, usamos el dato real
-                    setReferrals(count);
-                } else {
-                    // Fallback: Usar el dato estático si el RPC falla
-                    console.warn("RPC Error (usando fallback):", rpcError);
+                if (rpcError) {
+                    console.error("Error en RPC (usando fallback):", rpcError);
+                    // Fallback al dato estático si RPC falla
                     if (userData) {
                         setReferrals(userData.referral_count || 0);
                     }
+                } else {
+                    // Si RPC funciona, usamos el dato real
+                    setReferrals(Number(count) || 0);
                 }
 
             } catch (e) {
-                console.error("Error crítico cargando squad:", e);
+                console.error("Error crítico:", e);
             }
         };
 
         loadData();
-        
         const interval = setInterval(loadData, 10000);
         return () => clearInterval(interval);
 
