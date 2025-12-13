@@ -12,9 +12,11 @@ interface StakeData {
     end_at: string;
 }
 
+// Interfaz actualizada para recibir el Nivel desde el Padre
 interface Props {
     globalScore: number; 
     setGlobalScore: (val: number) => void;
+    userLevel?: number; // 🔥 Nuevo: Recibimos el nivel real aquí
 }
 
 const LOCK_OPTIONS = [
@@ -25,7 +27,8 @@ const LOCK_OPTIONS = [
     { days: 90, roi: 0.60, label: '90D', color: '#FFD700' }  
 ];
 
-export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) => {
+// Asignamos userLevel = 1 por defecto si no llega la prop
+export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, userLevel = 1 }) => {
     const { user } = useAuth();
     const userId = user?.id; 
 
@@ -33,16 +36,15 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
     
     // Estados sincronizados con Base de Datos
     const [lifetimePurchased, setLifetimePurchased] = useState(0);
-    const [realLevel, setRealLevel] = useState(1); 
-    
+    // NOTA: Eliminamos 'realLevel' local. Usamos 'userLevel' directo de los props.
+
     const [loading, setLoading] = useState(false);
     const [claimingId, setClaimingId] = useState<string | null>(null);
     const [amountToStake, setAmountToStake] = useState('');
     const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[0]); 
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // 🔥 LÓGICA DE NIVELES CORREGIDA
-    // Regla: Nivel 1-3 tope 10k. Nivel 4+ porcentajes.
+    // 🔥 LÓGICA DE NIVELES CORREGIDA (Reglas Solicitadas)
     const getGameplayAllowance = (earnedPts: number, level: number) => {
         // Nivel 1 al 3: Tope fijo de 10,000 puntos
         if (level <= 3) {
@@ -70,7 +72,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
         return "70%";
     };
     
-    // 🔥 CÁLCULOS FINANCIEROS
+    // 🔥 MATEMÁTICA FINANCIERA
     // 1. Purchased: Mínimo entre lo que tienes hoy y lo que has comprado en total.
     const effectivePurchased = Math.min(globalScore, lifetimePurchased);
     
@@ -79,7 +81,8 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
     
     // 3. Staking Permitido
     const allowancePurchased = effectivePurchased; // 100% de lo comprado
-    const stakeableEarned = getGameplayAllowance(earnedPoints, realLevel); // Lógica nueva
+    // Usamos 'userLevel' que viene de los props (App -> BulkStore -> Aquí)
+    const stakeableEarned = getGameplayAllowance(earnedPoints, userLevel); 
     const maxStakeable = allowancePurchased + stakeableEarned;
 
     // --- CARGA DE DATOS ---
@@ -97,21 +100,18 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
         if (stakeData) setStakes(stakeData as StakeData[]);
 
         // 2. Carga Inteligente (Función SQL)
-        // Obtenemos nivel y compras históricas
+        // Solo necesitamos el lifetime_purchased. El nivel ya lo tenemos por props.
         const { data: smartData, error } = await supabase
             .rpc('get_staking_calculations', { user_id_input: userId });
         
         if (!error && smartData) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const d = smartData as any;
-            
             setLifetimePurchased(Number(d.lifetime_purchased));
-            setRealLevel(Number(d.user_level));
-            
-            // NOTA: No actualizamos globalScore aquí para evitar el bucle infinito
+            // Ya no sobreescribimos el nivel con la BD, confiamos en la App.
         }
 
-    }, [userId]); // ⚠️ SOLUCIÓN DEL ERROR: 'globalScore' eliminado de aquí
+    }, [userId]); // ⚠️ IMPORTANTE: globalScore NO está aquí para evitar el bucle
 
     useEffect(() => {
         if (!userId) return;
@@ -210,8 +210,8 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
     };
 
     const getPctColor = () => {
-        if (realLevel <= 3) return '#FF5252'; 
-        if (realLevel < 8) return '#FFD700'; 
+        if (userLevel <= 3) return '#FF5252'; 
+        if (userLevel < 8) return '#FFD700'; 
         return '#4CAF50'; 
     };
 
@@ -227,8 +227,9 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
                     <span style={{color:'#fff'}}>{globalScore.toLocaleString()}</span>
                 </div>
                 
+                {/* Usamos userLevel directo de props */}
                 <div style={{fontSize:'11px', color:'#666', marginBottom:'5px', display:'flex', gap:'5px', alignItems:'center'}}>
-                    <Info size={10}/> ALLOWANCE (Lvl {realLevel}):
+                    <Info size={10}/> ALLOWANCE (Lvl {userLevel}):
                 </div>
                 
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'2px'}}>
@@ -236,10 +237,10 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore }) =>
                     <span>{effectivePurchased.toLocaleString()}</span>
                 </div>
                 
-                {/* Visualización dinámica (Max 10k o Porcentaje) */}
+                {/* Visualización dinámica */}
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
                     <span style={{color: getPctColor()}}>
-                        Gameplay ({getDisplayPercent(realLevel)}):
+                        Gameplay ({getDisplayPercent(userLevel)}):
                     </span>
                     <span>
                         {stakeableEarned.toLocaleString()} 
