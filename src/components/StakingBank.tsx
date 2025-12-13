@@ -12,11 +12,10 @@ interface StakeData {
     end_at: string;
 }
 
-// Interfaz actualizada para recibir el Nivel desde el Padre
 interface Props {
     globalScore: number; 
     setGlobalScore: (val: number) => void;
-    userLevel?: number; // Recibimos el nivel real aquí
+    userLevel?: number; 
 }
 
 // 🔥 CONFIGURACIÓN VISUAL: Botón "LIMITED" Dorado y Animado
@@ -28,16 +27,13 @@ const LOCK_OPTIONS = [
     { days: 90, roi: 0.60, label: '90D', color: '#FFD700' }  
 ];
 
-// Asignamos userLevel = 1 por defecto si no llega la prop
 export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, userLevel = 1 }) => {
     const { user } = useAuth();
     const userId = user?.id; 
 
     const [stakes, setStakes] = useState<StakeData[]>([]);
-    
-    // Estados sincronizados con Base de Datos
     const [lifetimePurchased, setLifetimePurchased] = useState(0);
-
+    
     const [loading, setLoading] = useState(false);
     const [claimingId, setClaimingId] = useState<string | null>(null);
     const [amountToStake, setAmountToStake] = useState('');
@@ -58,7 +54,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         return Math.floor(earnedPts * pct);
     };
 
-    // Texto para la UI
     const getDisplayPercent = (level: number) => {
         if (level <= 3) return "Max 10k";
         if (level === 4) return "10%";
@@ -68,55 +63,38 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         return "70%";
     };
     
-    // 🔥 CÁLCULOS FINANCIEROS (NET WORTH) - SOLUCIÓN AL PROBLEMA DE CUPO 🔥
+    // 🔥 CÁLCULOS DE CAPACIDAD DINÁMICA (NET WORTH) 🔥
     
-    // 1. Calcular cuánto dinero tengo YA bloqueado en la bóveda
+    // 1. Total bloqueado actualmente en la bóveda
     const totalLocked = stakes.reduce((sum, s) => sum + s.amount, 0);
 
-    // 2. Calcular mi Patrimonio Total (Lo que tengo en mano + Lo que tengo guardado)
+    // 2. Patrimonio Total (Lo que tengo en mano + Lo que tengo guardado)
     const netWorth = globalScore + totalLocked;
 
-    // A. ¿Cuánto de mi patrimonio total se considera "Comprado"?
-    const totalPurchasedEquity = Math.min(netWorth, lifetimePurchased);
-    
-    // B. ¿Cuánto de mi patrimonio total es "Gameplay"?
-    const totalGameplayEquity = Math.max(0, netWorth - totalPurchasedEquity);
-    
-    // C. ¿Cuánto de mi patrimonio ya está usado en Staking?
-    // Asumimos que los puntos comprados se usan primero para staking
-    const stakedFromPurchased = Math.min(totalLocked, totalPurchasedEquity);
-    const stakedFromGameplay = Math.max(0, totalLocked - stakedFromPurchased);
+    // 3. Dividir Patrimonio entre "Comprado" y "Juego"
+    // (Esto determina cuánto cupo total merezco tener)
+    const assetsAsPurchased = Math.min(netWorth, lifetimePurchased);
+    const assetsAsGameplay = Math.max(0, netWorth - assetsAsPurchased);
 
-    // D. Calcular Disponibles para Staking AHORA
+    // 4. Calcular CAPACIDAD TOTAL (El Techo máximo de staking permitido)
+    const capacityFromPurchased = assetsAsPurchased; // 100%
+    const capacityFromGameplay = getGameplayAllowance(assetsAsGameplay, userLevel);
     
-    // D1. Disponibles Comprados (Total Comprado - Lo que ya está en staking)
-    // Limitado por lo que tengo en la billetera actualmente
-    const availablePurchasedInWallet = Math.min(
-        globalScore, 
-        Math.max(0, totalPurchasedEquity - stakedFromPurchased)
-    );
+    const totalVaultCapacity = capacityFromPurchased + capacityFromGameplay;
 
-    // D2. Cupo Total Permitido de Gameplay (Basado en el Nivel y el Equity Total)
-    const totalGameplayAllowance = getGameplayAllowance(totalGameplayEquity, userLevel);
-    
-    // D3. Cupo Restante (Cupo Total - Lo que ya usé en staking de gameplay)
-    const remainingGameplayAllowance = Math.max(0, totalGameplayAllowance - stakedFromGameplay);
-    
-    // D4. Gameplay disponible en billetera real
-    const gameplayPointsInWallet = Math.max(0, globalScore - availablePurchasedInWallet);
-    
-    // Lo que realmente puedo stakear de gameplay ahora mismo
-    const stakeableGameplay = Math.min(gameplayPointsInWallet, remainingGameplayAllowance);
+    // 5. Calcular Espacio Restante (Capacidad Total - Lo que ya está ocupado)
+    // Esto libera espacio nuevo cuando ganas más puntos
+    const remainingCapacity = Math.max(0, totalVaultCapacity - totalLocked);
 
-    // E. TOTAL FINAL A MOSTRAR
-    const maxStakeable = availablePurchasedInWallet + stakeableGameplay;
+    // 6. TOTAL FINAL DISPONIBLE PARA STAKEAR
+    // (Mínimo entre lo que tengo en la mano y el espacio que me queda en la bóveda)
+    const maxStakeable = Math.min(globalScore, remainingCapacity);
 
 
     // --- CARGA DE DATOS ---
     const fetchData = useCallback(async () => {
         if(!userId) return;
         
-        // 1. Cargar Stakes Activos
         const { data: stakeData } = await supabase
             .from('stakes') 
             .select('*')
@@ -126,34 +104,24 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         
         if (stakeData) setStakes(stakeData as StakeData[]);
 
-        // 2. Cargar Historial de Compras
-        const { data: smartData, error } = await supabase
-            .rpc('get_staking_calculations', { user_id_input: userId });
+        const { data: userData } = await supabase
+            .from('user_score')
+            .select('total_bought_points')
+            .eq('user_id', userId)
+            .single();
         
-        if (!error && smartData) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const d = smartData as any;
-            setLifetimePurchased(Number(d.lifetime_purchased));
+        if (userData) {
+            setLifetimePurchased(userData.total_bought_points || 0);
         }
-
     }, [userId]); 
 
     useEffect(() => {
         if (!userId) return;
-        
-        // Ejecución inicial segura
-        const timer = setTimeout(() => {
-            fetchData();
-        }, 0);
-
+        const timer = setTimeout(() => { fetchData(); }, 0);
         const interval = setInterval(fetchData, 10000); 
-        return () => {
-            clearTimeout(timer);
-            clearInterval(interval);
-        };
+        return () => { clearTimeout(timer); clearInterval(interval); };
     }, [userId, fetchData]);
 
-    // Calcular ganancia estimada
     const calculatedProfit = amountToStake 
         ? Math.floor(parseInt(amountToStake) * selectedOption.roi) 
         : 0;
@@ -164,14 +132,14 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         setAmountToStake(val.toString());
     };
 
-    // --- STAKE ---
     const handleStake = async () => {
         if (!userId || !amountToStake) return;
         const amount = parseInt(amountToStake);
         
         if (amount <= 0) { alert("Enter a valid amount"); return; }
+        
         if (amount > maxStakeable) { 
-            alert(`Limit Exceeded! Your max stakeable allowance is ${maxStakeable.toLocaleString()}`); 
+            alert(`Limit Exceeded! You can currently stake ${maxStakeable.toLocaleString()} pts based on your Total Net Worth.`); 
             return; 
         }
         if (amount > globalScore) { 
@@ -209,7 +177,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         setLoading(false);
     };
 
-    // --- CLAIM ---
     const handleClaimStake = async (stakeId: string) => {
         if (!window.confirm("Unlock and Claim this Vault?")) return;
         setClaimingId(stakeId);
@@ -257,8 +224,8 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'2px'}}>
                     <span style={{color:'#00F2FE'}}>Purchased (100%):</span>
-                    {/* Mostramos lo disponible en wallet ahora mismo */}
-                    <span>{availablePurchasedInWallet.toLocaleString()}</span>
+                    {/* Visualizamos la capacidad total que otorgan tus compras */}
+                    <span>{capacityFromPurchased.toLocaleString()}</span>
                 </div>
                 
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
@@ -266,13 +233,14 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                         Gameplay ({getDisplayPercent(userLevel)}):
                     </span>
                     <span>
-                        {stakeableGameplay.toLocaleString()} 
-                        <span style={{color:'#555', fontSize:'9px'}}> ({gameplayPointsInWallet.toLocaleString()} Available)</span>
+                        {/* Visualizamos la capacidad total que otorga tu juego */}
+                        {capacityFromGameplay.toLocaleString()} 
+                        <span style={{color:'#555', fontSize:'9px'}}> (Total Cap)</span>
                     </span>
                 </div>
 
                 <div style={{borderTop:'1px dashed #444', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold'}}>
-                    <span>MAX STAKEABLE:</span>
+                    <span>AVAILABLE TO STAKE:</span>
                     <span style={{color:'#FFD700'}}>{maxStakeable.toLocaleString()}</span>
                 </div>
             </div>
