@@ -2,12 +2,11 @@ import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { StakingBank } from './StakingBank';
-// IMPORTANTE: Agregamos useTonConnectUI para la lógica de pagos
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
 import { Zap, Cpu, Shield, Rocket, Lock, Play, Hexagon, Crown } from 'lucide-react';
 
-// 👇 PON AQUÍ TU WALLET REAL (Donde recibirás los TON)
-const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q'; 
+// 👇 PON AQUÍ TU WALLET REAL
+const ADMIN_WALLET_ADDRESS = 'UQCc7...TU_WALLET_REAL...'; 
 
 interface PackNodeProps {
     title: string;
@@ -18,17 +17,17 @@ interface PackNodeProps {
     isLocked?: boolean;
     onClick: () => void;
     side: 'left' | 'right';
-    disabled?: boolean; // Para bloquear botón mientras carga
+    disabled?: boolean;
 }
 
+// 👇 MODIFICACIÓN 1: Agregamos userLevel a la interfaz
 interface BulkStoreProps {
     onPurchaseSuccess?: (newScore: number) => void;
     score: number;
     setScore: (val: number) => void;
-    userLevel: number; // <--- NUEVO
+    userLevel: number; // <--- IMPORTANTE
 }
 
-// Datos de los paquetes (Precios reales en TON)
 const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
     'starter':   { ton: 0.15, pts: 100000,   label: "Initialize Protocol" },
     'pro':       { ton: 0.75, pts: 500000,   label: "Upgrade System" },
@@ -38,15 +37,15 @@ const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
     'blackhole': { ton: 100.0, pts: 70000000, label: "⚠️ GOD MODE" }
 };
 
-export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, setScore }) => {
+// 👇 MODIFICACIÓN 2: Recibimos userLevel aquí
+export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, setScore, userLevel }) => {
     const { user } = useAuth();
-    const [tonConnectUI] = useTonConnectUI(); // Hook para transacciones
-    const [loading, setLoading] = useState(false); // Para evitar doble clic
+    const [tonConnectUI] = useTonConnectUI(); 
+    const [loading, setLoading] = useState(false);
     
     // Estado para recargar el banco visualmente
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // 🔥 LA NUEVA LÓGICA DE PAGO INTEGRADA
     const buyPack = async (packKey: string) => {
         if (!user) return;
         if (loading) return;
@@ -54,18 +53,16 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         const selectedPack = PACK_DATA[packKey];
         if (!selectedPack) return;
 
-        // 1. Confirmación visual simple
         const msg = `CONFIRM TRANSACTION:\n\nProtocol: ${selectedPack.label}\nCost: ${selectedPack.ton} TON\nReward: ${selectedPack.pts.toLocaleString()} Pts`;
         if (!window.confirm(msg)) return;
 
         setLoading(true);
 
         try {
-            // 2. Preparar Transacción Blockchain
-            const amountInNano = (selectedPack.ton * 1000000000).toString(); // Convertir a Nanotons
+            const amountInNano = (selectedPack.ton * 1000000000).toString(); 
 
             const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 360, // 6 minutos validez
+                validUntil: Math.floor(Date.now() / 1000) + 360, 
                 messages: [
                     {
                         address: ADMIN_WALLET_ADDRESS,
@@ -74,18 +71,13 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 ],
             };
 
-            console.log("🔌 Initiating Neural Link (Opening Wallet)...");
-            
-            // 3. Enviar a la Wallet del usuario
+            console.log("🔌 Initiating Neural Link...");
             const result = await tonConnectUI.sendTransaction(transaction);
+            console.log("✅ Verifying with Core...", result);
 
-            console.log("✅ Transaction Hash Obtained. Verifying with Core...");
-
-            // 4. Registrar en Supabase (Backend Check)
-            // Usamos la función SQL 'register_purchase' que creamos antes
             const { data, error } = await supabase.rpc('register_purchase', {
                 p_user_id: user.id,
-                p_tx_hash: result.boc, // Usamos el BOC como prueba
+                p_tx_hash: result.boc, 
                 p_amount_ton: selectedPack.ton,
                 p_points_awarded: selectedPack.pts
             });
@@ -96,22 +88,20 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
             const response = data as any;
 
             if (response.success) {
-                // 5. ¡Éxito! Actualizar todo
                 if (onPurchaseSuccess) {
                     onPurchaseSuccess(response.new_score);
                 }
                 setScore(response.new_score);
-                setRefreshTrigger(prev => prev + 1); // Recargar Banco
+                setRefreshTrigger(prev => prev + 1); 
                 
-                alert(`✅ SYSTEM UPGRADE COMPLETE.\n\n+${selectedPack.pts.toLocaleString()} PTS added to Mainframe.`);
+                alert(`✅ SYSTEM UPGRADE COMPLETE.\n\n+${selectedPack.pts.toLocaleString()} PTS added.`);
             } else {
                 alert(`❌ ERROR: ${response.message}`);
             }
 
         } catch (err) {
             console.error("Transaction Aborted:", err);
-            // Mensaje estilo Cyberpunk si cancelan
-            alert("⚠️ CONNECTION SEVERED: Transaction cancelled by user.");
+            alert("⚠️ CONNECTION SEVERED: Transaction cancelled.");
         } finally {
             setLoading(false);
         }
@@ -174,7 +164,6 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 <PackNode 
                     title="WHALE_SERVER" points="1M" price="1.50 TON" 
                     color="#FFD700" icon={<Shield size={20}/>} side="left"
-                    // Cambié isLocked a false para que puedas probar compras, o déjalo true si prefieres ads primero
                     isLocked={false} 
                     onClick={() => buyPack('whale')} disabled={loading}
                 />
@@ -191,7 +180,6 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                     isLocked={true} onClick={() => unlockPack('EMPEROR')}
                 />
 
-                {/* BLACK HOLE */}
                 <div style={{ position: 'relative', zIndex: 2, margin: '40px 0' }}>
                     <div className="cyber-card" style={{ 
                         textAlign: 'center', padding: '30px', border: '2px solid #fff', 
@@ -219,10 +207,12 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 <div className="circuit-vault" style={{ borderRadius: '20px', padding: '4px' }}>
                     <div style={{ background: 'rgba(0,0,0,0.95)', borderRadius: '16px', overflow: 'hidden', padding:'10px' }}>
                         
+                        {/* 👇 MODIFICACIÓN 3: ¡AQUÍ PASAMOS EL NIVEL! */}
                         <StakingBank 
                             key={refreshTrigger} 
                             globalScore={score} 
-                            setGlobalScore={setScore} 
+                            setGlobalScore={setScore}
+                            userLevel={userLevel} 
                         />
                         
                     </div>
