@@ -255,7 +255,14 @@ export default function App() {
                     )}
 
                     {currentTab === 'mission' && <div style={{ animation: 'fadeIn 0.3s' }}><MissionZone /></div>}
-                    {currentTab === 'squad' && <div style={{ padding: '20px', animation: 'fadeIn 0.3s' }}><SquadZone /></div>}
+                    
+                    {/* 🔥 AQUÍ ESTÁ EL CAMBIO IMPORTANTE (Línea ~253) 🔥 */}
+                    {currentTab === 'squad' && (
+                        <div style={{ padding: '20px', animation: 'fadeIn 0.3s' }}>
+                            <SquadZone setGlobalScore={setScore} />
+                        </div>
+                    )}
+                    
                     {currentTab === 'wallet' && <div style={{ animation: 'fadeIn 0.3s' }}><WalletRoadmap /></div>}
                 </div>
                 <div style={{ flexShrink: 0 }}>
