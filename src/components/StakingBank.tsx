@@ -18,7 +18,6 @@ interface Props {
     userLevel?: number; 
 }
 
-// 🔥 DISEÑO: Configuración LIMITED con estilo especial
 const LOCK_OPTIONS = [
     { days: 1, roi: 0.02, label: '⚡ LIMITED', color: '#FFD700', isPromo: true }, 
     { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, 
@@ -42,10 +41,8 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
 
     // --- LÓGICA DE NIVELES (GAMEPLAY) ---
     const getGameplayAllowance = (earnedPts: number, level: number) => {
-        // Nivel 1-3: Tope fijo de 10k
         if (level <= 3) return Math.min(earnedPts, 10000);
         
-        // Niveles superiores: Porcentaje
         let pct = 0;
         if (level === 4) pct = 0.10;      
         else if (level === 5) pct = 0.20; 
@@ -65,30 +62,33 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         return "70%";
     };
     
-    // --- 🔥 MATEMÁTICA ESTRICTA (WALLET SNAPSHOT) 🔥 ---
+    // --- 🔥 MATEMÁTICA CORREGIDA (Lógica de Descuento de Bóveda) 🔥 ---
     
-    // 1. Purchased: Es estrictamente lo que compraste en tu vida, 
-    // pero no puede ser mayor a lo que tienes en la mano ahora.
-    // (Si lifetimePurchased en BD es 0, esto SERÁ 0).
-    const purchasedInWallet = Math.min(globalScore, lifetimePurchased);
-    
-    // 2. Gameplay: El saldo restante es estrictamente ganancia de juego.
-    // (Total - Purchased = Gameplay).
-    const gameplayInWallet = Math.max(0, globalScore - purchasedInWallet);
-    
-    // 3. Allowance: Calculamos el % solo sobre la parte de Gameplay.
-    // Si ganas más puntos jugando, 'gameplayInWallet' sube y este valor sube automáticamente.
-    const stakeableGameplay = getGameplayAllowance(gameplayInWallet, userLevel);
+    // 1. Total Dinero Bloqueado
+    const totalLocked = stakes.reduce((sum, s) => sum + s.amount, 0);
 
-    // 4. TOTAL DISPONIBLE: Suma directa.
-    const maxStakeable = purchasedInWallet + stakeableGameplay;
+    // 2. Calcular "Purchased" disponible en Billetera
+    // Lógica: (Total que compraste en tu vida) MENOS (Lo que ya tienes guardado en la bóveda).
+    // Esto nos dice cuánto "saldo comprado" te queda libre para usar.
+    const remainingLifetimePurchased = Math.max(0, lifetimePurchased - totalLocked);
+    
+    // Ahora limitamos eso por lo que realmente tienes en la mano.
+    const walletPurchased = Math.min(globalScore, remainingLifetimePurchased);
+
+    // 3. Calcular "Gameplay" (Lo que sobra)
+    // Si tienes 69k en mano, y 65k son "Purchased", entonces 4k son "Gameplay".
+    const walletGameplay = Math.max(0, globalScore - walletPurchased);
+
+    // 4. Calcular Cupo
+    const gameplayAllowance = getGameplayAllowance(walletGameplay, userLevel);
+    const maxStakeable = walletPurchased + gameplayAllowance;
 
 
     // --- CARGA DE DATOS ---
     const fetchData = useCallback(async () => {
         if(!userId) return;
         
-        // Cargar Stakes (Para visualización y límite de slots)
+        // Cargar Stakes
         const { data: stakeData } = await supabase
             .from('stakes') 
             .select('*')
@@ -98,7 +98,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         
         if (stakeData) setStakes(stakeData as StakeData[]);
 
-        // Cargar Historial Compras (CRÍTICO)
+        // Cargar Historial Compras
         const { data: userData } = await supabase
             .from('user_score')
             .select('total_bought_points')
@@ -106,7 +106,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
             .single();
         
         if (userData) {
-            // Aseguramos que sea número. Si es null, es 0.
             setLifetimePurchased(Number(userData.total_bought_points) || 0);
         }
     }, [userId]); 
@@ -135,14 +134,14 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         
         // 1. Validar Límite Financiero
         if (amount > maxStakeable) { 
-            alert(`Limit Exceeded! You can stake max ${maxStakeable.toLocaleString()} pts.`); 
+            alert(`Limit Exceeded! Based on your current points, you can stake ${maxStakeable.toLocaleString()} pts.`); 
             return; 
         }
         if (amount > globalScore) { alert("Insufficient balance."); return; }
 
         // 2. Validar Slots (3 Máximo para Gameplay)
-        // Es VIP si el monto a stakear cabe dentro de tus puntos comprados
-        const isVipStake = amount <= purchasedInWallet;
+        // Es VIP si el monto cabe dentro de tus puntos comprados disponibles
+        const isVipStake = amount <= walletPurchased;
 
         if (!isVipStake && stakes.length >= 3) {
             alert(`🔒 SLOT LIMIT REACHED (3/3)\n\nYou have 3 active vaults. You cannot stake Gameplay points until one unlocks.\n\n✨ TIP: Purchased points bypass this limit!`);
@@ -214,7 +213,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                     <span style={{color:'#00F2FE', display:'flex', alignItems:'center', gap:'4px'}}>
                         Purchased (Unlimited): <ShieldCheck size={10}/>
                     </span>
-                    <span>{purchasedInWallet.toLocaleString()}</span>
+                    <span>{walletPurchased.toLocaleString()}</span>
                 </div>
                 
                 {/* FILA GAMEPLAY */}
@@ -222,8 +221,8 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                     <span style={{color: getPctColor()}}>
                         Gameplay ({getDisplayPercent(userLevel)}):
                     </span>
-                    {/* Mostramos lo que puedes stakear HOY vs el total de juego que tienes en mano */}
-                    <span>{stakeableGameplay.toLocaleString()} <span style={{color:'#555', fontSize:'9px'}}>({gameplayInWallet.toLocaleString()} Total)</span></span>
+                    {/* Aquí saldrán tus 4k nuevos x % */}
+                    <span>{gameplayAllowance.toLocaleString()} <span style={{color:'#555', fontSize:'9px'}}>({walletGameplay.toLocaleString()} Total)</span></span>
                 </div>
 
                 <div style={{borderTop:'1px dashed #444', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold'}}>
