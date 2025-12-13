@@ -135,23 +135,37 @@ export const SquadZone: React.FC = () => {
     const [showMilestones, setShowMilestones] = useState(false);
     const [tonEarnings, setTonEarnings] = useState(0);
 
-    // 🔴 IMPORTANTE: CAMBIA ESTO POR EL NOMBRE REAL DE TU BOT (Sin @)
-    // Ejemplo: Si tu bot es t.me/GnovaBot, pon "GnovaBot"
     const BOT_USERNAME = "Gnovatoken_bot"; 
 
-    // 🔥 CORRECCIÓN 1: Eliminamos "ref_" para enviar solo el UUID limpio
-    // Esto hace que la base de datos (SQL) pueda leerlo sin errores.
     const inviteLink = user 
         ? `https://t.me/${BOT_USERNAME}?start=${user.id}` 
         : "Loading...";
 
+    // 🔥 CORRECCIÓN AQUÍ: Usamos la función RPC para contar referidos reales
     useEffect(() => {
         if(user) {
             const load = async () => {
-                const { data } = await supabase.from('user_score').select('referral_count, referral_ton_earnings').eq('user_id', user.id).single();
-                if(data) {
-                    setReferrals(data.referral_count);
-                    setTonEarnings(data.referral_ton_earnings || 0);
+                // 1. Obtener Ganancias TON (esto sí suele estar bien en tu tabla)
+                const { data: scoreData } = await supabase
+                    .from('user_score')
+                    .select('referral_ton_earnings')
+                    .eq('user_id', user.id)
+                    .single();
+                
+                if (scoreData) {
+                    setTonEarnings(scoreData.referral_ton_earnings || 0);
+                }
+
+                // 2. Obtener CONTEO REAL DE REFERIDOS usando la función segura (RPC)
+                // Esto salta la seguridad RLS y cuenta exactamente cuántas filas te tienen como 'referred_by'
+                const { data: countData, error } = await supabase
+                    .rpc('get_referral_count', { p_user_id: user.id });
+
+                if (!error) {
+                    // Si la función devuelve un número, lo usamos. Si no, 0.
+                    setReferrals(countData || 0);
+                } else {
+                    console.error("Error fetching referrals:", error);
                 }
             };
             load();
@@ -159,7 +173,7 @@ export const SquadZone: React.FC = () => {
     }, [user]);
 
     const handleCopy = () => {
-        if (!user) return; // Protección
+        if (!user) return; 
         navigator.clipboard.writeText(inviteLink);
         alert("✅ Link Copied!\n\nSend this to your friends.");
     };
