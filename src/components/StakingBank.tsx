@@ -42,7 +42,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
 
     // --- LÓGICA DE NIVELES (GAMEPLAY) ---
     const getGameplayAllowance = (earnedPts: number, level: number) => {
-        // Nivel 1-3: Tope fijo de 10k (o lo que tengas, lo que sea menor)
+        // Nivel 1-3: Tope fijo de 10k
         if (level <= 3) return Math.min(earnedPts, 10000);
         
         // Niveles superiores: Porcentaje
@@ -65,28 +65,30 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         return "70%";
     };
     
-    // --- 🔥 MATEMÁTICA RESTAURADA (WALLET SNAPSHOT) 🔥 ---
+    // --- 🔥 MATEMÁTICA ESTRICTA (WALLET SNAPSHOT) 🔥 ---
     
-    // 1. Purchased: Mínimo entre lo que tienes en la mano y lo que has comprado en tu vida.
-    // (Ej: Si compraste 1M pero en la mano tienes 300k, Purchased es 300k).
-    const effectivePurchased = Math.min(globalScore, lifetimePurchased);
+    // 1. Purchased: Es estrictamente lo que compraste en tu vida, 
+    // pero no puede ser mayor a lo que tienes en la mano ahora.
+    // (Si lifetimePurchased en BD es 0, esto SERÁ 0).
+    const purchasedInWallet = Math.min(globalScore, lifetimePurchased);
     
-    // 2. Gameplay: Todo lo que sobra es ganancia de juego.
-    // (Ej: Tienes 500k total, 300k son purchased -> 200k son gameplay).
-    const earnedPoints = Math.max(0, globalScore - effectivePurchased);
+    // 2. Gameplay: El saldo restante es estrictamente ganancia de juego.
+    // (Total - Purchased = Gameplay).
+    const gameplayInWallet = Math.max(0, globalScore - purchasedInWallet);
     
-    // 3. Allowance: Calculamos cuánto puedes stakear de esos puntos de juego según tu nivel.
-    const stakeableEarned = getGameplayAllowance(earnedPoints, userLevel);
+    // 3. Allowance: Calculamos el % solo sobre la parte de Gameplay.
+    // Si ganas más puntos jugando, 'gameplayInWallet' sube y este valor sube automáticamente.
+    const stakeableGameplay = getGameplayAllowance(gameplayInWallet, userLevel);
 
     // 4. TOTAL DISPONIBLE: Suma directa.
-    const maxStakeable = effectivePurchased + stakeableEarned;
+    const maxStakeable = purchasedInWallet + stakeableGameplay;
 
 
     // --- CARGA DE DATOS ---
     const fetchData = useCallback(async () => {
         if(!userId) return;
         
-        // Cargar Stakes (Solo para la lista visual de abajo)
+        // Cargar Stakes (Para visualización y límite de slots)
         const { data: stakeData } = await supabase
             .from('stakes') 
             .select('*')
@@ -104,6 +106,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
             .single();
         
         if (userData) {
+            // Aseguramos que sea número. Si es null, es 0.
             setLifetimePurchased(Number(userData.total_bought_points) || 0);
         }
     }, [userId]); 
@@ -130,16 +133,16 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         
         if (amount <= 0) { alert("Enter a valid amount"); return; }
         
-        // 1. Validar Límite Financiero (Esto asegura que respetamos el % de gameplay)
+        // 1. Validar Límite Financiero
         if (amount > maxStakeable) { 
-            alert(`Limit Exceeded! You can stake max ${maxStakeable.toLocaleString()} pts right now.`); 
+            alert(`Limit Exceeded! You can stake max ${maxStakeable.toLocaleString()} pts.`); 
             return; 
         }
         if (amount > globalScore) { alert("Insufficient balance."); return; }
 
         // 2. Validar Slots (3 Máximo para Gameplay)
         // Es VIP si el monto a stakear cabe dentro de tus puntos comprados
-        const isVipStake = amount <= effectivePurchased;
+        const isVipStake = amount <= purchasedInWallet;
 
         if (!isVipStake && stakes.length >= 3) {
             alert(`🔒 SLOT LIMIT REACHED (3/3)\n\nYou have 3 active vaults. You cannot stake Gameplay points until one unlocks.\n\n✨ TIP: Purchased points bypass this limit!`);
@@ -211,21 +214,20 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                     <span style={{color:'#00F2FE', display:'flex', alignItems:'center', gap:'4px'}}>
                         Purchased (Unlimited): <ShieldCheck size={10}/>
                     </span>
-                    {/* Muestra cuánto de tu saldo actual corresponde a compras */}
-                    <span>{effectivePurchased.toLocaleString()}</span>
+                    <span>{purchasedInWallet.toLocaleString()}</span>
                 </div>
                 
-                {/* FILA GAMEPLAY (Calculado sobre el saldo restante) */}
+                {/* FILA GAMEPLAY */}
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
                     <span style={{color: getPctColor()}}>
                         Gameplay ({getDisplayPercent(userLevel)}):
                     </span>
-                    {/* Muestra cuánto puedes stakear vs cuánto tienes de juego puro */}
-                    <span>{stakeableEarned.toLocaleString()} <span style={{color:'#555', fontSize:'9px'}}>({earnedPoints.toLocaleString()} Total)</span></span>
+                    {/* Mostramos lo que puedes stakear HOY vs el total de juego que tienes en mano */}
+                    <span>{stakeableGameplay.toLocaleString()} <span style={{color:'#555', fontSize:'9px'}}>({gameplayInWallet.toLocaleString()} Total)</span></span>
                 </div>
 
                 <div style={{borderTop:'1px dashed #444', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold'}}>
-                    <span>MAX STAKEABLE:</span>
+                    <span>AVAILABLE TO STAKE:</span>
                     <span style={{color:'#FFD700'}}>{maxStakeable.toLocaleString()}</span>
                 </div>
             </div>
@@ -283,7 +285,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 </div>
             )}
 
-            {/* LISTA DE ACTIVOS */}
+            {/* LISTA DE ACTIVOS CON SLOTS */}
             <h4 style={{margin:'0 0 15px 0', fontSize:'12px', color:'#aaa', textTransform:'uppercase', letterSpacing:'1px', borderTop:'1px dashed #333', paddingTop:'15px', display:'flex', justifyContent:'space-between'}}>
                 <span>Active Vaults</span>
                 <span style={{color: stakes.length >= 3 ? '#FFD700' : '#666', fontSize:'10px', display:'flex', alignItems:'center', gap:'4px'}}>
