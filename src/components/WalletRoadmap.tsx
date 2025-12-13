@@ -4,8 +4,6 @@ import { useAuth } from '../hooks/useAuth';
 import { Lock, TrendingUp, Users, DollarSign, Wallet, ShieldCheck, ArrowUpRight, BookOpen } from 'lucide-react';
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
 import { WhitepaperModal } from './WhitepaperModal';
-
-// 🔥 1. IMPORTAR TU NUEVO COMPONENTE
 import EarnTonSection from './EarnTonSection';
 
 interface InfoRowProps {
@@ -72,6 +70,7 @@ export const WalletRoadmap: React.FC = () => {
         if (data === true) {
             alert("🎉 +2,500 PTS ADDED! Knowledge is power.");
             setWpClaimed(true);
+            setWpClaimed(true);
             setShowWhitepaper(false);
         } else {
             alert("⚠️ Bonus already claimed.");
@@ -86,7 +85,7 @@ export const WalletRoadmap: React.FC = () => {
     const canWithdraw = tonEarnings > 0 && tonEarnings >= minWithdraw;
 
     return (
-        <div style={{ padding: '20px', paddingBottom: '100px' }}>
+        <div style={{ padding: '20px', paddingBottom: '120px' }}>
             
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px' }}>
                 <h2 style={{margin:0, fontSize:'24px'}}>My Wallet</h2>
@@ -95,7 +94,7 @@ export const WalletRoadmap: React.FC = () => {
                 </div>
             </div>
 
-            {/* GRID DE 2 COLUMNAS (COMPACTO) */}
+            {/* GRID DE 2 COLUMNAS (COMPACTO) - BALANCE Y VIP */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
                 
                 {/* 1. BALANCE */}
@@ -116,7 +115,7 @@ export const WalletRoadmap: React.FC = () => {
 
                     <div>
                         <div style={{fontSize:'9px', color:'#aaa', marginBottom:'4px', display:'flex', alignItems:'center', gap:'4px'}}>
-                            <Users size={10}/> {referralCount} Refs
+                            <div style={{display:'flex', alignItems:'center', gap:'4px'}}><Users size={10}/> {referralCount} Refs</div>
                         </div>
                         <button 
                             onClick={handleWithdraw}
@@ -172,19 +171,7 @@ export const WalletRoadmap: React.FC = () => {
                 </div>
             </div>
 
-            {/* 🔥 2. INTEGRACIÓN DE EARN TON SECTION
-               La insertamos aquí para que quede entre el Balance y el Whitepaper.
-               Reemplazamos el "margin-top" y "padding" del componente original
-               para que se ajuste a tu diseño inline si es necesario, pero
-               como es un componente aislado, funcionará bien.
-            */}
-            {user && (
-                <div style={{ marginBottom: '20px' }}>
-                    <EarnTonSection userId={user.id} />
-                </div>
-            )}
-
-            {/* 3. BOTÓN WHITEPAPER (Más delgado) */}
+            {/* 3. BOTÓN WHITEPAPER (ARRIBA DE HOW IT WORKS) */}
             <button onClick={() => setShowWhitepaper(true)} className="glass-card" style={{
                 width: '100%', padding: '10px 12px', marginBottom: '20px', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -204,12 +191,32 @@ export const WalletRoadmap: React.FC = () => {
                 <ArrowUpRight color="#E040FB" size={16} />
             </button>
 
+            {/* 4. HOW IT WORKS (REDISEÑADO - 2 COLUMNAS) */}
             <h3 style={{fontSize:'14px', margin:'0 0 10px 0'}}>How it works</h3>
-            <div style={{display:'flex', flexDirection:'column', gap:'8px'}}>
-                <InfoRow icon={<Users size={14} color="#4CAF50"/>} title="1. Invite Friends" desc="Share your link from the Squad Zone."/>
-                <InfoRow icon={<DollarSign size={14} color="#00F2FE"/>} title="2. They Buy Packs" desc="When they buy points with TON, you get paid."/>
-                <InfoRow icon={<TrendingUp size={14} color="#E040FB"/>} title="3. Withdrawals" desc={`Min 1 TON (Or 0 TON if Level 5+).`} />
+            <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: '1fr 1fr', // 🔥 AQUI ESTÁ EL CAMBIO A 2 COLUMNAS
+                gap: '8px', 
+                marginBottom: '25px' // Espacio antes del botón de Earn Ton
+            }}>
+                {/* Primer item ocupa 1 columna */}
+                <InfoRow icon={<Users size={14} color="#4CAF50"/>} title="1. Invite" desc="Share link"/>
+                
+                {/* Segundo item ocupa 1 columna */}
+                <InfoRow icon={<DollarSign size={14} color="#00F2FE"/>} title="2. They Buy" desc="Get paid in TON"/>
+                
+                {/* Tercer item ocupa 2 columnas (ancho completo) para que se vea bien */}
+                <div style={{ gridColumn: 'span 2' }}>
+                     <InfoRow icon={<TrendingUp size={14} color="#E040FB"/>} title="3. Withdraw" desc={`Min 1 TON (Or 0 TON if Level 5+)`}/>
+                </div>
             </div>
+
+            {/* 5. EARN TON SECTION (MOVIDO AL FINAL) */}
+            {user && (
+                <div style={{ marginTop: 'auto' }}>
+                    <EarnTonSection userId={user.id} />
+                </div>
+            )}
 
             {/* MODAL DE WHITEPAPER */}
             {showWhitepaper && (
@@ -226,11 +233,21 @@ export const WalletRoadmap: React.FC = () => {
 };
 
 const InfoRow: React.FC<InfoRowProps> = ({ icon, title, desc }) => (
-    <div className="glass-card" style={{ padding:'10px', display:'flex', alignItems:'center', gap:'12px', margin:0 }}>
-        <div style={{background:'rgba(255,255,255,0.05)', padding:'6px', borderRadius:'6px'}}>{icon}</div>
-        <div>
-            <div style={{fontWeight:'bold', fontSize:'11px', color:'#fff'}}>{title}</div>
-            <div style={{fontSize:'10px', color:'#aaa'}}>{desc}</div>
+    <div className="glass-card" style={{ 
+        padding:'10px', 
+        display:'flex', 
+        alignItems:'center', 
+        gap:'10px', 
+        margin:0,
+        height: '100%', // Para que las celdas tengan la misma altura
+        boxSizing: 'border-box'
+    }}>
+        <div style={{background:'rgba(255,255,255,0.05)', padding:'6px', borderRadius:'6px', flexShrink: 0}}>
+            {icon}
+        </div>
+        <div style={{overflow: 'hidden'}}>
+            <div style={{fontWeight:'bold', fontSize:'11px', color:'#fff', whiteSpace: 'nowrap'}}>{title}</div>
+            <div style={{fontSize:'10px', color:'#aaa', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden'}}>{desc}</div>
         </div>
     </div>
 );
