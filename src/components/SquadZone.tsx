@@ -19,6 +19,12 @@ interface MilestoneRowProps {
     isBig?: boolean;
 }
 
+// Interfaz para los datos que vienen de la base de datos
+interface UserScoreData {
+    referral_count: number;
+    referral_ton_earnings: number;
+}
+
 // --- 1. EL SOL (RAID CORE) ---
 const SunRaid = () => {
     const [hp, setHp] = useState(50000000);
@@ -141,35 +147,51 @@ export const SquadZone: React.FC = () => {
         ? `https://t.me/${BOT_USERNAME}?start=${user.id}` 
         : "Loading...";
 
-    // 🔥 CORRECCIÓN AQUÍ: Usamos la función RPC para contar referidos reales
+    // 🔥 LÓGICA DE CARGA DE REFERIDOS
     useEffect(() => {
-        if(user) {
-            const load = async () => {
-                // 1. Obtener Ganancias TON (esto sí suele estar bien en tu tabla)
+        if (!user) return;
+
+        const loadData = async () => {
+            try {
+                // 1. Cargar ganancias TON (Dato estático)
                 const { data: scoreData } = await supabase
                     .from('user_score')
-                    .select('referral_ton_earnings')
+                    .select('referral_ton_earnings, referral_count')
                     .eq('user_id', user.id)
                     .single();
                 
-                if (scoreData) {
-                    setTonEarnings(scoreData.referral_ton_earnings || 0);
+                // Hacemos cast seguro a la interfaz definida arriba
+                const userData = scoreData as unknown as UserScoreData;
+
+                if (userData) {
+                    setTonEarnings(userData.referral_ton_earnings || 0);
                 }
 
-                // 2. Obtener CONTEO REAL DE REFERIDOS usando la función segura (RPC)
-                // Esto salta la seguridad RLS y cuenta exactamente cuántas filas te tienen como 'referred_by'
-                const { data: countData, error } = await supabase
-                    .rpc('get_referral_count', { p_user_id: user.id });
+                // 2. Cargar Conteo Real de Referidos (Función Segura RPC)
+                const { data: count, error: rpcError } = await supabase
+                    .rpc('get_my_referrals', { ref_id: user.id });
 
-                if (!error) {
-                    // Si la función devuelve un número, lo usamos. Si no, 0.
-                    setReferrals(countData || 0);
+                if (!rpcError && typeof count === 'number') {
+                    // Si RPC funciona, usamos el dato real
+                    setReferrals(count);
                 } else {
-                    console.error("Error fetching referrals:", error);
+                    // Fallback: Usar el dato estático si el RPC falla
+                    console.warn("RPC Error (usando fallback):", rpcError);
+                    if (userData) {
+                        setReferrals(userData.referral_count || 0);
+                    }
                 }
-            };
-            load();
-        }
+
+            } catch (e) {
+                console.error("Error crítico cargando squad:", e);
+            }
+        };
+
+        loadData();
+        
+        const interval = setInterval(loadData, 10000);
+        return () => clearInterval(interval);
+
     }, [user]);
 
     const handleCopy = () => {
