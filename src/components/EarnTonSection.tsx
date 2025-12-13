@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-
-// CORREGIDO 1: Verifica si tu archivo supabaseClient está en la misma carpeta o una atrás.
-// Si está en la misma carpeta usa './', si está atrás usa '../'
+// Asegúrate que la ruta sea correcta según tu estructura de carpetas
 import { supabase } from '../services/supabase';
 
 interface EarnTonSectionProps {
@@ -47,7 +45,6 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
 
   const TARGET = 20;
 
-  // CORREGIDO 3: Movimos 'fetchTicketStats' DENTRO del useEffect para eliminar el error de dependencias
   useEffect(() => {
     const fetchTicketStats = async () => {
       try {
@@ -80,9 +77,10 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
     if (showModal && userId) {
       fetchTicketStats();
     }
-  }, [showModal, userId]); // Ahora el array de dependencias está limpio y correcto
+  }, [showModal, userId]);
 
   const totalTickets = Object.values(stats).reduce((a, b) => a + b, 0);
+  // Calculamos porcentaje para la barra visual (max 100%)
   const progressPercent = Math.min((totalTickets / TARGET) * 100, 100);
 
   const handleWithdrawRequest = async () => {
@@ -100,190 +98,224 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
       if (error) throw error;
       setWithdrawStep(3);
     } catch (error) {
-      // CORREGIDO 2: Manejo seguro del tipo 'error' sin usar 'any' explícito
       const message = error instanceof Error ? error.message : "Unknown error";
       alert("Error sending request: " + message);
     }
   };
 
   return (
-    <div className="w-full mt-6 mb-20 px-4">
-      {/* --- ENTRY BUTTON --- */}
+    <div className="w-full mt-6 mb-24 px-4">
+      {/* --- ENTRY BUTTON (Diseño Mejorado) --- */}
       <div 
         onClick={() => setShowModal(true)}
-        className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-4 shadow-lg cursor-pointer transform transition hover:scale-105 border border-blue-400"
+        className="relative overflow-hidden bg-gradient-to-br from-[#0088cc] to-[#005577] rounded-2xl p-5 shadow-[0_4px_20px_rgba(0,136,204,0.3)] cursor-pointer transform transition active:scale-95 border border-blue-400/30"
       >
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-white font-bold text-lg flex items-center gap-2">
-            💎 EARN 1 TON
+        {/* Decorative background circle */}
+        <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+
+        <div className="flex justify-between items-center mb-3 relative z-10">
+          <h3 className="text-white font-extrabold text-xl flex items-center gap-2 drop-shadow-md">
+            💎 1 FREE TON
           </h3>
-          <span className="bg-black/30 text-white text-xs px-2 py-1 rounded-lg">
+          <span className="bg-black/40 backdrop-blur-md text-white font-mono text-xs px-3 py-1.5 rounded-lg border border-white/10">
             {totalTickets}/{TARGET}
           </span>
         </div>
-        <div className="w-full bg-black/40 rounded-full h-2.5">
+
+        {/* Barra de progreso mini en el botón */}
+        <div className="w-full bg-black/30 rounded-full h-3 relative z-10 backdrop-blur-sm overflow-hidden border border-white/5">
           <div 
-            className="bg-blue-300 h-2.5 rounded-full transition-all duration-500" 
+            className="bg-gradient-to-r from-blue-200 to-white h-full rounded-full transition-all duration-700 ease-out shadow-[0_0_10px_rgba(255,255,255,0.5)]" 
             style={{ width: `${progressPercent}%` }}
           ></div>
         </div>
-        <p className="text-blue-100 text-xs mt-2 text-center">
-          Tap to view details & withdraw
+        
+        <p className="text-blue-100/80 text-xs mt-3 text-center font-medium relative z-10">
+          Tap to view missions & claim reward ✨
         </p>
       </div>
 
-      {/* --- MODAL --- */}
+      {/* --- MODAL (Diseño Nuevo) --- */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#1a1f2e] border border-gray-700 w-full max-w-md rounded-2xl p-6 relative shadow-2xl overflow-y-auto max-h-[90vh]">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-fadeIn">
+          <div className="w-full max-w-sm bg-[#151517] rounded-[32px] border border-[#333] shadow-2xl relative overflow-hidden flex flex-col max-h-[85vh]">
             
-            <button 
-              onClick={() => { setShowModal(false); setWithdrawStep(1); }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
-            >
-              ✕
-            </button>
+            {/* Header del Modal */}
+            <div className="px-6 pt-6 pb-4 bg-[#151517] z-10">
+                <button 
+                  onClick={() => { setShowModal(false); setWithdrawStep(1); }}
+                  className="absolute top-5 right-5 w-8 h-8 flex items-center justify-center rounded-full bg-[#2c2c2e] text-gray-400 hover:text-white transition"
+                >
+                  ✕
+                </button>
 
-            {/* STEP 1: DASHBOARD */}
-            {withdrawStep === 1 && (
-              <>
-                <h2 className="text-xl font-bold text-white text-center mb-1">MISSION: 1 FREE TON 💎</h2>
-                <p className="text-gray-400 text-xs text-center mb-6">Collect 20 Tickets to claim your reward</p>
-
-                {loading ? (
-                  <div className="text-white text-center py-8">Loading data...</div>
-                ) : (
-                  <div className="space-y-1">
-                    <div className="grid grid-cols-12 text-xs text-gray-500 font-bold uppercase tracking-wider mb-2 border-b border-gray-700 pb-2">
-                      <div className="col-span-6">Source</div>
-                      <div className="col-span-3 text-center">Progress</div>
-                      <div className="col-span-3 text-right">Limit</div>
+                <h2 className="text-2xl font-black text-white text-center tracking-tight">
+                    MISSION <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">TON</span> 💎
+                </h2>
+                
+                {/* Barra de Progreso Grande */}
+                <div className="mt-5 mb-1">
+                    <div className="flex justify-between text-xs font-bold text-gray-400 mb-2">
+                        <span>Progress</span>
+                        <span className={totalTickets >= TARGET ? "text-green-400" : "text-blue-400"}>
+                            {Math.floor(progressPercent)}%
+                        </span>
                     </div>
-
-                    <TicketRow 
-                      label="🛒 Bulk Store" 
-                      condition="1 Ticket / 500k pts spent"
-                      count={stats.bulk} 
-                      limit={LIMITS.bulk} 
-                    />
-                    <TicketRow 
-                      label="📺 Watch Ads" 
-                      condition="1 Ticket / 20 videos watched"
-                      count={stats.ads} 
-                      limit={LIMITS.ads} 
-                    />
-                    <TicketRow 
-                      label="🏦 Staking" 
-                      condition="1 Ticket / 1M pts staked"
-                      count={stats.staking} 
-                      limit={LIMITS.staking} 
-                    />
-                    <TicketRow 
-                      label="🆙 Level Up" 
-                      condition="1 Ticket per Level gained"
-                      count={stats.level} 
-                      limit={LIMITS.level} 
-                    />
-                    <TicketRow 
-                      label="📢 Social Task" 
-                      condition="Create post & verify (72h)"
-                      count={stats.social} 
-                      limit={LIMITS.social} 
-                    />
-                    <TicketRow 
-                      label="👥 Referrals" 
-                      condition="1 Ticket / 5 Refs (Lvl 3)"
-                      count={stats.referral} 
-                      limit={null} 
-                      isUnlimited 
-                    />
-
-                    <div className="mt-6 bg-blue-900/20 p-4 rounded-xl border border-blue-500/30 flex justify-between items-center">
-                      <span className="text-blue-200 font-bold">TOTAL COLLECTED:</span>
-                      <span className="text-2xl font-bold text-white">
-                        {totalTickets} <span className="text-gray-500 text-sm">/ {TARGET}</span>
-                      </span>
+                    <div className="h-4 w-full bg-[#2c2c2e] rounded-full overflow-hidden border border-white/5 relative">
+                        {/* Efecto de brillo de fondo */}
+                        <div className="absolute top-0 bottom-0 left-0 w-full opacity-20 bg-[url('https://www.transparenttextures.com/patterns/diagonal-stripes.png')]"></div>
+                        <div 
+                            className="h-full bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-400 transition-all duration-700 ease-out relative"
+                            style={{ width: `${progressPercent}%` }}
+                        >
+                             <div className="absolute right-0 top-0 bottom-0 w-1 bg-white/50 blur-[2px]"></div>
+                        </div>
                     </div>
+                    <div className="text-center mt-2 text-xs text-gray-500 font-mono">
+                        {totalTickets} / {TARGET} Tickets Collected
+                    </div>
+                </div>
+            </div>
 
-                    <button
-                      onClick={() => totalTickets >= TARGET ? setWithdrawStep(2) : null}
-                      disabled={totalTickets < TARGET}
-                      className={`w-full py-3 rounded-xl font-bold text-lg mt-4 transition-all ${
-                        totalTickets >= TARGET 
-                          ? 'bg-green-500 hover:bg-green-600 text-white shadow-[0_0_15px_rgba(34,197,94,0.5)]' 
-                          : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                      }`}
-                    >
-                      {totalTickets >= TARGET ? "REQUEST WITHDRAW 💸" : "LOCKED 🔒"}
-                    </button>
-                    {totalTickets < TARGET && (
-                      <p className="text-xs text-center text-gray-500 mt-2">
-                        You need {TARGET - totalTickets} more tickets to unlock.
-                      </p>
+            {/* Cuerpo Scrollable */}
+            <div className="overflow-y-auto px-5 pb-6 custom-scrollbar">
+                
+                {/* STEP 1: DASHBOARD */}
+                {withdrawStep === 1 && (
+                  <>
+                    {loading ? (
+                      <div className="flex flex-col items-center justify-center py-10 space-y-3">
+                         <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                         <p className="text-gray-500 text-sm">Syncing blockchain...</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3 mt-2">
+                        
+                        <TicketRow 
+                          label="Bulk Store" 
+                          condition="Spend 500k pts"
+                          count={stats.bulk} 
+                          limit={LIMITS.bulk} 
+                        />
+                        <TicketRow 
+                          label="Watch Ads" 
+                          condition="20 videos watched"
+                          count={stats.ads} 
+                          limit={LIMITS.ads} 
+                        />
+                        <TicketRow 
+                          label="Staking" 
+                          condition="Stake 1M pts"
+                          count={stats.staking} 
+                          limit={LIMITS.staking} 
+                        />
+                        <TicketRow 
+                          label="Level Up" 
+                          condition="1 Ticket per Level"
+                          count={stats.level} 
+                          limit={LIMITS.level} 
+                        />
+                        <TicketRow 
+                          label="Social Task" 
+                          condition="Post & Verify"
+                          count={stats.social} 
+                          limit={LIMITS.social} 
+                        />
+                        <TicketRow 
+                          label="Referrals" 
+                          condition="5 Refs (Lvl 3)"
+                          count={stats.referral} 
+                          limit={null} 
+                          isUnlimited 
+                        />
+
+                        {/* Botón de Acción Principal */}
+                        <div className="mt-4 pt-4 border-t border-white/5">
+                            <button
+                              onClick={() => totalTickets >= TARGET ? setWithdrawStep(2) : null}
+                              disabled={totalTickets < TARGET}
+                              className={`w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+                                totalTickets >= TARGET 
+                                  ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-[0_0_20px_rgba(34,197,94,0.4)] hover:scale-[1.02]' 
+                                  : 'bg-[#2c2c2e] text-gray-500 cursor-not-allowed border border-white/5'
+                              }`}
+                            >
+                              {totalTickets >= TARGET ? (
+                                <><span>CLAIM 1 TON</span> 💸</>
+                              ) : (
+                                <><span>LOCKED</span> 🔒</>
+                              )}
+                            </button>
+                            
+                            {totalTickets < TARGET && (
+                              <p className="text-[10px] text-center text-gray-600 mt-3 font-medium uppercase tracking-wide">
+                                Need {TARGET - totalTickets} more tickets
+                              </p>
+                            )}
+                        </div>
+                      </div>
                     )}
+                  </>
+                )}
+
+                {/* STEP 2: WITHDRAW INPUT */}
+                {withdrawStep === 2 && (
+                  <div className="animate-fadeIn">
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-2xl mb-6">
+                      <h4 className="text-yellow-200 font-bold text-sm mb-1">⚠️ Verification Required</h4>
+                      <p className="text-yellow-200/70 text-xs leading-relaxed">
+                        Withdrawals are manually reviewed for fair play. Processing takes <strong>24-48 hours</strong>.
+                      </p>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-gray-400 text-xs font-bold ml-1 uppercase tracking-wide">Your TON Wallet Address</label>
+                        <input 
+                          type="text" 
+                          placeholder="UQBj..." 
+                          className="w-full bg-[#000] border border-[#333] rounded-xl p-4 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none font-mono text-sm shadow-inner mt-2 transition-all"
+                          value={walletAddress}
+                          onChange={(e) => setWalletAddress(e.target.value)}
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleWithdrawRequest}
+                        className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-white py-4 rounded-xl font-bold shadow-[0_0_20px_rgba(37,99,235,0.4)] hover:scale-[1.02] transition-transform"
+                      >
+                        SUBMIT REQUEST 🚀
+                      </button>
+                      
+                      <button
+                        onClick={() => setWithdrawStep(1)}
+                        className="w-full text-gray-500 py-3 text-sm font-medium hover:text-gray-300 transition"
+                      >
+                        Cancel & Go Back
+                      </button>
+                    </div>
                   </div>
                 )}
-              </>
-            )}
 
-            {/* STEP 2: WITHDRAW INPUT */}
-            {withdrawStep === 2 && (
-              <>
-                <h2 className="text-xl font-bold text-white text-center mb-6">💰 Claim Reward</h2>
-                <div className="space-y-4">
-                  <p className="text-gray-300 text-sm text-center">
-                    Congratulations! You've reached the goal. Please enter your TON Wallet address below.
-                  </p>
-                  
-                  <div className="bg-yellow-900/20 border border-yellow-600/30 p-3 rounded-lg">
-                    <p className="text-yellow-200 text-xs flex gap-2">
-                      ⚠️ <strong>Important:</strong> Withdrawals are manually reviewed to ensure fair play. Processing time: <strong>24-48 hours</strong>.
+                {/* STEP 3: SUCCESS */}
+                {withdrawStep === 3 && (
+                  <div className="text-center py-10 animate-fadeIn flex flex-col items-center">
+                    <div className="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(34,197,94,0.3)]">
+                        <span className="text-5xl">🎉</span>
+                    </div>
+                    <h2 className="text-3xl font-black text-white mb-3">Request Sent!</h2>
+                    <p className="text-gray-400 text-sm mb-8 px-4 leading-relaxed">
+                      We've received your request. The team will verify your activity and send <strong>1 TON</strong> to your wallet soon.
                     </p>
+                    <button
+                      onClick={() => setShowModal(false)}
+                      className="w-full bg-[#2c2c2e] border border-white/10 text-white py-4 rounded-xl font-bold hover:bg-[#3a3a3d] transition"
+                    >
+                      CLOSE
+                    </button>
                   </div>
-
-                  <div>
-                    <label className="text-gray-400 text-xs ml-1">Your TON Wallet Address</label>
-                    <input 
-                      type="text" 
-                      placeholder="UQBj..." 
-                      className="w-full bg-black/50 border border-gray-600 rounded-lg p-3 text-white focus:border-blue-500 outline-none font-mono text-sm"
-                      value={walletAddress}
-                      onChange={(e) => setWalletAddress(e.target.value)}
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleWithdrawRequest}
-                    className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-xl font-bold mt-2"
-                  >
-                    SUBMIT REQUEST
-                  </button>
-                  <button
-                    onClick={() => setWithdrawStep(1)}
-                    className="w-full text-gray-400 py-2 text-sm"
-                  >
-                    Go Back
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* STEP 3: SUCCESS */}
-            {withdrawStep === 3 && (
-              <div className="text-center py-6">
-                <div className="text-5xl mb-4">🎉</div>
-                <h2 className="text-2xl font-bold text-white mb-2">Request Sent!</h2>
-                <p className="text-gray-400 text-sm mb-6">
-                  We have received your request. The team will verify your activity and send 1 TON to your wallet within 48 hours.
-                </p>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold"
-                >
-                  AWESOME!
-                </button>
-              </div>
-            )}
+                )}
+            </div>
           </div>
         </div>
       )}
@@ -291,28 +323,48 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
   );
 };
 
+// --- COMPONENTE TICKET ROW REDISEÑADO (Estilo Card) ---
 const TicketRow: React.FC<TicketRowProps> = ({ label, condition, count, limit, isUnlimited }) => {
   const isMaxed = !isUnlimited && limit !== null && count >= limit;
+  const progress = isUnlimited ? 100 : limit ? Math.min((count / limit) * 100, 100) : 0;
   
   return (
-    <div className="grid grid-cols-12 items-center border-b border-gray-800 py-3 last:border-0 hover:bg-white/5 transition px-1 rounded">
-      <div className="col-span-6 flex flex-col justify-center">
-        <span className="text-sm text-gray-200 font-medium">{label}</span>
-        <span className="text-[10px] text-gray-500 italic leading-tight mt-0.5">{condition}</span>
-      </div>
+    <div className={`relative overflow-hidden rounded-2xl p-4 border transition-all duration-200 group ${
+        isMaxed 
+        ? 'bg-[#1a1a1c] border-green-500/20 opacity-80' // Estilo completado
+        : 'bg-[#1e1e22] border-white/5 hover:border-blue-500/30 hover:bg-[#25252a]' // Estilo normal
+    }`}>
+      
+      {/* Barra de progreso de fondo sutil */}
+      {!isUnlimited && !isMaxed && (
+          <div className="absolute bottom-0 left-0 h-1 bg-blue-500/20 z-0" style={{ width: `${progress}%` }}></div>
+      )}
 
-      <div className={`col-span-3 text-center text-sm font-bold ${count > 0 ? 'text-blue-400' : 'text-gray-600'}`}>
-        💎 {count}
-      </div>
+      <div className="flex justify-between items-center relative z-10">
+        {/* Info Izquierda */}
+        <div className="flex flex-col">
+           <div className="flex items-center gap-2">
+                <span className={`text-sm font-bold ${isMaxed ? 'text-green-400' : 'text-gray-200'}`}>
+                    {label}
+                </span>
+                {isMaxed && <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 rounded font-bold">DONE</span>}
+                {isUnlimited && <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 rounded font-bold">∞</span>}
+           </div>
+           <span className="text-[11px] text-gray-500 mt-0.5">{condition}</span>
+        </div>
 
-      <div className="col-span-3 text-right text-xs flex items-center justify-end">
-        {isUnlimited ? (
-          <span className="text-green-400 font-bold bg-green-400/10 px-2 py-0.5 rounded text-[10px]">UNLIMITED</span>
-        ) : (
-          <span className={isMaxed ? "text-red-400 font-bold" : "text-gray-500"}>
-            Max {limit}
-          </span>
-        )}
+        {/* Status Derecha */}
+        <div className="text-right">
+            <div className="flex items-center justify-end gap-1.5">
+                <span className={`text-base font-bold ${count > 0 ? 'text-white' : 'text-gray-600'}`}>
+                    {count}
+                </span>
+                <span className="text-xs text-gray-500 font-medium">
+                    / {isUnlimited ? '∞' : limit}
+                </span>
+            </div>
+            <div className="text-[10px] text-blue-400 font-bold mt-0.5">TICKETS</div>
+        </div>
       </div>
     </div>
   );
