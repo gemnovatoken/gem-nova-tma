@@ -5,7 +5,7 @@ import { StakingBank } from './StakingBank';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
 import { Zap, Cpu, Shield, Rocket, Lock, Play, Hexagon, Crown } from 'lucide-react';
 
-// 👇 PON AQUÍ TU WALLET REAL
+// 👇 ASEGÚRATE DE QUE ESTA SEA TU WALLET REAL
 const ADMIN_WALLET_ADDRESS = 'UQCc7...TU_WALLET_REAL...'; 
 
 interface PackNodeProps {
@@ -20,12 +20,12 @@ interface PackNodeProps {
     disabled?: boolean;
 }
 
-// 👇 MODIFICACIÓN 1: Agregamos userLevel a la interfaz
+// Interfaz actualizada para recibir el nivel desde App.tsx
 interface BulkStoreProps {
     onPurchaseSuccess?: (newScore: number) => void;
     score: number;
     setScore: (val: number) => void;
-    userLevel: number; // <--- IMPORTANTE
+    userLevel: number; // 🔥 Dato crítico para el Staking
 }
 
 const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
@@ -37,13 +37,12 @@ const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
     'blackhole': { ton: 100.0, pts: 70000000, label: "⚠️ GOD MODE" }
 };
 
-// 👇 MODIFICACIÓN 2: Recibimos userLevel aquí
 export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, setScore, userLevel }) => {
     const { user } = useAuth();
     const [tonConnectUI] = useTonConnectUI(); 
     const [loading, setLoading] = useState(false);
     
-    // Estado para recargar el banco visualmente
+    // Estado para recargar el banco visualmente si hay cambios
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const buyPack = async (packKey: string) => {
@@ -207,7 +206,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 <div className="circuit-vault" style={{ borderRadius: '20px', padding: '4px' }}>
                     <div style={{ background: 'rgba(0,0,0,0.95)', borderRadius: '16px', overflow: 'hidden', padding:'10px' }}>
                         
-                        {/* 👇 MODIFICACIÓN 3: ¡AQUÍ PASAMOS EL NIVEL! */}
+                        {/* 🔥 PASO CLAVE: Aquí enviamos el Nivel al Banco */}
                         <StakingBank 
                             key={refreshTrigger} 
                             globalScore={score} 
