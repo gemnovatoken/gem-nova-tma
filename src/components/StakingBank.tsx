@@ -39,7 +39,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
     const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[0]); 
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // --- LÓGICA DE NIVELES (GAMEPLAY) ---
+    // LÓGICA DE NIVELES
     const getGameplayAllowance = (earnedPts: number, level: number) => {
         if (level <= 3) return Math.min(earnedPts, 10000);
         
@@ -62,20 +62,36 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         return "70%";
     };
     
-    // --- 🔥 MATEMÁTICA DE BILLETERA (WALLET SNAPSHOT) 🔥 ---
+    // 🔥 CÁLCULOS DE CAPACIDAD DINÁMICA (NET WORTH) 🔥
+    // Esto arregla que te salga 0 cuando ganas nuevos puntos.
     
-    // 1. Puntos Comprados DISPONIBLES EN MANO (VIP)
-    // Se calculan sobre lo que tienes HOY, no sobre históricos.
-    const purchasedInWallet = Math.min(globalScore, lifetimePurchased);
-    
-    // 2. Puntos Gameplay DISPONIBLES EN MANO
-    const gameplayInWalletRaw = Math.max(0, globalScore - purchasedInWallet);
-    
-    // 3. Aplicar % de Nivel al Gameplay
-    const gameplayStakeable = getGameplayAllowance(gameplayInWalletRaw, userLevel);
+    // 1. Dinero ya guardado
+    const totalLocked = stakes.reduce((sum, s) => sum + s.amount, 0);
 
-    // 4. TOTAL DISPONIBLE HOY
-    const maxStakeable = purchasedInWallet + gameplayStakeable;
+    // 2. Riqueza Total (Mano + Bóveda)
+    const netWorth = globalScore + totalLocked;
+
+    // 3. Dividir Riqueza
+    const assetsAsPurchased = Math.min(netWorth, lifetimePurchased);
+    const assetsAsGameplay = Math.max(0, netWorth - assetsAsPurchased);
+
+    // 4. Calcular CUPO TOTAL (Techo máximo permitido)
+    const capacityFromPurchased = assetsAsPurchased; // 100%
+    const capacityFromGameplay = getGameplayAllowance(assetsAsGameplay, userLevel);
+    
+    const totalVaultCapacity = capacityFromPurchased + capacityFromGameplay;
+
+    // 5. Espacio Libre (Cupo Total - Ocupado)
+    const remainingCapacity = Math.max(0, totalVaultCapacity - totalLocked);
+
+    // 6. DISPONIBLE REAL (Mínimo entre lo que tengo en mano y el espacio libre)
+    const maxStakeable = Math.min(globalScore, remainingCapacity);
+
+    // 7. Visualización para la UI (Qué parte es Purchased vs Gameplay)
+    // Esto es solo visual para las barras de progreso
+    const purchasedInWallet = Math.min(globalScore, Math.max(0, lifetimePurchased - Math.min(totalLocked, lifetimePurchased)));
+    // El resto es gameplay stakeable
+    const gameplayStakeable = Math.max(0, maxStakeable - purchasedInWallet); 
 
 
     // --- CARGA DE DATOS ---
@@ -117,28 +133,26 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         setAmountToStake(Math.floor(maxStakeable * pct).toString());
     };
 
-    // --- FUNCIÓN STAKE INTELIGENTE (CON LÓGICA DE SLOTS) ---
+    // --- FUNCIÓN STAKE (CON LÓGICA DE SLOTS) ---
     const handleStake = async () => {
         if (!userId || !amountToStake) return;
         const amount = parseInt(amountToStake);
         
         if (amount <= 0) { alert("Enter a valid amount"); return; }
         
-        // 1. Validar Límite Financiero (Cupo)
+        // 1. Validar Cupo Financiero
         if (amount > maxStakeable) { 
-            alert(`Limit Exceeded! You can stake max ${maxStakeable.toLocaleString()} pts right now.`); 
+            alert(`Limit Exceeded! Based on your Net Worth, you can stake ${maxStakeable.toLocaleString()} pts.`); 
             return; 
         }
         if (amount > globalScore) { alert("Insufficient balance."); return; }
 
-        // --- 🔥 LÓGICA DE SLOTS (3 MÁXIMO) 🔥 ---
-        
-        // Es VIP si el monto cabe dentro de tus puntos comprados disponibles
+        // 2. Validar Slots (3 Máximo para Gameplay)
+        // Es VIP si el monto a stakear es menor o igual a lo que tengo disponible como "Comprado"
         const isVipStake = amount <= purchasedInWallet;
 
-        // Si NO es VIP (es gameplay) y ya tienes 3 o más bóvedas... BLOQUEAR.
         if (!isVipStake && stakes.length >= 3) {
-            alert(`🔒 SLOT LIMIT REACHED (3/3)\n\nYou have 3 active vaults. You cannot stake Gameplay points until one unlocks.\n\n✨ TIP: Purchased points bypass this limit!`);
+            alert(`🔒 SLOT LIMIT REACHED (3/3)\n\nYou have 3 active vaults. You cannot stake Gameplay points until one unlocks.\n\n✨ TIP: Purchased points have Unlimited Slots!`);
             return;
         }
 
@@ -191,7 +205,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 <Lock size={20} color="#FFD700"/> Vault Staking
             </h3>
             
-            {/* PANEL DE INFORMACIÓN */}
             <div style={{background:'rgba(0,0,0,0.3)', padding:'12px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #333'}}>
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#aaa', marginBottom:'8px'}}>
                     <span>Total Balance:</span>
@@ -202,15 +215,14 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                     <Info size={10}/> ALLOWANCE (Lvl {userLevel}):
                 </div>
                 
-                {/* FILA PURCHASED (VIP - Sin Límite de Slots) */}
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'2px'}}>
                     <span style={{color:'#00F2FE', display:'flex', alignItems:'center', gap:'4px'}}>
                         Purchased (Unlimited): <ShieldCheck size={10}/>
                     </span>
+                    {/* Mostramos lo disponible para stakear ahora */}
                     <span>{purchasedInWallet.toLocaleString()}</span>
                 </div>
                 
-                {/* FILA GAMEPLAY (Límite 3 Slots) */}
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
                     <span style={{color: getPctColor()}}>
                         Gameplay ({getDisplayPercent(userLevel)}):
@@ -219,12 +231,11 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 </div>
 
                 <div style={{borderTop:'1px dashed #444', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold'}}>
-                    <span>STAKEABLE NOW:</span>
+                    <span>AVAILABLE TO STAKE:</span>
                     <span style={{color:'#FFD700'}}>{maxStakeable.toLocaleString()}</span>
                 </div>
             </div>
 
-            {/* BOTONES DE SELECCIÓN CON ESTILO PROMO */}
             <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'4px', marginBottom:'15px'}}>
                 {LOCK_OPTIONS.map((opt) => {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -247,7 +258,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 })}
             </div>
 
-            {/* INPUT Y BOTÓN */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                 <div style={{position:'relative', width:'100%'}}>
                     <input type="number" placeholder="Amount" value={amountToStake}
@@ -269,7 +279,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 ))}
             </div>
 
-            {/* PREVIEW GANANCIA */}
             {parseInt(amountToStake) > 0 && (
                 <div style={{marginBottom:'25px', padding:'10px', background:'rgba(76, 175, 80, 0.1)', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid #4CAF50'}}>
                     <div style={{fontSize:'12px', color:'#aaa'}}>Profit in {selectedOption.days} days:</div>
@@ -277,7 +286,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 </div>
             )}
 
-            {/* LISTA DE ACTIVOS CON CONTADOR DE SLOTS */}
             <h4 style={{margin:'0 0 15px 0', fontSize:'12px', color:'#aaa', textTransform:'uppercase', letterSpacing:'1px', borderTop:'1px dashed #333', paddingTop:'15px', display:'flex', justifyContent:'space-between'}}>
                 <span>Active Vaults</span>
                 <span style={{color: stakes.length >= 3 ? '#FFD700' : '#666', fontSize:'10px', display:'flex', alignItems:'center', gap:'4px'}}>
@@ -319,7 +327,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 </div>
             )}
 
-            {/* MODAL ÉXITO */}
             {showSuccess && (
                 <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}}>
                     <div className="glass-card" style={{width: '100%', maxWidth: '300px', textAlign: 'center', border: '1px solid #4CAF50', boxShadow: '0 0 30px rgba(76, 175, 80, 0.2)'}}>
