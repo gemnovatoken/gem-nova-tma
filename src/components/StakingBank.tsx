@@ -18,7 +18,7 @@ interface Props {
     userLevel?: number; 
 }
 
-// Configuración Visual del Botón "LIMITED"
+// 🔥 DISEÑO: Configuración LIMITED con estilo especial
 const LOCK_OPTIONS = [
     { days: 1, roi: 0.02, label: '⚡ LIMITED', color: '#FFD700', isPromo: true }, 
     { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, 
@@ -42,8 +42,10 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
 
     // --- LÓGICA DE NIVELES (GAMEPLAY) ---
     const getGameplayAllowance = (earnedPts: number, level: number) => {
+        // Nivel 1-3: Tope fijo de 10k
         if (level <= 3) return Math.min(earnedPts, 10000);
         
+        // Niveles superiores: Porcentaje
         let pct = 0;
         if (level === 4) pct = 0.10;      
         else if (level === 5) pct = 0.20; 
@@ -63,26 +65,28 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         return "70%";
     };
     
-    // --- 🔥 MATEMÁTICA CORREGIDA: SEPARACIÓN STRICTA 🔥 ---
+    // --- 🔥 MATEMÁTICA CORREGIDA (WALLET SNAPSHOT) 🔥 ---
+    // Esta es la lógica que te funcionaba bien.
     
-    // 1. Purchased: Solo lo que se ha comprado históricamente, limitado por lo que tienes en mano.
-    // Si lifetimePurchased es 0 (nunca compró), esto será 0.
-    const purchasedInWallet = Math.min(globalScore, lifetimePurchased);
+    // 1. Purchased: Mínimo entre lo que tienes en mano y lo que has comprado en tu vida.
+    // (Nunca puede ser mayor a tu saldo actual).
+    const effectivePurchased = Math.min(globalScore, lifetimePurchased);
     
-    // 2. Gameplay: Todo lo que sobra. (Total - Comprado = Ganado en Juego)
-    const gameplayInWalletRaw = Math.max(0, globalScore - purchasedInWallet);
+    // 2. Gameplay: Todo lo que sobra es ganancia de juego.
+    const earnedPoints = Math.max(0, globalScore - effectivePurchased);
     
-    // 3. Stakeable de Gameplay: Aplicamos el % o límite según nivel
-    const gameplayStakeable = getGameplayAllowance(gameplayInWalletRaw, userLevel);
+    // 3. Allowance: Calculamos cuánto puedes stakear de esos puntos de juego.
+    const stakeableEarned = getGameplayAllowance(earnedPoints, userLevel);
 
-    // 4. TOTAL DISPONIBLE (Suma de lo comprado + lo permitido del juego)
-    const maxStakeable = purchasedInWallet + gameplayStakeable;
+    // 4. TOTAL DISPONIBLE
+    const maxStakeable = effectivePurchased + stakeableEarned;
 
 
     // --- CARGA DE DATOS ---
     const fetchData = useCallback(async () => {
         if(!userId) return;
         
+        // Cargar Stakes (Solo visualización)
         const { data: stakeData } = await supabase
             .from('stakes') 
             .select('*')
@@ -92,6 +96,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         
         if (stakeData) setStakes(stakeData as StakeData[]);
 
+        // Cargar Historial Compras (CRÍTICO para separar los puntos)
         const { data: userData } = await supabase
             .from('user_score')
             .select('total_bought_points')
@@ -99,7 +104,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
             .single();
         
         if (userData) {
-            // Aseguramos que sea un número válido
             setLifetimePurchased(Number(userData.total_bought_points) || 0);
         }
     }, [userId]); 
@@ -128,15 +132,14 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         
         // 1. Validar Límite Financiero
         if (amount > maxStakeable) { 
-            alert(`Limit Exceeded! You can stake max ${maxStakeable.toLocaleString()} pts right now.`); 
+            alert(`Limit Exceeded! You can stake max ${maxStakeable.toLocaleString()} pts.`); 
             return; 
         }
         if (amount > globalScore) { alert("Insufficient balance."); return; }
 
-        // --- VALIDACIÓN DE SLOTS (3 MÁXIMO PARA GAMEPLAY) ---
-        // Si lo que intentas stakear cabe dentro de tu saldo "Comprado", es VIP (Ilimitado).
-        // Si excede tu saldo comprado, estás usando puntos de juego, por lo tanto aplica límite de slots.
-        const isVipStake = amount <= purchasedInWallet;
+        // 2. Validar Slots (3 Máximo para Gameplay)
+        // Es VIP si el monto a stakear cabe dentro de tus puntos comprados
+        const isVipStake = amount <= effectivePurchased;
 
         if (!isVipStake && stakes.length >= 3) {
             alert(`🔒 SLOT LIMIT REACHED (3/3)\n\nYou have 3 active vaults. You cannot stake Gameplay points until one unlocks.\n\n✨ TIP: Purchased points bypass this limit!`);
@@ -203,12 +206,12 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                     <Info size={10}/> ALLOWANCE (Lvl {userLevel}):
                 </div>
                 
-                {/* FILA PURCHASED */}
+                {/* FILA PURCHASED (VIP) */}
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'2px'}}>
                     <span style={{color:'#00F2FE', display:'flex', alignItems:'center', gap:'4px'}}>
                         Purchased (Unlimited): <ShieldCheck size={10}/>
                     </span>
-                    <span>{purchasedInWallet.toLocaleString()}</span>
+                    <span>{effectivePurchased.toLocaleString()}</span>
                 </div>
                 
                 {/* FILA GAMEPLAY */}
@@ -216,17 +219,17 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                     <span style={{color: getPctColor()}}>
                         Gameplay ({getDisplayPercent(userLevel)}):
                     </span>
-                    {/* Muestra cuánto puedes stakear vs cuánto tienes en total de juego */}
-                    <span>{gameplayStakeable.toLocaleString()} <span style={{color:'#555', fontSize:'9px'}}>({gameplayInWalletRaw.toLocaleString()} Total)</span></span>
+                    {/* Mostramos lo que puedes stakear vs lo que tienes de juego */}
+                    <span>{stakeableEarned.toLocaleString()} <span style={{color:'#555', fontSize:'9px'}}>({earnedPoints.toLocaleString()} Total)</span></span>
                 </div>
 
                 <div style={{borderTop:'1px dashed #444', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold'}}>
-                    <span>AVAILABLE TO STAKE:</span>
+                    <span>MAX STAKEABLE:</span>
                     <span style={{color:'#FFD700'}}>{maxStakeable.toLocaleString()}</span>
                 </div>
             </div>
 
-            {/* BOTONES DE SELECCIÓN */}
+            {/* BOTONES DE SELECCIÓN CON ESTILO PROMO */}
             <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'4px', marginBottom:'15px'}}>
                 {LOCK_OPTIONS.map((opt) => {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -263,7 +266,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 </button>
             </div>
 
-            {/* SLIDER */}
             <div style={{display:'flex', gap:'5px', marginBottom:'20px'}}>
                 {[0.25, 0.50, 0.75, 1].map((pct) => (
                     <button key={pct} onClick={() => setPercentage(pct)} style={{flex:1, padding:'6px', background:'rgba(255,255,255,0.05)', border:'none', borderRadius:'4px', color:'#aaa', fontSize:'10px', cursor:'pointer'}}>
@@ -272,7 +274,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 ))}
             </div>
 
-            {/* PREVIEW */}
             {parseInt(amountToStake) > 0 && (
                 <div style={{marginBottom:'25px', padding:'10px', background:'rgba(76, 175, 80, 0.1)', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid #4CAF50'}}>
                     <div style={{fontSize:'12px', color:'#aaa'}}>Profit in {selectedOption.days} days:</div>
@@ -322,7 +323,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 </div>
             )}
 
-            {/* MODAL */}
             {showSuccess && (
                 <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}}>
                     <div className="glass-card" style={{width: '100%', maxWidth: '300px', textAlign: 'center', border: '1px solid #4CAF50', boxShadow: '0 0 30px rgba(76, 175, 80, 0.2)'}}>
