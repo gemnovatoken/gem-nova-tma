@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Target, Zap, Users, DollarSign, Video, Rocket } from 'lucide-react';
+import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Target, Zap, Users, DollarSign, Video, Rocket, Lock } from 'lucide-react';
 
 // Interfaces
 interface RewardCardProps {
@@ -19,7 +19,14 @@ interface MilestoneRowProps {
     isBig?: boolean;
 }
 
-// Interfaz para la respuesta de la base de datos
+interface ReferralUser {
+    user_id: string;
+    username: string;
+    limit_level: number;
+    bonus_claimed_initial: boolean;
+    bonus_claimed_lvl4: boolean;
+}
+
 interface UserScoreData {
     referral_ton_earnings: number;
     referral_count: number;
@@ -140,6 +147,11 @@ export const SquadZone: React.FC = () => {
     const [referrals, setReferrals] = useState(0);
     const [showMilestones, setShowMilestones] = useState(false);
     const [tonEarnings, setTonEarnings] = useState(0);
+    
+    // Estados para la lista de referidos
+    const [showReferralList, setShowReferralList] = useState(false);
+    const [referralList, setReferralList] = useState<ReferralUser[]>([]);
+    const [loadingList, setLoadingList] = useState(false);
 
     const BOT_USERNAME = "Gnovatoken_bot"; 
 
@@ -147,38 +159,30 @@ export const SquadZone: React.FC = () => {
         ? `https://t.me/${BOT_USERNAME}?start=${user.id}` 
         : "Loading...";
 
-    // 🔥 LÓGICA DE REFERIDOS LIMPIA Y SEGURA
+    // Carga de Datos Principales
     useEffect(() => {
         if (!user) return;
 
         const loadData = async () => {
             try {
-                // 1. Obtener ganancias TON (Dato estático)
+                // 1. Ganancias TON
                 const { data: scoreData } = await supabase
                     .from('user_score')
-                    .select('referral_ton_earnings, referral_count')
+                    .select('referral_ton_earnings')
                     .eq('user_id', user.id)
                     .single();
                 
-                // Tipamos la respuesta para evitar 'any'
+                // Tipado seguro
                 const userData = scoreData as unknown as UserScoreData;
-
                 if (userData) {
                     setTonEarnings(userData.referral_ton_earnings || 0);
                 }
 
-                // 2. CONTAR REFERIDOS REALES (Función RPC SQL)
+                // 2. Conteo de Referidos (Función segura)
                 const { data: count, error: rpcError } = await supabase
                     .rpc('get_my_referrals', { my_id: user.id });
 
-                if (rpcError) {
-                    console.error("Error en RPC (usando fallback):", rpcError);
-                    // Fallback al dato estático si RPC falla
-                    if (userData) {
-                        setReferrals(userData.referral_count || 0);
-                    }
-                } else {
-                    // Si RPC funciona, usamos el dato real
+                if (!rpcError) {
                     setReferrals(Number(count) || 0);
                 }
 
@@ -190,8 +194,55 @@ export const SquadZone: React.FC = () => {
         loadData();
         const interval = setInterval(loadData, 10000);
         return () => clearInterval(interval);
-
     }, [user]);
+
+    // Función para abrir la lista y cargar datos
+    const handleOpenAgents = async () => {
+        setShowReferralList(true);
+        setLoadingList(true);
+        if(!user) return;
+
+        const { data, error } = await supabase.rpc('get_my_referrals_list', { my_id: user.id });
+        
+        if(error) {
+            console.error("Error loading list:", error);
+        } else {
+            setReferralList(data as ReferralUser[]);
+        }
+        setLoadingList(false);
+    };
+
+    // Función para Reclamar Recompensas
+    const handleClaimReward = async (targetId: string, type: 'initial' | 'lvl4') => {
+        if(!user) return;
+        
+        // Optimistic UI Update (Actualizar visualmente antes de esperar)
+        setReferralList(prev => prev.map(u => {
+            if(u.user_id === targetId) {
+                return {
+                    ...u,
+                    bonus_claimed_initial: type === 'initial' ? true : u.bonus_claimed_initial,
+                    bonus_claimed_lvl4: type === 'lvl4' ? true : u.bonus_claimed_lvl4
+                };
+            }
+            return u;
+        }));
+
+        const { data, error } = await supabase.rpc('claim_referral_reward', {
+            referral_user_id: targetId,
+            reward_type: type,
+            my_id: user.id
+        });
+
+        if(error || !data) {
+            alert("Error claiming reward. Maybe requirements not met yet.");
+            // Revertir si falla (opcional, o recargar lista)
+            handleOpenAgents(); 
+        } else {
+            // Éxito: vibrar o mostrar feedback
+            if(window.navigator.vibrate) window.navigator.vibrate(200);
+        }
+    };
 
     const handleCopy = () => {
         if (!user) return; 
@@ -210,8 +261,8 @@ export const SquadZone: React.FC = () => {
                 background: 'rgba(0, 242, 254, 0.05)', border: '1px solid rgba(0, 242, 254, 0.2)',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
-                {/* Stats */}
-                <div style={{display:'flex', gap:'15px'}}>
+                {/* Stats (Clickable para abrir lista) */}
+                <div style={{display:'flex', gap:'15px', cursor:'pointer'}} onClick={handleOpenAgents}>
                     <div style={{textAlign:'center'}}>
                         <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>{referrals}</div>
                         <div style={{fontSize:'8px', color:'#aaa', display:'flex', alignItems:'center', gap:'2px', justifyContent:'center'}}>
@@ -249,20 +300,18 @@ export const SquadZone: React.FC = () => {
                 </div>
             </div>
 
-            {/* 3. BOUNTY BOARD */}
+            {/* 3. BOUNTY BOARD (Info Visual) */}
             <div className="glass-card" style={{ padding:'10px', marginBottom:'10px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px', borderBottom:'1px solid #333', paddingBottom:'5px' }}>
                     <h3 style={{ fontSize: '12px', margin: 0, color:'#aaa' }}>ACTIVE BOUNTIES</h3>
                     <div style={{fontSize:'8px', color:'#4CAF50', background:'rgba(76, 175, 80, 0.1)', padding:'2px 6px', borderRadius:'4px'}}>AUTO-CLAIM</div>
                 </div>
                 
-                {/* Fila 1 */}
                 <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', marginBottom:'8px'}}>
                     <RewardCard icon={<Gift size={12} color="#4CAF50"/>} title="New Recruit" reward="+2,500 Pts" color="#4CAF50" />
                     <RewardCard icon={<Zap size={12} color="#E040FB"/>} title="Active Miner" reward="+5,000 Pts" sub="Lvl 4" color="#E040FB" />
                 </div>
 
-                {/* Fila 2 */}
                 <div style={{
                     background: 'rgba(255, 215, 0, 0.1)', border: '1px solid rgba(255, 215, 0, 0.3)', 
                     borderRadius: '10px', padding: '10px', display:'flex', justifyContent:'space-between', alignItems:'center'
@@ -280,7 +329,7 @@ export const SquadZone: React.FC = () => {
                 </div>
             </div>
 
-            {/* 4. BOTÓN VIEW ALL MILESTONES */}
+            {/* BOTONES MODALES */}
             <button onClick={() => setShowMilestones(true)} className="glass-card" style={{
                 width: '100%', padding: '10px', 
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -293,7 +342,78 @@ export const SquadZone: React.FC = () => {
                 <ChevronRight size={14} color="#aaa" />
             </button>
 
-            {/* MODAL DE HITOS */}
+            {/* --- MODAL 1: LISTA DE AGENTES (REFERIDOS) --- */}
+            {showReferralList && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000,
+                    background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px'
+                }}>
+                    <div className="glass-card" style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto', border: '1px solid #00F2FE', position: 'relative', padding:'15px' }}>
+                        <button onClick={() => setShowReferralList(false)} style={{ position: 'absolute', top: 15, right: 15, background: 'none', border: 'none', color: '#fff' }}><X /></button>
+                        <h3 style={{ textAlign: 'center', color: '#00F2FE', marginTop: 0, display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
+                            <Users size={20}/> YOUR AGENTS
+                        </h3>
+
+                        {loadingList ? (
+                            <p style={{textAlign:'center', color:'#aaa'}}>Scanning blockchain...</p>
+                        ) : referralList.length === 0 ? (
+                            <div style={{textAlign:'center', padding:'20px', color:'#666'}}>
+                                <p>No active agents found.</p>
+                                <p style={{fontSize:'12px'}}>Invite friends to start building your squad!</p>
+                            </div>
+                        ) : (
+                            <div style={{marginTop:'15px'}}>
+                                {/* Header Tabla */}
+                                <div style={{display:'grid', gridTemplateColumns:'0.5fr 2fr 1fr 1fr', fontSize:'10px', color:'#666', marginBottom:'10px', paddingBottom:'5px', borderBottom:'1px solid #333'}}>
+                                    <div>#</div>
+                                    <div>AGENT</div>
+                                    <div style={{textAlign:'center'}}>INIT</div>
+                                    <div style={{textAlign:'center'}}>LVL 4</div>
+                                </div>
+
+                                {/* Filas */}
+                                {referralList.map((refUser, index) => (
+                                    <div key={refUser.user_id} style={{display:'grid', gridTemplateColumns:'0.5fr 2fr 1fr 1fr', alignItems:'center', marginBottom:'10px', fontSize:'12px'}}>
+                                        <div style={{color:'#aaa'}}>{index + 1}</div>
+                                        <div>
+                                            <div style={{color:'#fff', fontWeight:'bold'}}>{refUser.username || 'Unknown'}</div>
+                                            <div style={{fontSize:'9px', color:'#00F2FE'}}>Lvl {refUser.limit_level}</div>
+                                        </div>
+                                        
+                                        {/* Botón Claim Inicial */}
+                                        <div style={{textAlign:'center'}}>
+                                            {refUser.bonus_claimed_initial ? (
+                                                <CheckCircle2 size={16} color="#4CAF50" style={{margin:'0 auto'}}/>
+                                            ) : (
+                                                <button onClick={() => handleClaimReward(refUser.user_id, 'initial')} 
+                                                    style={{background:'#4CAF50', border:'none', borderRadius:'4px', color:'#000', fontSize:'9px', fontWeight:'bold', padding:'4px', cursor:'pointer', width:'100%'}}>
+                                                    GET
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Botón Claim Nivel 4 */}
+                                        <div style={{textAlign:'center'}}>
+                                            {refUser.bonus_claimed_lvl4 ? (
+                                                <CheckCircle2 size={16} color="#E040FB" style={{margin:'0 auto'}}/>
+                                            ) : refUser.limit_level >= 4 ? (
+                                                <button onClick={() => handleClaimReward(refUser.user_id, 'lvl4')}
+                                                    style={{background:'#E040FB', border:'none', borderRadius:'4px', color:'#fff', fontSize:'9px', fontWeight:'bold', padding:'4px', cursor:'pointer', width:'100%'}}>
+                                                    5K
+                                                </button>
+                                            ) : (
+                                                <Lock size={14} color="#444" style={{margin:'0 auto'}}/>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* --- MODAL 2: HITOS GLOBALES --- */}
             {showMilestones && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000,
