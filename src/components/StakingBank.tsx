@@ -16,12 +16,11 @@ interface StakeData {
 interface Props {
     globalScore: number; 
     setGlobalScore: (val: number) => void;
-    userLevel?: number; // 🔥 Nuevo: Recibimos el nivel real aquí
+    userLevel?: number; // Recibimos el nivel real aquí
 }
 
-// 🔥 MODIFICACIÓN VISUAL AQUÍ: Cambiamos el primer elemento
+// 🔥 CONFIGURACIÓN VISUAL: Botón "LIMITED" Dorado y Animado
 const LOCK_OPTIONS = [
-    // isPromo: true activa el diseño dorado y la animación
     { days: 1, roi: 0.02, label: '⚡ LIMITED', color: '#FFD700', isPromo: true }, 
     { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, 
     { days: 30, roi: 0.15, label: '30D', color: '#00F2FE' }, 
@@ -38,7 +37,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
     
     // Estados sincronizados con Base de Datos
     const [lifetimePurchased, setLifetimePurchased] = useState(0);
-    // NOTA: Eliminamos 'realLevel' local. Usamos 'userLevel' directo de los props.
 
     const [loading, setLoading] = useState(false);
     const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -46,14 +44,10 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
     const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[0]); 
     const [showSuccess, setShowSuccess] = useState(false);
 
-    // 🔥 LÓGICA DE NIVELES CORREGIDA (Reglas Solicitadas)
+    // LÓGICA DE NIVELES
     const getGameplayAllowance = (earnedPts: number, level: number) => {
-        // Nivel 1 al 3: Tope fijo de 10,000 puntos
-        if (level <= 3) {
-            return Math.min(earnedPts, 10000);
-        }
+        if (level <= 3) return Math.min(earnedPts, 10000);
         
-        // Niveles superiores: Porcentajes
         let pct = 0;
         if (level === 4) pct = 0.10;      // 10%
         else if (level === 5) pct = 0.20; // 20%
@@ -74,18 +68,49 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         return "70%";
     };
     
-    // 🔥 MATEMÁTICA FINANCIERA
-    // 1. Purchased: Mínimo entre lo que tienes hoy y lo que has comprado en total.
-    const effectivePurchased = Math.min(globalScore, lifetimePurchased);
+    // 🔥 CÁLCULOS FINANCIEROS (NET WORTH) - SOLUCIÓN AL PROBLEMA DE CUPO 🔥
     
-    // 2. Gameplay: Lo que sobra (Saldo total - Purchased).
-    const earnedPoints = Math.max(0, globalScore - effectivePurchased);
+    // 1. Calcular cuánto dinero tengo YA bloqueado en la bóveda
+    const totalLocked = stakes.reduce((sum, s) => sum + s.amount, 0);
+
+    // 2. Calcular mi Patrimonio Total (Lo que tengo en mano + Lo que tengo guardado)
+    const netWorth = globalScore + totalLocked;
+
+    // A. ¿Cuánto de mi patrimonio total se considera "Comprado"?
+    const totalPurchasedEquity = Math.min(netWorth, lifetimePurchased);
     
-    // 3. Staking Permitido
-    const allowancePurchased = effectivePurchased; // 100% de lo comprado
-    // Usamos 'userLevel' que viene de los props (App -> BulkStore -> Aquí)
-    const stakeableEarned = getGameplayAllowance(earnedPoints, userLevel); 
-    const maxStakeable = allowancePurchased + stakeableEarned;
+    // B. ¿Cuánto de mi patrimonio total es "Gameplay"?
+    const totalGameplayEquity = Math.max(0, netWorth - totalPurchasedEquity);
+    
+    // C. ¿Cuánto de mi patrimonio ya está usado en Staking?
+    // Asumimos que los puntos comprados se usan primero para staking
+    const stakedFromPurchased = Math.min(totalLocked, totalPurchasedEquity);
+    const stakedFromGameplay = Math.max(0, totalLocked - stakedFromPurchased);
+
+    // D. Calcular Disponibles para Staking AHORA
+    
+    // D1. Disponibles Comprados (Total Comprado - Lo que ya está en staking)
+    // Limitado por lo que tengo en la billetera actualmente
+    const availablePurchasedInWallet = Math.min(
+        globalScore, 
+        Math.max(0, totalPurchasedEquity - stakedFromPurchased)
+    );
+
+    // D2. Cupo Total Permitido de Gameplay (Basado en el Nivel y el Equity Total)
+    const totalGameplayAllowance = getGameplayAllowance(totalGameplayEquity, userLevel);
+    
+    // D3. Cupo Restante (Cupo Total - Lo que ya usé en staking de gameplay)
+    const remainingGameplayAllowance = Math.max(0, totalGameplayAllowance - stakedFromGameplay);
+    
+    // D4. Gameplay disponible en billetera real
+    const gameplayPointsInWallet = Math.max(0, globalScore - availablePurchasedInWallet);
+    
+    // Lo que realmente puedo stakear de gameplay ahora mismo
+    const stakeableGameplay = Math.min(gameplayPointsInWallet, remainingGameplayAllowance);
+
+    // E. TOTAL FINAL A MOSTRAR
+    const maxStakeable = availablePurchasedInWallet + stakeableGameplay;
+
 
     // --- CARGA DE DATOS ---
     const fetchData = useCallback(async () => {
@@ -101,8 +126,7 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         
         if (stakeData) setStakes(stakeData as StakeData[]);
 
-        // 2. Carga Inteligente (Función SQL)
-        // Solo necesitamos el lifetime_purchased. El nivel ya lo tenemos por props.
+        // 2. Cargar Historial de Compras
         const { data: smartData, error } = await supabase
             .rpc('get_staking_calculations', { user_id_input: userId });
         
@@ -110,10 +134,9 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const d = smartData as any;
             setLifetimePurchased(Number(d.lifetime_purchased));
-            // Ya no sobreescribimos el nivel con la BD, confiamos en la App.
         }
 
-    }, [userId]); // ⚠️ IMPORTANTE: globalScore NO está aquí para evitar el bucle
+    }, [userId]); 
 
     useEffect(() => {
         if (!userId) return;
@@ -183,7 +206,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         else {
             alert(data?.[0]?.message || "Transaction Failed");
         }
-        
         setLoading(false);
     };
 
@@ -229,24 +251,23 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                     <span style={{color:'#fff'}}>{globalScore.toLocaleString()}</span>
                 </div>
                 
-                {/* Usamos userLevel directo de props */}
                 <div style={{fontSize:'11px', color:'#666', marginBottom:'5px', display:'flex', gap:'5px', alignItems:'center'}}>
                     <Info size={10}/> ALLOWANCE (Lvl {userLevel}):
                 </div>
                 
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'2px'}}>
                     <span style={{color:'#00F2FE'}}>Purchased (100%):</span>
-                    <span>{effectivePurchased.toLocaleString()}</span>
+                    {/* Mostramos lo disponible en wallet ahora mismo */}
+                    <span>{availablePurchasedInWallet.toLocaleString()}</span>
                 </div>
                 
-                {/* Visualización dinámica */}
                 <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
                     <span style={{color: getPctColor()}}>
                         Gameplay ({getDisplayPercent(userLevel)}):
                     </span>
                     <span>
-                        {stakeableEarned.toLocaleString()} 
-                        <span style={{color:'#555', fontSize:'9px'}}> ({earnedPoints.toLocaleString()} Total)</span>
+                        {stakeableGameplay.toLocaleString()} 
+                        <span style={{color:'#555', fontSize:'9px'}}> ({gameplayPointsInWallet.toLocaleString()} Available)</span>
                     </span>
                 </div>
 
@@ -256,36 +277,29 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 </div>
             </div>
 
-            {/* 🔥 BOTONES DE SELECCIÓN CON EL CAMBIO VISUAL AQUI */}
+            {/* BOTONES DE SELECCIÓN CON ESTILO PROMO */}
             <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'4px', marginBottom:'15px'}}>
                 {LOCK_OPTIONS.map((opt) => {
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const isPromo = (opt as any).isPromo; // Detectamos si es el botón Promo
+                    const isPromo = (opt as any).isPromo;
                     const isSelected = selectedOption.label === opt.label;
 
                     return (
                         <button key={opt.label} onClick={() => setSelectedOption(opt)}
                             style={{
                                 padding: '8px 2px', borderRadius: '8px',
-                                // Lógica de Borde
                                 border: isSelected 
                                     ? `1px solid ${opt.color}` 
                                     : (isPromo ? `1px dashed ${opt.color}` : '1px solid rgba(255,255,255,0.1)'),
-                                
-                                // Lógica de Fondo
                                 background: isSelected 
                                     ? `rgba(255,255,255,0.1)` 
                                     : (isPromo ? 'rgba(255, 215, 0, 0.1)' : 'transparent'),
-                                
                                 color: '#fff', cursor: 'pointer', transition: 'all 0.2s',
                                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                
-                                // Animación Solo si es Promo y NO está seleccionado
                                 animation: (isPromo && !isSelected) ? 'pulse-gold 2s infinite' : 'none'
                             }}>
                             <span style={{
                                 fontWeight:'bold', fontSize: isPromo ? '9px' : '10px',
-                                // Color Dorado para texto Promo
                                 color: isPromo ? '#FFD700' : 'white'
                             }}>
                                 {opt.label}
@@ -388,7 +402,6 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 </div>
             )}
 
-            {/* Estilo para la animación de pulso */}
             <style>{`
                 @keyframes pulse-gold {
                     0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
