@@ -1,71 +1,90 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient'; // Asegúrate de que la ruta sea correcta
 
-const EarnTonSection = ({ userId }) => {
-  const [showModal, setShowModal] = useState(false);
-  const [loading, setLoading] = useState(true);
+// CORREGIDO 1: Verifica si tu archivo supabaseClient está en la misma carpeta o una atrás.
+// Si está en la misma carpeta usa './', si está atrás usa '../'
+import { supabase } from '../services/supabase';
+
+interface EarnTonSectionProps {
+  userId: string;
+}
+
+interface TicketStats {
+  bulk: number;
+  ads: number;
+  staking: number;
+  level: number;
+  social: number;
+  referral: number;
+}
+
+interface TicketRowProps {
+  label: string;
+  condition: string;
+  count: number;
+  limit: number | null;
+  isUnlimited?: boolean;
+}
+
+const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   
-  // Estado para guardar los contadores traídos de Supabase
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<TicketStats>({
     bulk: 0, ads: 0, staking: 0, level: 0, social: 0, referral: 0
   });
 
-  const [withdrawStep, setWithdrawStep] = useState(1); // 1: Tabla, 2: Wallet Input, 3: Éxito
-  const [walletAddress, setWalletAddress] = useState('');
+  const [withdrawStep, setWithdrawStep] = useState<number>(1);
+  const [walletAddress, setWalletAddress] = useState<string>('');
 
-  // CONFIGURACIÓN DE LÍMITES (Reglas del juego)
   const LIMITS = {
     bulk: 5,
     ads: 3,
     staking: 3,
     level: 7,
     social: 2,
-    referral: 9999 // Ilimitado
+    referral: 9999
   };
 
-  const TARGET = 20; // Meta para ganar el TON
+  const TARGET = 20;
 
-  // Cargar datos cuando se abre el modal
+  // CORREGIDO 3: Movimos 'fetchTicketStats' DENTRO del useEffect para eliminar el error de dependencias
   useEffect(() => {
+    const fetchTicketStats = async () => {
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('users')
+          .select('tickets_bulk, tickets_ads, tickets_staking, tickets_level, tickets_social, tickets_referral')
+          .eq('id', userId)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          setStats({
+            bulk: data.tickets_bulk || 0,
+            ads: data.tickets_ads || 0,
+            staking: data.tickets_staking || 0,
+            level: data.tickets_level || 0,
+            social: data.tickets_social || 0,
+            referral: data.tickets_referral || 0,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (showModal && userId) {
       fetchTicketStats();
     }
-  }, [showModal, userId]);
+  }, [showModal, userId]); // Ahora el array de dependencias está limpio y correcto
 
-  const fetchTicketStats = async () => {
-    try {
-      setLoading(true);
-      // Hacemos la consulta a la base de datos
-      const { data, error } = await supabase
-        .from('users')
-        .select('tickets_bulk, tickets_ads, tickets_staking, tickets_level, tickets_social, tickets_referral')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-
-      if (data) {
-        setStats({
-          bulk: data.tickets_bulk || 0,
-          ads: data.tickets_ads || 0,
-          staking: data.tickets_staking || 0,
-          level: data.tickets_level || 0,
-          social: data.tickets_social || 0,
-          referral: data.tickets_referral || 0,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Calcular totales y porcentaje visual
   const totalTickets = Object.values(stats).reduce((a, b) => a + b, 0);
   const progressPercent = Math.min((totalTickets / TARGET) * 100, 100);
 
-  // Función para enviar la solicitud de retiro
   const handleWithdrawRequest = async () => {
     if (!walletAddress) return alert("Please enter your TON wallet address");
 
@@ -79,15 +98,17 @@ const EarnTonSection = ({ userId }) => {
         }]);
 
       if (error) throw error;
-      setWithdrawStep(3); // Mostrar pantalla de éxito
+      setWithdrawStep(3);
     } catch (error) {
-      alert("Error sending request: " + error.message);
+      // CORREGIDO 2: Manejo seguro del tipo 'error' sin usar 'any' explícito
+      const message = error instanceof Error ? error.message : "Unknown error";
+      alert("Error sending request: " + message);
     }
   };
 
   return (
     <div className="w-full mt-6 mb-20 px-4">
-      {/* --- BOTÓN DE ENTRADA (Visible en la Wallet) --- */}
+      {/* --- ENTRY BUTTON --- */}
       <div 
         onClick={() => setShowModal(true)}
         className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-4 shadow-lg cursor-pointer transform transition hover:scale-105 border border-blue-400"
@@ -100,7 +121,6 @@ const EarnTonSection = ({ userId }) => {
             {totalTickets}/{TARGET}
           </span>
         </div>
-        {/* Barra de progreso pequeña */}
         <div className="w-full bg-black/40 rounded-full h-2.5">
           <div 
             className="bg-blue-300 h-2.5 rounded-full transition-all duration-500" 
@@ -112,12 +132,11 @@ const EarnTonSection = ({ userId }) => {
         </p>
       </div>
 
-      {/* --- VENTANA EMERGENTE (MODAL) --- */}
+      {/* --- MODAL --- */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#1a1f2e] border border-gray-700 w-full max-w-md rounded-2xl p-6 relative shadow-2xl overflow-y-auto max-h-[90vh]">
             
-            {/* Botón Cerrar */}
             <button 
               onClick={() => { setShowModal(false); setWithdrawStep(1); }}
               className="absolute top-4 right-4 text-gray-400 hover:text-white"
@@ -125,7 +144,7 @@ const EarnTonSection = ({ userId }) => {
               ✕
             </button>
 
-            {/* --- PASO 1: TABLA DE MISIONES --- */}
+            {/* STEP 1: DASHBOARD */}
             {withdrawStep === 1 && (
               <>
                 <h2 className="text-xl font-bold text-white text-center mb-1">MISSION: 1 FREE TON 💎</h2>
@@ -135,14 +154,12 @@ const EarnTonSection = ({ userId }) => {
                   <div className="text-white text-center py-8">Loading data...</div>
                 ) : (
                   <div className="space-y-1">
-                    {/* Encabezados de la Tabla */}
                     <div className="grid grid-cols-12 text-xs text-gray-500 font-bold uppercase tracking-wider mb-2 border-b border-gray-700 pb-2">
                       <div className="col-span-6">Source</div>
                       <div className="col-span-3 text-center">Progress</div>
                       <div className="col-span-3 text-right">Limit</div>
                     </div>
 
-                    {/* Filas de Tickets (Con condiciones) */}
                     <TicketRow 
                       label="🛒 Bulk Store" 
                       condition="1 Ticket / 500k pts spent"
@@ -181,7 +198,6 @@ const EarnTonSection = ({ userId }) => {
                       isUnlimited 
                     />
 
-                    {/* Total Acumulado */}
                     <div className="mt-6 bg-blue-900/20 p-4 rounded-xl border border-blue-500/30 flex justify-between items-center">
                       <span className="text-blue-200 font-bold">TOTAL COLLECTED:</span>
                       <span className="text-2xl font-bold text-white">
@@ -189,7 +205,6 @@ const EarnTonSection = ({ userId }) => {
                       </span>
                     </div>
 
-                    {/* Botón de Acción (Bloqueado o Desbloqueado) */}
                     <button
                       onClick={() => totalTickets >= TARGET ? setWithdrawStep(2) : null}
                       disabled={totalTickets < TARGET}
@@ -211,7 +226,7 @@ const EarnTonSection = ({ userId }) => {
               </>
             )}
 
-            {/* --- PASO 2: INGRESAR WALLET --- */}
+            {/* STEP 2: WITHDRAW INPUT */}
             {withdrawStep === 2 && (
               <>
                 <h2 className="text-xl font-bold text-white text-center mb-6">💰 Claim Reward</h2>
@@ -253,7 +268,7 @@ const EarnTonSection = ({ userId }) => {
               </>
             )}
 
-            {/* --- PASO 3: ÉXITO --- */}
+            {/* STEP 3: SUCCESS */}
             {withdrawStep === 3 && (
               <div className="text-center py-6">
                 <div className="text-5xl mb-4">🎉</div>
@@ -269,7 +284,6 @@ const EarnTonSection = ({ userId }) => {
                 </button>
               </div>
             )}
-
           </div>
         </div>
       )}
@@ -277,25 +291,20 @@ const EarnTonSection = ({ userId }) => {
   );
 };
 
-// --- COMPONENTE AUXILIAR PARA LAS FILAS (Row) ---
-// Ahora incluye la propiedad "condition" para mostrar el texto pequeño
-const TicketRow = ({ label, condition, count, limit, isUnlimited }) => {
-  const isMaxed = !isUnlimited && count >= limit;
+const TicketRow: React.FC<TicketRowProps> = ({ label, condition, count, limit, isUnlimited }) => {
+  const isMaxed = !isUnlimited && limit !== null && count >= limit;
   
   return (
     <div className="grid grid-cols-12 items-center border-b border-gray-800 py-3 last:border-0 hover:bg-white/5 transition px-1 rounded">
-      {/* Columna 1: Nombre y Condición */}
       <div className="col-span-6 flex flex-col justify-center">
         <span className="text-sm text-gray-200 font-medium">{label}</span>
         <span className="text-[10px] text-gray-500 italic leading-tight mt-0.5">{condition}</span>
       </div>
 
-      {/* Columna 2: Progreso */}
       <div className={`col-span-3 text-center text-sm font-bold ${count > 0 ? 'text-blue-400' : 'text-gray-600'}`}>
         💎 {count}
       </div>
 
-      {/* Columna 3: Límite */}
       <div className="col-span-3 text-right text-xs flex items-center justify-end">
         {isUnlimited ? (
           <span className="text-green-400 font-bold bg-green-400/10 px-2 py-0.5 rounded text-[10px]">UNLIMITED</span>
