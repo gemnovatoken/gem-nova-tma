@@ -5,6 +5,9 @@ import { Lock, TrendingUp, Users, DollarSign, Wallet, ShieldCheck, ArrowUpRight,
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
 import { WhitepaperModal } from './WhitepaperModal';
 
+// 🔥 1. IMPORTAR TU NUEVO COMPONENTE
+import EarnTonSection from './EarnTonSection';
+
 interface InfoRowProps {
     icon: React.ReactNode;
     title: string;
@@ -168,6 +171,18 @@ export const WalletRoadmap: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* 🔥 2. INTEGRACIÓN DE EARN TON SECTION
+               La insertamos aquí para que quede entre el Balance y el Whitepaper.
+               Reemplazamos el "margin-top" y "padding" del componente original
+               para que se ajuste a tu diseño inline si es necesario, pero
+               como es un componente aislado, funcionará bien.
+            */}
+            {user && (
+                <div style={{ marginBottom: '20px' }}>
+                    <EarnTonSection userId={user.id} />
+                </div>
+            )}
 
             {/* 3. BOTÓN WHITEPAPER (Más delgado) */}
             <button onClick={() => setShowWhitepaper(true)} className="glass-card" style={{
