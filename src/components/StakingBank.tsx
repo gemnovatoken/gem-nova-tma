@@ -19,8 +19,10 @@ interface Props {
     userLevel?: number; // 🔥 Nuevo: Recibimos el nivel real aquí
 }
 
+// 🔥 MODIFICACIÓN VISUAL AQUÍ: Cambiamos el primer elemento
 const LOCK_OPTIONS = [
-    { days: 1, roi: 0.02, label: 'TEST 1D', color: '#FFFFFF' }, 
+    // isPromo: true activa el diseño dorado y la animación
+    { days: 1, roi: 0.02, label: '⚡ LIMITED', color: '#FFD700', isPromo: true }, 
     { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, 
     { days: 30, roi: 0.15, label: '30D', color: '#00F2FE' }, 
     { days: 60, roi: 0.35, label: '60D', color: '#FF0055' }, 
@@ -254,21 +256,44 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                 </div>
             </div>
 
-            {/* BOTONES DE SELECCIÓN */}
+            {/* 🔥 BOTONES DE SELECCIÓN CON EL CAMBIO VISUAL AQUI */}
             <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'4px', marginBottom:'15px'}}>
-                {LOCK_OPTIONS.map((opt) => (
-                    <button key={opt.label} onClick={() => setSelectedOption(opt)}
-                        style={{
-                            padding: '8px 2px', borderRadius: '8px',
-                            border: selectedOption.label === opt.label ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
-                            background: selectedOption.label === opt.label ? `rgba(255,255,255,0.1)` : 'transparent',
-                            color: '#fff', cursor: 'pointer', transition: 'all 0.2s',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center'
-                        }}>
-                        <span style={{fontWeight:'bold', fontSize:'10px'}}>{opt.label}</span>
-                        <span style={{fontSize:'9px', color: opt.color}}>+{Math.floor(opt.roi * 100)}%</span>
-                    </button>
-                ))}
+                {LOCK_OPTIONS.map((opt) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const isPromo = (opt as any).isPromo; // Detectamos si es el botón Promo
+                    const isSelected = selectedOption.label === opt.label;
+
+                    return (
+                        <button key={opt.label} onClick={() => setSelectedOption(opt)}
+                            style={{
+                                padding: '8px 2px', borderRadius: '8px',
+                                // Lógica de Borde
+                                border: isSelected 
+                                    ? `1px solid ${opt.color}` 
+                                    : (isPromo ? `1px dashed ${opt.color}` : '1px solid rgba(255,255,255,0.1)'),
+                                
+                                // Lógica de Fondo
+                                background: isSelected 
+                                    ? `rgba(255,255,255,0.1)` 
+                                    : (isPromo ? 'rgba(255, 215, 0, 0.1)' : 'transparent'),
+                                
+                                color: '#fff', cursor: 'pointer', transition: 'all 0.2s',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                                
+                                // Animación Solo si es Promo y NO está seleccionado
+                                animation: (isPromo && !isSelected) ? 'pulse-gold 2s infinite' : 'none'
+                            }}>
+                            <span style={{
+                                fontWeight:'bold', fontSize: isPromo ? '9px' : '10px',
+                                // Color Dorado para texto Promo
+                                color: isPromo ? '#FFD700' : 'white'
+                            }}>
+                                {opt.label}
+                            </span>
+                            <span style={{fontSize:'9px', color: opt.color}}>+{Math.floor(opt.roi * 100)}%</span>
+                        </button>
+                    );
+                })}
             </div>
 
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
@@ -362,6 +387,15 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
                     </div>
                 </div>
             )}
+
+            {/* Estilo para la animación de pulso */}
+            <style>{`
+                @keyframes pulse-gold {
+                    0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+                    70% { box-shadow: 0 0 0 6px rgba(255, 215, 0, 0); }
+                    100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+                }
+            `}</style>
         </div>
     );
 };
