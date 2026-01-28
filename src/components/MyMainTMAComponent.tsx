@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
+// CORRECCIÓN: Se eliminó 'Flame' de los imports porque no se usaba
 import { Zap, Gamepad2, Rocket, Bot, Video, Server } from 'lucide-react';
 import type { SetStateAction, Dispatch } from 'react';
 
@@ -25,6 +26,14 @@ interface DockButtonProps {
     icon: React.ReactNode; label: string; sub?: string; color?: string; onClick: () => void;
 }
 
+// Interfaz para los efectos visuales (Números flotantes)
+interface ClickEffect {
+    id: number;
+    x: number;
+    y: number;
+    value: number;
+}
+
 const LEVEL_NAMES = ["Laptop", "GPU Rig", "Garage Farm", "Server Room", "Industrial", "Geothermal", "Fusion", "Quantum"];
 
 export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
@@ -35,6 +44,10 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const [showBoosts, setShowBoosts] = useState(false);
     const [loading, setLoading] = useState(false);
     const [claiming, setClaiming] = useState(false);
+    
+    // Estados para el "Juice" Visual
+    const [isPressed, setIsPressed] = useState(false);
+    const [clickEffects, setClickEffects] = useState<ClickEffect[]>([]);
     
     const { 
         score, setScore, energy, setEnergy, levels, setLevels, 
@@ -49,11 +62,10 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const isEliteMode = globalLevel >= 6 && globalLevel < 8; 
     const isBasicMode = globalLevel < 6; 
 
-    // --- FUNCIÓN DE COBRO (CLAIM) ---
+    // --- FUNCIÓN DE COBRO (CLAIM) ORIGINAL ---
     const handleClaim = useCallback(async () => {
         if (!user || energy < 1 || claiming) return;
         
-        if (window.navigator.vibrate) window.navigator.vibrate(50);
         setClaiming(true);
 
         const amountToClaim = Math.floor(energy);
@@ -69,6 +81,46 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
         setTimeout(() => setClaiming(false), 500);
     }, [user, energy, claiming, setScore, setEnergy]);
+
+    // --- WRAPPER CON "JUICE" (EFECTOS VISUALES) ---
+    const handleTapWithJuice = (e: React.TouchEvent | React.MouseEvent) => {
+        if (energy < 1 || claiming) return;
+
+        // 1. Feedback Háptico (Vibración)
+        if (window.navigator.vibrate) window.navigator.vibrate(50); // Vibración seca
+
+        // 2. Efecto Rebote (Animación CSS)
+        setIsPressed(true);
+        setTimeout(() => setIsPressed(false), 100);
+
+        // 3. Números Flotantes
+        // Obtenemos coordenadas del toque o click
+        let clientX, clientY;
+        if ('changedTouches' in e) {
+            clientX = e.changedTouches[0].clientX;
+            clientY = e.changedTouches[0].clientY;
+        } else {
+            clientX = (e as React.MouseEvent).clientX;
+            clientY = (e as React.MouseEvent).clientY;
+        }
+
+        const newEffect: ClickEffect = {
+            id: Date.now(),
+            x: clientX,
+            y: clientY,
+            value: Math.floor(energy)
+        };
+
+        setClickEffects(prev => [...prev, newEffect]);
+
+        // Limpiar el efecto después de 1 segundo
+        setTimeout(() => {
+            setClickEffects(prev => prev.filter(item => item.id !== newEffect.id));
+        }, 1000);
+
+        // 4. Ejecutar la lógica original
+        handleClaim();
+    };
 
     // --- AUTO-CLAIM DEL BOT ---
     useEffect(() => {
@@ -184,7 +236,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             setEnergy(maxEnergy);
             alert("🔋 Smart Refill!\nCollected pending points & Filled Tank 100%");
         }
-    }, [maxEnergy, setEnergy, user, setOverclockTime, energy, setScore]); // Agregamos 'energy' y 'setScore' a las dependencias
+    }, [maxEnergy, setEnergy, user, setOverclockTime, energy, setScore]);
 
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
         if (loading || !user) return; setLoading(true);
@@ -229,6 +281,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             position: 'relative', overflow: 'hidden'
         }}>
             
+            {/* SCORE HEADER */}
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-10px' }}>
                 <div onClick={() => setShowRanking(true)} className="glass-card" style={{ 
                     padding: '4px 12px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', 
@@ -245,16 +298,23 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 <div style={{fontSize:'9px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
             </div>
 
-            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '260px', height: '260px' }}>
-                {/* Animación de fondo */}
+            {/* ZONA CENTRAL: REACTOR VIVO */}
+            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '280px', height: '280px' }}>
+                
+                {/* 1. Anillos Decorativos (Animación Idle) */}
                 <div style={{ 
                     position: 'absolute', width: '100%', height: '100%', 
                     borderRadius: '50%', border: '1px dashed rgba(255,255,255,0.1)',
-                    animation: 'spin 20s linear infinite' 
+                    animation: 'spin 20s linear infinite', zIndex: 0
+                }}></div>
+                <div style={{ 
+                    position: 'absolute', width: '90%', height: '90%', 
+                    borderRadius: '50%', border: '1px solid rgba(0, 242, 254, 0.05)',
+                    animation: 'pulse-glow 4s ease-in-out infinite', zIndex: 0
                 }}></div>
 
-                {/* Círculo SVG */}
-                <div style={{ position: 'absolute', width: '260px', height: '260px', zIndex: 0, transform: 'rotate(-90deg)' }}>
+                {/* 2. Círculo SVG (Barra de Progreso) */}
+                <div style={{ position: 'absolute', width: '260px', height: '260px', zIndex: 1, transform: 'rotate(-90deg)' }}>
                     <svg width="260" height="260">
                         <circle cx="130" cy="130" r={radius} stroke="#1a1a1a" strokeWidth="12" fill="transparent" />
                         <circle cx="130" cy="130" r={radius} stroke={ringColor} strokeWidth="12" fill="transparent" 
@@ -264,13 +324,21 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     </svg>
                 </div>
 
-                {/* BOTÓN CENTRAL */}
-                <button onClick={handleClaim} disabled={energy < 1}
+                {/* 3. BOTÓN CENTRAL CON INTERACCIÓN */}
+                <button 
+                    // Cambiamos el onClick por onTouchStart/MouseDown para mejor respuesta
+                    onTouchStart={handleTapWithJuice}
+                    onMouseDown={handleTapWithJuice} 
+                    disabled={energy < 1}
                     style={{
                         width: '170px', height: '170px', borderRadius: '50%', zIndex: 2, border: 'none',
-                        background: claiming ? '#fff' : `radial-gradient(circle at 30% 30%, ${ringColor}, #000)`,
+                        // Gradiente más vivo
+                        background: claiming ? '#fff' : `radial-gradient(circle at 30% 30%, ${ringColor}, #050505)`,
                         boxShadow: `0 0 ${fillPercent/2}px ${ringColor}`, 
-                        cursor: 'pointer', transform: claiming ? 'scale(0.95)' : 'scale(1)', transition: 'all 0.1s',
+                        cursor: 'pointer', 
+                        // 🔥 APLICA LA ANIMACIÓN DE REBOTE AQUÍ
+                        transform: isPressed ? 'scale(0.92)' : (claiming ? 'scale(0.95)' : 'scale(1)'), 
+                        transition: 'transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)', // Efecto resorte
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
                     }}
                 >
@@ -288,10 +356,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
                             {(overclockTime && overclockTime > 0) ? (
                                 <div style={{
-                                    color: '#FF0055', 
-                                    fontWeight: '900', 
-                                    fontSize: '14px', 
-                                    marginTop: '2px',
+                                    color: '#FF0055', fontWeight: '900', fontSize: '14px', marginTop: '2px',
                                     animation: 'pulse 0.8s infinite alternate' 
                                 }}>
                                     TURBO {overclockTime}s
@@ -304,8 +369,28 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                         </>
                     )}
                 </button>
+
+                {/* 4. VISUALIZADOR DE CLICKS (Floating Numbers) */}
+                {clickEffects.map((effect) => (
+                    <div key={effect.id} style={{
+                        position: 'fixed', // Fixed para evitar problemas con transformaciones padres
+                        left: effect.x,
+                        top: effect.y,
+                        pointerEvents: 'none',
+                        zIndex: 100,
+                        color: ringColor, // Del color de la energía
+                        fontWeight: '900',
+                        fontSize: '24px',
+                        textShadow: '0 0 10px rgba(0,0,0,0.8)',
+                        animation: 'floatUp 0.8s ease-out forwards', // Animación CSS
+                        transform: 'translate(-50%, -50%)'
+                    }}>
+                        +{effect.value}
+                    </div>
+                ))}
             </div>
 
+            {/* STATUS BAR & DOCK */}
             <div style={{ width: '100%', padding: '0 15px', zIndex: 10 }}>
                 <div style={{ marginBottom:'2px', display:'flex', justifyContent:'center', fontSize:'9px', color: ringColor, fontWeight:'bold' }}>
                     <span>
@@ -321,10 +406,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '5px' }}>
                         <DockButton icon={<Rocket/>} label="UPGRADE" color="#00F2FE" onClick={() => setShowBoosts(true)} />
                         <DockButton 
-                            icon={<Bot/>} 
-                            label="MANAGER" 
-                            sub={getBotLabel()} 
-                            color={getBotColor()} 
+                            icon={<Bot/>} label="MANAGER" sub={getBotLabel()} color={getBotColor()} 
                             onClick={handleBotClick} 
                         />
                         <DockButton icon={<Zap/>} label="OVERCLOCK" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
@@ -351,6 +433,15 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 @keyframes pulse { 
                     0% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px #FF0055; } 
                     100% { transform: scale(1.1); opacity: 0.8; text-shadow: 0 0 20px #FF0055; } 
+                }
+                @keyframes pulse-glow {
+                    0% { transform: scale(1); opacity: 0.5; border-color: rgba(0, 242, 254, 0.1); }
+                    50% { transform: scale(1.05); opacity: 0.8; border-color: rgba(0, 242, 254, 0.3); }
+                    100% { transform: scale(1); opacity: 0.5; border-color: rgba(0, 242, 254, 0.1); }
+                }
+                @keyframes floatUp {
+                    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+                    100% { transform: translate(-50%, -150px) scale(1.5); opacity: 0; }
                 }
             `}</style>
         </div>
