@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { CheckCircle, Lock, Calendar, Info, Unlock, ShieldCheck } from 'lucide-react';
+import { CheckCircle, Lock, Calendar, Zap, Shield, TrendingUp } from 'lucide-react';
 
 interface StakeData {
     id: string;
@@ -18,12 +18,14 @@ interface Props {
     userLevel?: number; 
 }
 
-const LOCK_OPTIONS = [
-    { days: 1, roi: 0.02, label: '⚡ LIMITED', color: '#FFD700', isPromo: true }, 
-    { days: 15, roi: 0.05, label: '15D', color: '#4CAF50' }, 
-    { days: 30, roi: 0.15, label: '30D', color: '#00F2FE' }, 
-    { days: 60, roi: 0.35, label: '60D', color: '#FF0055' }, 
-    { days: 90, roi: 0.60, label: '90D', color: '#FFD700' }  
+// Configuración de Opciones
+const FLASH_OPTION = { days: 1, roi: 0.02, label: '⚡ FLASH 24H', minLevel: 1 };
+
+const DEEP_OPTIONS = [
+    { days: 15, roi: 0.05, label: '15 DAYS', minLevel: 3 }, 
+    { days: 30, roi: 0.15, label: '30 DAYS', minLevel: 3 }, 
+    { days: 60, roi: 0.35, label: '60 DAYS', minLevel: 3 }, 
+    { days: 90, roi: 0.60, label: '90 DAYS', minLevel: 3 }  
 ];
 
 export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, userLevel = 1 }) => {
@@ -31,91 +33,85 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
     const userId = user?.id; 
 
     const [stakes, setStakes] = useState<StakeData[]>([]);
-    const [lifetimePurchased, setLifetimePurchased] = useState(0);
-    
     const [loading, setLoading] = useState(false);
     const [claimingId, setClaimingId] = useState<string | null>(null);
     const [amountToStake, setAmountToStake] = useState('');
-    const [selectedOption, setSelectedOption] = useState(LOCK_OPTIONS[0]); 
+    const [selectedOption, setSelectedOption] = useState(FLASH_OPTION); 
     const [showSuccess, setShowSuccess] = useState(false);
-
-    // --- LÓGICA DE NIVELES (GAMEPLAY) ---
-    const getGameplayAllowance = (earnedPts: number, level: number) => {
-        if (level <= 3) return Math.min(earnedPts, 10000);
-        
-        let pct = 0;
-        if (level === 4) pct = 0.10;      
-        else if (level === 5) pct = 0.20; 
-        else if (level === 6) pct = 0.35; 
-        else if (level === 7) pct = 0.50; 
-        else if (level >= 8) pct = 0.70;  
-
-        return Math.floor(earnedPts * pct);
-    };
-
-    const getDisplayPercent = (level: number) => {
-        if (level <= 3) return "Max 10k";
-        if (level === 4) return "10%";
-        if (level === 5) return "20%";
-        if (level === 6) return "35%";
-        if (level === 7) return "50%";
-        return "70%";
-    };
     
-    // --- 🔥 MATEMÁTICA CORREGIDA (Lógica de Descuento de Bóveda) 🔥 ---
-    
-    // 1. Total Dinero Bloqueado
-    const totalLocked = stakes.reduce((sum, s) => sum + s.amount, 0);
+    // 🔥 SOLUCIÓN AL ERROR: Trigger para recargar datos manualmente sin ciclos
+    const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // 2. Calcular "Purchased" disponible en Billetera
-    // Lógica: (Total que compraste en tu vida) MENOS (Lo que ya tienes guardado en la bóveda).
-    // Esto nos dice cuánto "saldo comprado" te queda libre para usar.
-    const remainingLifetimePurchased = Math.max(0, lifetimePurchased - totalLocked);
-    
-    // Ahora limitamos eso por lo que realmente tienes en la mano.
-    const walletPurchased = Math.min(globalScore, remainingLifetimePurchased);
-
-    // 3. Calcular "Gameplay" (Lo que sobra)
-    // Si tienes 69k en mano, y 65k son "Purchased", entonces 4k son "Gameplay".
-    const walletGameplay = Math.max(0, globalScore - walletPurchased);
-
-    // 4. Calcular Cupo
-    const gameplayAllowance = getGameplayAllowance(walletGameplay, userLevel);
-    const maxStakeable = walletPurchased + gameplayAllowance;
-
-
-    // --- CARGA DE DATOS ---
-    const fetchData = useCallback(async () => {
-        if(!userId) return;
-        
-        // Cargar Stakes
-        const { data: stakeData } = await supabase
-            .from('stakes') 
-            .select('*')
-            .eq('user_id', userId)
-            .eq('status', 'active') 
-            .order('end_at', { ascending: true });
-        
-        if (stakeData) setStakes(stakeData as StakeData[]);
-
-        // Cargar Historial Compras
-        const { data: userData } = await supabase
-            .from('user_score')
-            .select('total_bought_points')
-            .eq('user_id', userId)
-            .single();
-        
-        if (userData) {
-            setLifetimePurchased(Number(userData.total_bought_points) || 0);
-        }
-    }, [userId]); 
+    // Ref para evitar fugas de memoria si el componente se desmonta
+    const isMounted = useRef(true);
 
     useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
+
+    // --- 1. LÓGICA DE SLOTS ---
+    const getMaxSlots = (level: number) => {
+        if (level >= 7) return 10;
+        if (level >= 5) return 4;
+        return 2; // Nivel 1-4
+    };
+    const maxSlots = getMaxSlots(userLevel);
+    const usedSlots = stakes.length;
+
+    // --- 2. LÓGICA DE CAPACIDAD ---
+    const getDeepVaultCapPercent = (level: number) => {
+        if (level <= 2) return 0;
+        if (level === 3) return 0.10;
+        if (level === 4) return 0.25;
+        if (level === 5) return 0.40;
+        if (level === 6) return 0.55;
+        return 0.70; // Nivel 7+
+    };
+
+    const totalLocked = stakes.reduce((sum, s) => sum + s.amount, 0);
+
+    let maxStakeable = 0;
+    let capLabel = "";
+
+    if (selectedOption.days === 1) {
+        maxStakeable = globalScore;
+        capLabel = "100% Balance";
+    } else {
+        const capPercent = getDeepVaultCapPercent(userLevel);
+        const totalWealth = globalScore + totalLocked; 
+        const totalAllowedInVault = Math.floor(totalWealth * capPercent);
+        const remainingQuota = Math.max(0, totalAllowedInVault - totalLocked);
+        maxStakeable = Math.min(globalScore, remainingQuota);
+        capLabel = `${(capPercent * 100).toFixed(0)}% Quota`;
+    }
+
+    // --- CARGA DE DATOS (REFACTORIZADA) ---
+    // Movemos la lógica dentro del useEffect para eliminar la dependencia externa que causaba el error
+    useEffect(() => {
         if (!userId) return;
-        const timer = setTimeout(() => fetchData(), 0);
-        const interval = setInterval(fetchData, 10000); 
-        return () => { clearTimeout(timer); clearInterval(interval); };
-    }, [userId, fetchData]);
+
+        const loadStakes = async () => {
+            const { data: stakeData } = await supabase
+                .from('stakes') 
+                .select('*')
+                .eq('user_id', userId)
+                .eq('status', 'active') 
+                .order('end_at', { ascending: true });
+            
+            if (stakeData && isMounted.current) {
+                setStakes(stakeData as StakeData[]);
+            }
+        };
+
+        loadStakes(); // Carga inicial
+        const interval = setInterval(loadStakes, 10000); // Polling cada 10s
+
+        return () => clearInterval(interval);
+    }, [userId, refreshTrigger]); // Se recarga si cambia el usuario o disparamos el trigger
+
+    // Helper para forzar recarga
+    const triggerReload = () => setRefreshTrigger(prev => prev + 1);
 
     // UI Helpers
     const calculatedProfit = amountToStake ? Math.floor(parseInt(amountToStake) * selectedOption.roi) : 0;
@@ -132,19 +128,14 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         
         if (amount <= 0) { alert("Enter a valid amount"); return; }
         
-        // 1. Validar Límite Financiero
         if (amount > maxStakeable) { 
-            alert(`Limit Exceeded! Based on your current points, you can stake ${maxStakeable.toLocaleString()} pts.`); 
+            alert(`Limit Exceeded! Based on your Level ${userLevel}, you can only stake ${maxStakeable.toLocaleString()} pts in this vault.`); 
             return; 
         }
         if (amount > globalScore) { alert("Insufficient balance."); return; }
-
-        // 2. Validar Slots (3 Máximo para Gameplay)
-        // Es VIP si el monto cabe dentro de tus puntos comprados disponibles
-        const isVipStake = amount <= walletPurchased;
-
-        if (!isVipStake && stakes.length >= 3) {
-            alert(`🔒 SLOT LIMIT REACHED (3/3)\n\nYou have 3 active vaults. You cannot stake Gameplay points until one unlocks.\n\n✨ TIP: Purchased points bypass this limit!`);
+        
+        if (usedSlots >= maxSlots) {
+            alert(`🔒 SLOT LIMIT REACHED (${usedSlots}/${maxSlots})\n\nLevel up to unlock more simultaneous deposits!`);
             return;
         }
 
@@ -164,11 +155,11 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
             setGlobalScore(data[0].new_balance); 
             setAmountToStake('');
             setShowSuccess(true);
-            setTimeout(() => fetchData(), 500); 
+            setTimeout(triggerReload, 500); // Usamos el trigger seguro
         } else {
             alert("Transaction Failed");
         }
-        setLoading(false);
+        if (isMounted.current) setLoading(false);
     };
 
     const handleClaimStake = async (stakeId: string) => {
@@ -180,166 +171,176 @@ export const StakingBank: React.FC<Props> = ({ globalScore, setGlobalScore, user
         else if (data && data[0].success) {
             alert(data[0].message); 
             setGlobalScore(data[0].new_balance);
-            setTimeout(() => fetchData(), 500); 
+            setTimeout(triggerReload, 500); // Usamos el trigger seguro
         }
-        setClaimingId(null);
+        if (isMounted.current) setClaimingId(null);
     };
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour:'2-digit', minute:'2-digit' });
-    };
-
-    const getPctColor = () => (userLevel <= 3 ? '#FF5252' : '#4CAF50');
 
     return (
-        <div className="glass-card">
-            <h3 style={{display:'flex', alignItems:'center', gap:'10px', marginTop:0, color:'#fff'}}>
-                <Lock size={20} color="#FFD700"/> Vault Staking
-            </h3>
+        <div className="glass-card" style={{position:'relative', overflow:'hidden'}}>
+            {/* Header Futurista */}
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px', borderBottom:'1px solid rgba(255,255,255,0.1)', paddingBottom:'10px'}}>
+                <h3 style={{display:'flex', alignItems:'center', gap:'10px', margin:0, color:'#fff', letterSpacing:'1px'}}>
+                    <Shield size={18} color="#00F2FE"/> CYBER VAULT
+                </h3>
+                <div style={{fontSize:'10px', color: usedSlots >= maxSlots ? '#FF5252' : '#4CAF50', border:'1px solid rgba(255,255,255,0.2)', padding:'2px 8px', borderRadius:'12px'}}>
+                    SLOTS: {usedSlots} / {maxSlots}
+                </div>
+            </div>
             
-            {/* PANEL DE INFORMACIÓN */}
-            <div style={{background:'rgba(0,0,0,0.3)', padding:'12px', borderRadius:'8px', marginBottom:'20px', border:'1px solid #333'}}>
-                <div style={{display:'flex', justifyContent:'space-between', fontSize:'12px', color:'#aaa', marginBottom:'8px'}}>
-                    <span>Total Balance:</span>
-                    <span style={{color:'#fff'}}>{globalScore.toLocaleString()}</span>
+            {/* 1. FLASH VAULT (Siempre disponible) */}
+            <div 
+                onClick={() => setSelectedOption(FLASH_OPTION)}
+                style={{
+                    background: selectedOption.days === 1 ? 'linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, rgba(0,0,0,0) 100%)' : 'rgba(255,255,255,0.03)',
+                    border: selectedOption.days === 1 ? '1px solid #FFD700' : '1px solid #333',
+                    borderRadius: '12px', padding: '12px', marginBottom: '15px', cursor: 'pointer',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', transition: 'all 0.3s'
+                }}
+            >
+                <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+                    <div style={{background:'rgba(255, 215, 0, 0.2)', padding:'8px', borderRadius:'50%'}}>
+                        <Zap size={18} color="#FFD700"/>
+                    </div>
+                    <div>
+                        <div style={{color:'#FFD700', fontWeight:'bold', fontSize:'13px'}}>FLASH STAKING</div>
+                        <div style={{color:'#aaa', fontSize:'10px'}}>Duration: 24 Hours • No Limits</div>
+                    </div>
                 </div>
-                
-                <div style={{fontSize:'11px', color:'#666', marginBottom:'5px', display:'flex', gap:'5px', alignItems:'center'}}>
-                    <Info size={10}/> ALLOWANCE (Lvl {userLevel}):
-                </div>
-                
-                {/* FILA PURCHASED (VIP) */}
-                <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'2px'}}>
-                    <span style={{color:'#00F2FE', display:'flex', alignItems:'center', gap:'4px'}}>
-                        Purchased (Unlimited): <ShieldCheck size={10}/>
-                    </span>
-                    <span>{walletPurchased.toLocaleString()}</span>
-                </div>
-                
-                {/* FILA GAMEPLAY */}
-                <div style={{display:'flex', justifyContent:'space-between', fontSize:'11px', marginBottom:'8px'}}>
-                    <span style={{color: getPctColor()}}>
-                        Gameplay ({getDisplayPercent(userLevel)}):
-                    </span>
-                    {/* Aquí saldrán tus 4k nuevos x % */}
-                    <span>{gameplayAllowance.toLocaleString()} <span style={{color:'#555', fontSize:'9px'}}>({walletGameplay.toLocaleString()} Total)</span></span>
-                </div>
-
-                <div style={{borderTop:'1px dashed #444', paddingTop:'8px', display:'flex', justifyContent:'space-between', fontSize:'13px', color:'#fff', fontWeight:'bold'}}>
-                    <span>AVAILABLE TO STAKE:</span>
-                    <span style={{color:'#FFD700'}}>{maxStakeable.toLocaleString()}</span>
+                <div style={{textAlign:'right'}}>
+                    <div style={{color:'#fff', fontWeight:'bold', fontSize:'16px'}}>2%</div>
+                    <div style={{color:'#666', fontSize:'9px'}}>ROI</div>
                 </div>
             </div>
 
-            {/* BOTONES DE SELECCIÓN */}
-            <div style={{display:'grid', gridTemplateColumns:'repeat(5, 1fr)', gap:'4px', marginBottom:'15px'}}>
-                {LOCK_OPTIONS.map((opt) => {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const isPromo = (opt as any).isPromo;
-                    const isSelected = selectedOption.label === opt.label;
-                    return (
-                        <button key={opt.label} onClick={() => setSelectedOption(opt)}
-                            style={{
-                                padding: '8px 2px', borderRadius: '8px',
-                                border: isSelected ? `1px solid ${opt.color}` : (isPromo ? `1px dashed ${opt.color}` : '1px solid rgba(255,255,255,0.1)'),
-                                background: isSelected ? `rgba(255,255,255,0.1)` : (isPromo ? 'rgba(255, 215, 0, 0.1)' : 'transparent'),
-                                color: '#fff', cursor: 'pointer', transition: 'all 0.2s',
-                                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                animation: (isPromo && !isSelected) ? 'pulse-gold 2s infinite' : 'none'
-                            }}>
-                            <span style={{fontWeight:'bold', fontSize: isPromo ? '9px' : '10px', color: isPromo ? '#FFD700' : 'white'}}>{opt.label}</span>
-                            <span style={{fontSize:'9px', color: opt.color}}>+{Math.floor(opt.roi * 100)}%</span>
+            {/* 2. DEEP VAULT SELECTOR (Grid) */}
+            <div style={{marginBottom:'15px'}}>
+                <div style={{fontSize:'10px', color:'#aaa', marginBottom:'8px', display:'flex', alignItems:'center', gap:'5px'}}>
+                    <Lock size={10}/> DEEP STORAGE (Level Restricted)
+                </div>
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px'}}>
+                    {DEEP_OPTIONS.map((opt) => {
+                        const isLocked = userLevel < opt.minLevel;
+                        const isSelected = selectedOption.label === opt.label;
+                        
+                        return (
+                            <button key={opt.days} 
+                                onClick={() => !isLocked && setSelectedOption(opt)}
+                                disabled={isLocked}
+                                style={{
+                                    background: isSelected ? 'rgba(0, 242, 254, 0.15)' : (isLocked ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.03)'),
+                                    border: isSelected ? '1px solid #00F2FE' : (isLocked ? '1px solid #333' : '1px solid rgba(255,255,255,0.1)'),
+                                    borderRadius: '10px', padding: '10px',
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                    opacity: isLocked ? 0.6 : 1, cursor: isLocked ? 'not-allowed' : 'pointer',
+                                    position: 'relative', overflow: 'hidden'
+                                }}
+                            >
+                                <div style={{textAlign:'left'}}>
+                                    <div style={{color: isLocked ? '#666' : '#fff', fontWeight:'bold', fontSize:'12px'}}>{opt.days} DAYS</div>
+                                    {isLocked && <div style={{color:'#FF5252', fontSize:'9px', display:'flex', alignItems:'center', gap:'2px'}}><Lock size={8}/> Lvl {opt.minLevel}</div>}
+                                </div>
+                                <div style={{color: isLocked ? '#666' : (isSelected ? '#00F2FE' : '#aaa'), fontWeight:'bold', fontSize:'14px'}}>
+                                    {Math.floor(opt.roi * 100)}%
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
+            {/* 3. INPUT AREA */}
+            <div style={{background:'rgba(0,0,0,0.2)', padding:'15px', borderRadius:'12px', border:'1px solid #333', marginBottom:'20px'}}>
+                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px', fontSize:'11px'}}>
+                    <span style={{color:'#aaa'}}>Available Quota:</span>
+                    <span style={{color: selectedOption.days === 1 ? '#FFD700' : '#00F2FE'}}>{maxStakeable.toLocaleString()} <span style={{fontSize:'9px', color:'#666'}}>({capLabel})</span></span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+                    <div style={{position:'relative', width:'100%'}}>
+                        <input type="number" placeholder="0" value={amountToStake}
+                            onChange={(e) => setAmountToStake(e.target.value)}
+                            style={{ padding: '12px', borderRadius: '8px', border: 'none', width: '100%', background:'rgba(255,255,255,0.05)', color:'#fff', fontWeight:'bold', paddingRight:'50px', fontSize:'16px' }}
+                        />
+                        <span style={{position:'absolute', right:'12px', top:'14px', fontSize:'12px', color:'#aaa'}}>PTS</span>
+                    </div>
+                </div>
+
+                <div style={{display:'flex', gap:'5px', marginBottom:'15px'}}>
+                    {[0.25, 0.50, 0.75, 1].map((pct) => (
+                        <button key={pct} onClick={() => setPercentage(pct)} style={{flex:1, padding:'6px', background:'rgba(255,255,255,0.1)', border:'none', borderRadius:'4px', color:'#ccc', fontSize:'10px', cursor:'pointer'}}>
+                            {pct * 100}%
                         </button>
-                    );
-                })}
-            </div>
-
-            {/* INPUT Y BOTÓN */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                <div style={{position:'relative', width:'100%'}}>
-                    <input type="number" placeholder="Amount" value={amountToStake}
-                        onChange={(e) => setAmountToStake(e.target.value)}
-                        style={{ padding: '12px', borderRadius: '8px', border: 'none', width: '100%', background:'rgba(255,255,255,0.1)', color:'#fff', fontWeight:'bold', paddingRight:'50px' }}
-                    />
-                    <span style={{position:'absolute', right:'12px', top:'12px', fontSize:'12px', color:'#aaa'}}>PTS</span>
+                    ))}
                 </div>
-                <button className="btn-neon" onClick={handleStake} disabled={loading} style={{minWidth:'80px'}}>
-                    {loading ? '...' : 'LOCK'}
+
+                <button className="btn-neon" onClick={handleStake} disabled={loading} style={{width:'100%', background: selectedOption.days === 1 ? '#FFD700' : '#00F2FE', color:'#000', border:'none'}}>
+                    {loading ? 'PROCESSING...' : `LOCK FOR ${selectedOption.days} DAYS`}
                 </button>
+
+                {parseInt(amountToStake) > 0 && (
+                    <div style={{marginTop:'10px', textAlign:'center', fontSize:'11px', color:'#aaa'}}>
+                        Profit: <span style={{color:'#fff', fontWeight:'bold'}}>+{calculatedProfit.toLocaleString()} PTS</span>
+                    </div>
+                )}
             </div>
 
-            <div style={{display:'flex', gap:'5px', marginBottom:'20px'}}>
-                {[0.25, 0.50, 0.75, 1].map((pct) => (
-                    <button key={pct} onClick={() => setPercentage(pct)} style={{flex:1, padding:'6px', background:'rgba(255,255,255,0.05)', border:'none', borderRadius:'4px', color:'#aaa', fontSize:'10px', cursor:'pointer'}}>
-                        {pct * 100}%
-                    </button>
-                ))}
-            </div>
-
-            {/* PREVIEW */}
-            {parseInt(amountToStake) > 0 && (
-                <div style={{marginBottom:'25px', padding:'10px', background:'rgba(76, 175, 80, 0.1)', borderRadius:'8px', display:'flex', justifyContent:'space-between', alignItems:'center', border:'1px solid #4CAF50'}}>
-                    <div style={{fontSize:'12px', color:'#aaa'}}>Profit in {selectedOption.days} days:</div>
-                    <div style={{color:'#4CAF50', fontWeight:'bold'}}>+{calculatedProfit.toLocaleString()} PTS</div>
-                </div>
-            )}
-
-            {/* LISTA DE ACTIVOS CON SLOTS */}
-            <h4 style={{margin:'0 0 15px 0', fontSize:'12px', color:'#aaa', textTransform:'uppercase', letterSpacing:'1px', borderTop:'1px dashed #333', paddingTop:'15px', display:'flex', justifyContent:'space-between'}}>
-                <span>Active Vaults</span>
-                <span style={{color: stakes.length >= 3 ? '#FFD700' : '#666', fontSize:'10px', display:'flex', alignItems:'center', gap:'4px'}}>
-                    {stakes.length >= 3 && <Lock size={10}/>} SLOTS: {stakes.length}/3
-                </span>
+            {/* 4. ACTIVE LIST */}
+            <h4 style={{margin:'0 0 10px 0', fontSize:'11px', color:'#aaa', display:'flex', alignItems:'center', gap:'5px', borderTop:'1px dashed #333', paddingTop:'15px'}}>
+                <TrendingUp size={12}/> ACTIVE DEPOSITS
             </h4>
             
             {stakes.length === 0 ? (
                 <div style={{ padding:'20px', textAlign:'center', opacity:0.5 }}>
-                    <Lock size={30} color="#555" style={{marginBottom:'5px'}}/>
-                    <p style={{ color: '#888', fontSize: '12px', margin:0 }}>Your vault is empty.</p>
+                    <p style={{ color: '#666', fontSize: '12px', margin:0 }}>No active deposits.</p>
                 </div>
             ) : (
-                <div style={{display:'flex', flexDirection:'column', gap:'10px', maxHeight:'200px', overflowY:'auto'}}>
+                <div style={{display:'flex', flexDirection:'column', gap:'8px', maxHeight:'200px', overflowY:'auto'}}>
                     {stakes.map((stake) => {
                         const isReady = new Date(stake.end_at) < new Date();
+                        const progressColor = isReady ? '#4CAF50' : (stake.duration_days === 1 ? '#FFD700' : '#00F2FE');
+                        
                         return (
-                            <div key={stake.id} style={{ padding: '12px', background:'rgba(255,255,255,0.03)', borderRadius:'10px', borderLeft:`3px solid ${isReady ? '#4CAF50' : '#00F2FE'}` }}>
-                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'5px'}}>
-                                    <span style={{color:'#fff', fontWeight:'bold'}}>💎 {stake.amount.toLocaleString()}</span>
-                                    <span style={{color:'#4CAF50', fontSize:'12px', fontWeight:'bold'}}>+{stake.estimated_return.toLocaleString()}</span>
+                            <div key={stake.id} style={{ padding: '10px', background:'rgba(255,255,255,0.02)', borderRadius:'8px', borderLeft:`3px solid ${progressColor}`, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                <div>
+                                    <div style={{color:'#fff', fontWeight:'bold', fontSize:'13px'}}>{stake.amount.toLocaleString()} PTS</div>
+                                    <div style={{color:'#aaa', fontSize:'10px', display:'flex', alignItems:'center', gap:'4px'}}>
+                                        <Calendar size={10}/> {stake.duration_days} Days ({stake.roi_percent * 100}%)
+                                    </div>
                                 </div>
-                                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'11px', color:'#888'}}>
-                                    {isReady ? (
-                                        <button onClick={() => handleClaimStake(stake.id)} disabled={claimingId === stake.id}
-                                            style={{background: '#4CAF50', color: '#000', border: 'none', borderRadius: '4px', padding: '4px 12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'}}>
-                                            {claimingId === stake.id ? '...' : <><Unlock size={12}/> CLAIM NOW</>}
-                                        </button>
-                                    ) : (
-                                        <div style={{display:'flex', alignItems:'center', gap:'4px'}}>
-                                            <Calendar size={10}/> Unlocks: {formatDate(stake.end_at)}
-                                        </div>
-                                    )}
-                                    <div>{stake.duration_days} Days ({stake.roi_percent * 100}%)</div>
-                                </div>
+                                {isReady ? (
+                                    <button onClick={() => handleClaimStake(stake.id)} disabled={claimingId === stake.id}
+                                        style={{background: '#4CAF50', color: '#000', border: 'none', borderRadius: '4px', padding: '6px 12px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', fontSize:'10px'}}>
+                                        {claimingId === stake.id ? '...' : 'CLAIM'}
+                                    </button>
+                                ) : (
+                                    <div style={{textAlign:'right'}}>
+                                        <div style={{color: progressColor, fontWeight:'bold', fontSize:'12px'}}>+{stake.estimated_return.toLocaleString()}</div>
+                                        <div style={{color:'#666', fontSize:'9px'}}>LOCKED</div>
+                                    </div>
+                                )}
                             </div>
                         );
                     })}
                 </div>
             )}
 
+            {/* SUCCESS MODAL */}
             {showSuccess && (
                 <div style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.9)', zIndex: 6000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'}}>
                     <div className="glass-card" style={{width: '100%', maxWidth: '300px', textAlign: 'center', border: '1px solid #4CAF50', boxShadow: '0 0 30px rgba(76, 175, 80, 0.2)'}}>
                         <div style={{margin: '0 auto 15px', width: '60px', height: '60px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
                             <CheckCircle color="#4CAF50" size={32} />
                         </div>
-                        <h2 style={{margin: '0 0 10px 0', color:'#fff'}}>Success!</h2>
-                        <p style={{color: '#ccc', fontSize: '14px', marginBottom:'20px'}}>You locked <strong>{amountToStake} PTS</strong> for {selectedOption.days} days.</p>
-                        <button className="btn-neon" onClick={() => setShowSuccess(false)} style={{width:'100%'}}>CLOSE</button>
+                        <h2 style={{margin: '0 0 10px 0', color:'#fff'}}>DEPOSIT LOCKED</h2>
+                        <p style={{color: '#ccc', fontSize: '12px', marginBottom:'20px'}}>
+                            Your funds are generating interest.<br/>
+                            Come back in {selectedOption.days} days!
+                        </p>
+                        <button className="btn-neon" onClick={() => setShowSuccess(false)} style={{width:'100%'}}>CONTINUE</button>
                     </div>
                 </div>
             )}
-            
-            <style>{`@keyframes pulse-gold { 0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(255, 215, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); } }`}</style>
         </div>
     );
 };
