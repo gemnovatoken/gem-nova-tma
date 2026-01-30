@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 
-// --- ESTILOS CSS INCRUSTADOS (Para asegurar el diseño) ---
+// --- ESTILOS CSS INCRUSTADOS ---
 const styles = `
   .ton-wrapper {
     width: 100%;
@@ -168,30 +168,32 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
   const [walletAddress, setWalletAddress] = useState<string>('');
 
   const LIMITS = {
-    bulk: 5, ads: 3, staking: 3, level: 7, social: 2, referral: 9999
+    bulk: 5, ads: 10, staking: 3, level: 8, social: 2, referral: 9999
   };
 
   const TARGET = 20;
 
+  // --- 🔥 CARGA DE DATOS CORREGIDA 🔥 ---
   useEffect(() => {
     const fetchTicketStats = async () => {
       try {
         setLoading(true);
+        // LLAMAMOS AL RPC QUE ACABAMOS DE CREAR EN SQL
         const { data, error } = await supabase
-          .from('users')
-          .select('tickets_bulk, tickets_ads, tickets_staking, tickets_level, tickets_social, tickets_referral')
-          .eq('id', userId)
-          .single();
+          .rpc('get_mission_stats', { target_user_id: userId });
 
         if (error) throw error;
-        if (data) {
+
+        // Si tenemos datos, los asignamos
+        if (data && data.length > 0) {
+          const result = data[0]; // RPC devuelve un array
           setStats({
-            bulk: data.tickets_bulk || 0,
-            ads: data.tickets_ads || 0,
-            staking: data.tickets_staking || 0,
-            level: data.tickets_level || 0,
-            social: data.tickets_social || 0,
-            referral: data.tickets_referral || 0,
+            bulk: result.tickets_bulk || 0,
+            ads: result.tickets_ads || 0,
+            staking: result.tickets_staking || 0,
+            level: result.tickets_level || 0,
+            social: result.tickets_social || 0,
+            referral: result.tickets_referral || 0,
           });
         }
       } catch (error) {
@@ -201,8 +203,12 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
       }
     };
 
+    if (userId) {
+      fetchTicketStats(); // Cargar al inicio para mostrar la barra externa
+    }
+    
     if (showModal && userId) {
-      fetchTicketStats();
+      fetchTicketStats(); // Recargar al abrir modal
     }
   }, [showModal, userId]);
 
@@ -287,7 +293,7 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
                         count={stats.bulk} limit={LIMITS.bulk} 
                       />
                       <TicketCard 
-                        label="Watch Ads" condition="20 videos watched"
+                        label="Watch Ads" condition="1 Ticket per 10 videos"
                         count={stats.ads} limit={LIMITS.ads} 
                       />
                       <TicketCard 
@@ -303,7 +309,7 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
                         count={stats.social} limit={LIMITS.social} 
                       />
                       <TicketCard 
-                        label="Referrals" condition="5 Refs (Lvl 3)"
+                        label="Referrals" condition="1 Ticket per Invite"
                         count={stats.referral} limit={null} isUnlimited 
                       />
 
@@ -313,7 +319,7 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
                           disabled={totalTickets < TARGET}
                           className={`action-btn ${totalTickets >= TARGET ? 'btn-green' : 'btn-disabled'}`}
                         >
-                          {totalTickets >= TARGET ? "CLAIM 1 TON 💸" : "LOCKED 🔒"}
+                          {totalTickets >= TARGET ? "CLAIM 1 TON 💸" : `LOCKED (Need ${TARGET}) 🔒`}
                         </button>
                       </div>
                     </div>
