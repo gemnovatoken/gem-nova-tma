@@ -134,35 +134,46 @@ export default function App() {
 
                 } 
                 // ==========================================
-                // CASO B: USUARIO NUEVO (CORREGIDO)
+                // CASO B: USUARIO NUEVO (CORREGIDO & VERIFICADO)
                 // ==========================================
                 else {
                     console.log("🆕 Usuario Nuevo detectado. Start Param:", startParam);
                     
                     let referrerId = null;
 
-                    // Lógica robusta para capturar el referido
-                    if (startParam) {
-                        if (startParam.includes('_')) {
-                            // Si el link es tipo: t.me/bot?start=ref_12345
-                            referrerId = startParam.split('_')[1]; 
-                        } else {
-                            // Si el link es tipo: t.me/bot?start=12345 (Directo)
+                    // LÓGICA ROBUSTA PARA EXTRAER REFERIDO
+                    if (startParam && startParam.length > 5) { // Evitamos códigos basura muy cortos
+                        if (startParam.includes('ref_')) {
+                            // Caso 1: t.me/bot?start=ref_e3a4...
+                            referrerId = startParam.split('ref_')[1]; 
+                        } 
+                        else if (startParam.includes('_')) {
+                             // Caso 2: t.me/bot?start=algo_e3a4...
+                             referrerId = startParam.split('_')[1];
+                        }
+                        else {
+                            // Caso 3: t.me/bot?start=e3a4... (Directo)
                             referrerId = startParam; 
                         }
                     }
 
-                    console.log("🔗 ID de Referido capturado:", referrerId);
+                    console.log("🔗 ID de Referido enviado al SQL:", referrerId);
 
+                    // REGISTRO DEL USUARIO CON EL REFERIDO LIMPIO
                     const { error: insertError } = await supabase.rpc('register_new_user', {
                         p_user_id: user.id,
                         p_username: username,
-                        p_referral_code_text: referrerId // ID capturado correctamente
+                        p_referral_code_text: referrerId // Enviamos el UUID limpio o null
                     });
                     
                     if (!insertError) {
-                        setEnergy(0); 
-                        energyRef.current = 0;
+                        // BONO VISUAL: Si entró con referido, iniciamos el contador en 5000
+                        setScore(referrerId ? 5000 : 0); 
+                        scoreRef.current = referrerId ? 5000 : 0;
+                        
+                        setEnergy(1000); 
+                        energyRef.current = 1000;
+                        
                         setCanSave(true);
                     } else {
                         console.error("❌ Error registrando usuario:", insertError);
