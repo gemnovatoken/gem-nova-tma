@@ -9,6 +9,7 @@ import { WalletRoadmap } from './components/WalletRoadmap';
 import { supabase } from './services/supabase';
 import { useAuth } from './hooks/useAuth';
 import { MissionZone } from './components/MissionZone';
+import { LotteryFloatingButton } from './components/LotteryFloatingButton';
 
 const GAME_CONFIG = {
     limit: { values: [500, 1000, 1500, 2000, 4000, 6000, 8500, 12000] },
@@ -221,6 +222,10 @@ export default function App() {
                 <div style={{ flex: 1, overflowY: 'auto', position: 'relative', display: 'flex', flexDirection: 'column', paddingTop: '20px' }}>
                     {currentTab === 'mine' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                            
+                            {/* 🔥 AQUÍ AGREGAMOS LA LOTERÍA FLOTANTE 🔥 */}
+                            <LotteryFloatingButton />
+
                             <div style={{ padding: '0 15px', marginBottom: '0', flexShrink: 0 }}>
                                 <MarketDashboard globalProgress={globalProgress} />
                             </div>
@@ -256,7 +261,6 @@ export default function App() {
 
                     {currentTab === 'mission' && <div style={{ animation: 'fadeIn 0.3s' }}><MissionZone /></div>}
                     
-                    {/* 🔥 AQUÍ ESTÁ EL CAMBIO IMPORTANTE (Línea ~253) 🔥 */}
                     {currentTab === 'squad' && (
                         <div style={{ padding: '20px', animation: 'fadeIn 0.3s' }}>
                             <SquadZone setGlobalScore={setScore} />
