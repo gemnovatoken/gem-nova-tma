@@ -47,16 +47,18 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const buyPack = async (packKey: string) => {
-        // 1. DIAGNÓSTICO DE USUARIO (NUEVO)
-        console.log("👤 User Info:", user);
+        // 🛑 CANDADO DE SEGURIDAD 1: Verificar Usuario
+        console.log("🔍 Verificando usuario antes de comprar...", user);
         
-        if (!user || !user.id || user.id === "") {
-            return alert("⚠️ CRITICAL ERROR: User ID not found. Please reload the Mini App.");
+        if (!user || !user.id || user.id === "" || user.id.length < 10) {
+            alert("⚠️ ERROR CRÍTICO: La App no detecta tu Usuario ID.\n\nPor seguridad, la compra se ha bloqueado para que no pierdas dinero.\n\nSOLUCIÓN: Recarga la App (F5) e intenta de nuevo.");
+            return; // <--- AQUÍ SE DETIENE TODO. NO SE ABRE LA WALLET.
         }
-        
-        // 2. Verificar conexión Wallet
+
+        // 🛑 CANDADO DE SEGURIDAD 2: Verificar Conexión Wallet
         if (!tonConnectUI.connected) {
-            return alert("⚠️ Please connect your wallet first.");
+            alert("⚠️ Por favor conecta tu billetera primero.");
+            return;
         }
 
         if (loading) return;
@@ -64,33 +66,33 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         const selectedPack = PACK_DATA[packKey];
         if (!selectedPack) return;
 
+        // Confirmación visual
         const msg = `CONFIRM TRANSACTION:\n\nProtocol: ${selectedPack.label}\nCost: ${selectedPack.ton} TON\nReward: ${selectedPack.pts.toLocaleString()} Pts`;
         if (!window.confirm(msg)) return;
 
         setLoading(true);
 
         try {
-            // 2. CORRECCIÓN MATEMÁTICA (CRÍTICA) 
-            // Usamos toFixed(0) para eliminar cualquier decimal fantasma de JavaScript
+            // MATEMÁTICAS SEGURAS (Sin decimales)
             const amountInNano = (selectedPack.ton * 1000000000).toFixed(0);
-
-            console.log("🔢 Sending Amount (NanoTONs):", amountInNano); // Para ver en consola
 
             const transaction = {
                 validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutos
                 messages: [
                     {
                         address: ADMIN_WALLET_ADDRESS,
-                        amount: amountInNano, // Enviamos el string limpio
+                        amount: amountInNano,
                     },
                 ],
             };
 
+            // 1. PRIMERO COBRAMOS (Wallet)
             const result = await tonConnectUI.sendTransaction(transaction);
             
-            // 3. REGISTRO EN SUPABASE
+            // 2. LUEGO ENTREGAMOS PUNTOS (Base de Datos)
+            // Aquí es donde fallaba antes, pero ahora el Candado 1 asegura que user.id existe
             const { data, error } = await supabase.rpc('register_purchase', {
-                p_user_id: user.id,
+                p_user_id: user.id, // Ahora sabemos que esto NO es ""
                 p_tx_hash: result.boc, 
                 p_amount_ton: selectedPack.ton,
                 p_points_awarded: selectedPack.pts
@@ -105,25 +107,21 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 if (onPurchaseSuccess) onPurchaseSuccess(response.new_score);
                 setScore(response.new_score);
                 setRefreshTrigger(prev => prev + 1); 
-                alert(`✅ SUCCESS! +${selectedPack.pts.toLocaleString()} PTS added.`);
+                alert(`✅ COMPRA EXITOSA!\n\n+${selectedPack.pts.toLocaleString()} Puntos agregados.`);
             } else {
-                alert(`❌ ERROR: ${response.message}`);
+                alert(`❌ ERROR DE ENTREGA: ${response.message}`);
             }
 
         } catch (err) {
-            // 4. DIAGNÓSTICO REAL EN CONSOLA
-            console.error("❌ TRANSACTION ERROR DETAILED:", err);
-            
-            // Si el error es específico, lo mostramos, si no, uno genérico
+            console.error("Transaction Error:", err);
+            // Mensaje amigable si el usuario cancela o falla
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const errorMessage = (err as any).message || JSON.stringify(err);
+            const errMsg = (err as any).message || JSON.stringify(err);
             
-            if (errorMessage.includes("User rejected")) {
-                alert("Transaction cancelled by user.");
-            } else if (errorMessage.includes("Not enough")) {
-                 alert("⚠️ Insufficient funds for Gas Fees.\nRemember you need extra TON (~0.05) for network fees.");
+            if (errMsg.includes("User rejected")) {
+                alert("❌ Cancelado por el usuario.");
             } else {
-                alert(`⚠️ Error: ${errorMessage}\nCheck console for details.`);
+                alert("⚠️ La transacción no se completó o fue cancelada.\nNo se ha cobrado nada (o verifica tu wallet).");
             }
         } finally {
             setLoading(false);
