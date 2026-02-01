@@ -47,17 +47,17 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const buyPack = async (packKey: string) => {
-        // 🛑 CANDADO DE SEGURIDAD 1: Verificar Usuario
-        console.log("🔍 Verificando usuario antes de comprar...", user);
+        // 1. SAFETY CHECK: User ID
+        console.log("👤 User Status:", user);
         
-        if (!user || !user.id || user.id === "" || user.id.length < 10) {
-            alert("⚠️ ERROR CRÍTICO: La App no detecta tu Usuario ID.\n\nPor seguridad, la compra se ha bloqueado para que no pierdas dinero.\n\nSOLUCIÓN: Recarga la App (F5) e intenta de nuevo.");
-            return; // <--- AQUÍ SE DETIENE TODO. NO SE ABRE LA WALLET.
+        if (!user || !user.id || user.id.length < 5) {
+            alert("⚠️ CRITICAL ERROR: User ID missing.\n\nPlease reload the Mini App to fix your session before buying.");
+            return; 
         }
 
-        // 🛑 CANDADO DE SEGURIDAD 2: Verificar Conexión Wallet
+        // 2. SAFETY CHECK: Wallet Connection
         if (!tonConnectUI.connected) {
-            alert("⚠️ Por favor conecta tu billetera primero.");
+            alert("⚠️ Please connect your wallet first.");
             return;
         }
 
@@ -66,18 +66,18 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         const selectedPack = PACK_DATA[packKey];
         if (!selectedPack) return;
 
-        // Confirmación visual
+        // Confirmation Dialog (English)
         const msg = `CONFIRM TRANSACTION:\n\nProtocol: ${selectedPack.label}\nCost: ${selectedPack.ton} TON\nReward: ${selectedPack.pts.toLocaleString()} Pts`;
         if (!window.confirm(msg)) return;
 
         setLoading(true);
 
         try {
-            // MATEMÁTICAS SEGURAS (Sin decimales)
+            // 3. PREPARE TRANSACTION
             const amountInNano = (selectedPack.ton * 1000000000).toFixed(0);
 
             const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutos
+                validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutes
                 messages: [
                     {
                         address: ADMIN_WALLET_ADDRESS,
@@ -86,19 +86,26 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 ],
             };
 
-            // 1. PRIMERO COBRAMOS (Wallet)
+            // 4. SEND TRANSACTION (This takes the money)
+            console.log("🔌 Sending Transaction...");
             const result = await tonConnectUI.sendTransaction(transaction);
             
-            // 2. LUEGO ENTREGAMOS PUNTOS (Base de Datos)
-            // Aquí es donde fallaba antes, pero ahora el Candado 1 asegura que user.id existe
+            console.log("✅ PAYMENT SUCCESSFUL. Hash:", result.boc);
+
+            // --- IF WE REACH HERE, YOU HAVE PAID. THE ERROR IS BELOW ---
+
+            // 5. SAVE TO DATABASE
             const { data, error } = await supabase.rpc('register_purchase', {
-                p_user_id: user.id, // Ahora sabemos que esto NO es ""
+                p_user_id: user.id, 
                 p_tx_hash: result.boc, 
                 p_amount_ton: selectedPack.ton,
                 p_points_awarded: selectedPack.pts
             });
 
-            if (error) throw error;
+            if (error) {
+                // IMPORTANT: If DB fails, we throw a specific error
+                throw new Error(`DB_ERROR: ${error.message}`);
+            }
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const response = data as any;
@@ -107,21 +114,28 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 if (onPurchaseSuccess) onPurchaseSuccess(response.new_score);
                 setScore(response.new_score);
                 setRefreshTrigger(prev => prev + 1); 
-                alert(`✅ COMPRA EXITOSA!\n\n+${selectedPack.pts.toLocaleString()} Puntos agregados.`);
+                alert(`✅ SUCCESS!\n\n+${selectedPack.pts.toLocaleString()} Points added.`);
             } else {
-                alert(`❌ ERROR DE ENTREGA: ${response.message}`);
+                throw new Error(`API_ERROR: ${response.message}`);
             }
 
         } catch (err) {
-            console.error("Transaction Error:", err);
-            // Mensaje amigable si el usuario cancela o falla
+            console.error("❌ Transaction Flow Error:", err);
+            
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const errMsg = (err as any).message || JSON.stringify(err);
-            
+
+            // LOGIC TO DISTINGUISH ERRORS
             if (errMsg.includes("User rejected")) {
-                alert("❌ Cancelado por el usuario.");
-            } else {
-                alert("⚠️ La transacción no se completó o fue cancelada.\nNo se ha cobrado nada (o verifica tu wallet).");
+                alert("❌ Transaction cancelled by user.");
+            } 
+            else if (errMsg.includes("DB_ERROR") || errMsg.includes("API_ERROR")) {
+                // 🛑 THIS IS YOUR CASE: Payment worked, DB failed.
+                alert(`⚠️ PAYMENT SUCCESSFUL, BUT POINTS ERROR.\n\nYour payment went through, but the server didn't update.\n\nTake a screenshot of this error:\n${errMsg}`);
+            } 
+            else {
+                // Generic wallet error (Gas, Timeout, etc)
+                alert(`⚠️ Transaction Failed (Not Charged).\n\nReason: ${errMsg}`);
             }
         } finally {
             setLoading(false);
