@@ -47,9 +47,14 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const buyPack = async (packKey: string) => {
-        if (!user) return;
+        // 1. DIAGNÓSTICO DE USUARIO (NUEVO)
+        console.log("👤 User Info:", user);
         
-        // 1. Verificar conexión
+        if (!user || !user.id || user.id === "") {
+            return alert("⚠️ CRITICAL ERROR: User ID not found. Please reload the Mini App.");
+        }
+        
+        // 2. Verificar conexión Wallet
         if (!tonConnectUI.connected) {
             return alert("⚠️ Please connect your wallet first.");
         }
