@@ -6,7 +6,7 @@ import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
 import { Zap, Cpu, Shield, Rocket, Lock, Play, Hexagon, Crown } from 'lucide-react';
 
 // 👇 PON AQUÍ TU WALLET REAL
-const ADMIN_WALLET_ADDRESS = 'UQCc7...TU_WALLET_REAL...'; 
+const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q'; 
 
 interface PackNodeProps {
     title: string;
