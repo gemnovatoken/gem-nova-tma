@@ -47,15 +47,20 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const buyPack = async (packKey: string) => {
-        // 1. SAFETY CHECK: User ID
-        console.log("👤 User Status:", user);
+        // 1. CAPTURE USER ID IMMEDIATELY (Snapshot)
+        // We store it in a local variable to prevent state changes during transaction
+        const safeUserId = user?.id;
+
+        console.log("👤 Snapshot User ID:", safeUserId);
         
-        if (!user || !user.id || user.id.length < 5) {
-            alert("⚠️ CRITICAL ERROR: User ID missing.\n\nPlease reload the Mini App to fix your session before buying.");
-            return; 
+        // 2. STRICT VALIDATION (Block if empty)
+        // If safeUserId is empty string "" or undefined, we STOP here.
+        if (!safeUserId || safeUserId.trim() === "" || safeUserId.length < 20) {
+            alert("⚠️ CRITICAL ERROR: Invalid User Session.\n\nThe app cannot identify your User ID. Please reload the Mini App to fix the session before spending money.");
+            return; // STOP! Do not open wallet.
         }
 
-        // 2. SAFETY CHECK: Wallet Connection
+        // 3. CHECK WALLET CONNECTION
         if (!tonConnectUI.connected) {
             alert("⚠️ Please connect your wallet first.");
             return;
@@ -66,18 +71,18 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         const selectedPack = PACK_DATA[packKey];
         if (!selectedPack) return;
 
-        // Confirmation Dialog (English)
+        // CONFIRMATION DIALOG
         const msg = `CONFIRM TRANSACTION:\n\nProtocol: ${selectedPack.label}\nCost: ${selectedPack.ton} TON\nReward: ${selectedPack.pts.toLocaleString()} Pts`;
         if (!window.confirm(msg)) return;
 
         setLoading(true);
 
         try {
-            // 3. PREPARE TRANSACTION
+            // 4. PREPARE TRANSACTION (Safe Math)
             const amountInNano = (selectedPack.ton * 1000000000).toFixed(0);
 
             const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutes
+                validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutes validity
                 messages: [
                     {
                         address: ADMIN_WALLET_ADDRESS,
@@ -86,24 +91,22 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 ],
             };
 
-            // 4. SEND TRANSACTION (This takes the money)
+            // 5. SEND TRANSACTION (Wallet Interaction)
             console.log("🔌 Sending Transaction...");
             const result = await tonConnectUI.sendTransaction(transaction);
             
             console.log("✅ PAYMENT SUCCESSFUL. Hash:", result.boc);
 
-            // --- IF WE REACH HERE, YOU HAVE PAID. THE ERROR IS BELOW ---
-
-            // 5. SAVE TO DATABASE
+            // 6. SAVE TO DATABASE (Using safeUserId)
+            // We use 'safeUserId' here, NOT 'user.id', to guarantee it is not empty
             const { data, error } = await supabase.rpc('register_purchase', {
-                p_user_id: user.id, 
+                p_user_id: safeUserId,  // <--- KEY FIX IS HERE
                 p_tx_hash: result.boc, 
                 p_amount_ton: selectedPack.ton,
                 p_points_awarded: selectedPack.pts
             });
 
             if (error) {
-                // IMPORTANT: If DB fails, we throw a specific error
                 throw new Error(`DB_ERROR: ${error.message}`);
             }
 
@@ -125,17 +128,15 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const errMsg = (err as any).message || JSON.stringify(err);
 
-            // LOGIC TO DISTINGUISH ERRORS
             if (errMsg.includes("User rejected")) {
                 alert("❌ Transaction cancelled by user.");
             } 
-            else if (errMsg.includes("DB_ERROR") || errMsg.includes("API_ERROR")) {
-                // 🛑 THIS IS YOUR CASE: Payment worked, DB failed.
-                alert(`⚠️ PAYMENT SUCCESSFUL, BUT POINTS ERROR.\n\nYour payment went through, but the server didn't update.\n\nTake a screenshot of this error:\n${errMsg}`);
+            else if (errMsg.includes("DB_ERROR")) {
+                // If this happens, take a screenshot. But with 'safeUserId', it shouldn't happen.
+                alert(`⚠️ PAYMENT SUCCESSFUL, BUT DB ERROR.\n\nPoints were not added automatically.\nError: ${errMsg}`);
             } 
             else {
-                // Generic wallet error (Gas, Timeout, etc)
-                alert(`⚠️ Transaction Failed (Not Charged).\n\nReason: ${errMsg}`);
+                alert(`⚠️ Transaction Failed.\n\nReason: ${errMsg}`);
             }
         } finally {
             setLoading(false);
