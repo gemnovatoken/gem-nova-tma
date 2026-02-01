@@ -49,9 +49,9 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     const buyPack = async (packKey: string) => {
         if (!user) return;
         
-        // 1. NUEVO: Verificar conexión antes de nada
+        // 1. Verificar conexión
         if (!tonConnectUI.connected) {
-            return alert("⚠️ Neural Link Disconnected. Please connect your wallet first.");
+            return alert("⚠️ Please connect your wallet first.");
         }
 
         if (loading) return;
@@ -65,27 +65,25 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         setLoading(true);
 
         try {
-            // 2. CORRECCIÓN: Aumentamos el tiempo de vida a 600 segundos (10 min)
-            // Esto evita el error "Connection Severed" por timeout
-            const validUntilTimestamp = Math.floor(Date.now() / 1000) + 600;
+            // 2. CORRECCIÓN MATEMÁTICA (CRÍTICA) 
+            // Usamos toFixed(0) para eliminar cualquier decimal fantasma de JavaScript
+            const amountInNano = (selectedPack.ton * 1000000000).toFixed(0);
 
-            const amountInNano = (selectedPack.ton * 1000000000).toString(); 
+            console.log("🔢 Sending Amount (NanoTONs):", amountInNano); // Para ver en consola
 
             const transaction = {
-                validUntil: validUntilTimestamp, 
+                validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutos
                 messages: [
                     {
                         address: ADMIN_WALLET_ADDRESS,
-                        amount: amountInNano,
+                        amount: amountInNano, // Enviamos el string limpio
                     },
                 ],
             };
 
-            console.log("🔌 Initiating Neural Link...");
             const result = await tonConnectUI.sendTransaction(transaction);
-            console.log("✅ Verifying with Core...", result);
-
-            // 3. REGISTRO EN SUPABASE (Tu lógica original intacta)
+            
+            // 3. REGISTRO EN SUPABASE
             const { data, error } = await supabase.rpc('register_purchase', {
                 p_user_id: user.id,
                 p_tx_hash: result.boc, 
@@ -99,21 +97,29 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
             const response = data as any;
 
             if (response.success) {
-                if (onPurchaseSuccess) {
-                    onPurchaseSuccess(response.new_score);
-                }
+                if (onPurchaseSuccess) onPurchaseSuccess(response.new_score);
                 setScore(response.new_score);
                 setRefreshTrigger(prev => prev + 1); 
-                
-                alert(`✅ SYSTEM UPGRADE COMPLETE.\n\n+${selectedPack.pts.toLocaleString()} PTS added.`);
+                alert(`✅ SUCCESS! +${selectedPack.pts.toLocaleString()} PTS added.`);
             } else {
                 alert(`❌ ERROR: ${response.message}`);
             }
 
         } catch (err) {
-            console.error("Transaction Aborted:", err);
-            // Mensaje de error más claro
-            alert("⚠️ TRANSACTION FAILED.\n\nPossible causes:\n1. Not enough TON for gas fees.\n2. Request timed out (try again).\n3. Cancelled by user.");
+            // 4. DIAGNÓSTICO REAL EN CONSOLA
+            console.error("❌ TRANSACTION ERROR DETAILED:", err);
+            
+            // Si el error es específico, lo mostramos, si no, uno genérico
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const errorMessage = (err as any).message || JSON.stringify(err);
+            
+            if (errorMessage.includes("User rejected")) {
+                alert("Transaction cancelled by user.");
+            } else if (errorMessage.includes("Not enough")) {
+                 alert("⚠️ Insufficient funds for Gas Fees.\nRemember you need extra TON (~0.05) for network fees.");
+            } else {
+                alert(`⚠️ Error: ${errorMessage}\nCheck console for details.`);
+            }
         } finally {
             setLoading(false);
         }
