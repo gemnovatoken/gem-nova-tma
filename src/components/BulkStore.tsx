@@ -48,6 +48,12 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
 
     const buyPack = async (packKey: string) => {
         if (!user) return;
+        
+        // 1. NUEVO: Verificar conexión antes de nada
+        if (!tonConnectUI.connected) {
+            return alert("⚠️ Neural Link Disconnected. Please connect your wallet first.");
+        }
+
         if (loading) return;
 
         const selectedPack = PACK_DATA[packKey];
@@ -59,10 +65,14 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         setLoading(true);
 
         try {
+            // 2. CORRECCIÓN: Aumentamos el tiempo de vida a 600 segundos (10 min)
+            // Esto evita el error "Connection Severed" por timeout
+            const validUntilTimestamp = Math.floor(Date.now() / 1000) + 600;
+
             const amountInNano = (selectedPack.ton * 1000000000).toString(); 
 
             const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 360, 
+                validUntil: validUntilTimestamp, 
                 messages: [
                     {
                         address: ADMIN_WALLET_ADDRESS,
@@ -75,6 +85,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
             const result = await tonConnectUI.sendTransaction(transaction);
             console.log("✅ Verifying with Core...", result);
 
+            // 3. REGISTRO EN SUPABASE (Tu lógica original intacta)
             const { data, error } = await supabase.rpc('register_purchase', {
                 p_user_id: user.id,
                 p_tx_hash: result.boc, 
@@ -101,7 +112,8 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
 
         } catch (err) {
             console.error("Transaction Aborted:", err);
-            alert("⚠️ CONNECTION SEVERED: Transaction cancelled.");
+            // Mensaje de error más claro
+            alert("⚠️ TRANSACTION FAILED.\n\nPossible causes:\n1. Not enough TON for gas fees.\n2. Request timed out (try again).\n3. Cancelled by user.");
         } finally {
             setLoading(false);
         }
