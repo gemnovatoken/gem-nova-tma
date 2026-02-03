@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Play, Calendar, Lock } from 'lucide-react';
+// 👇 HE QUITADO 'Play' DE AQUÍ
+import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Calendar, Lock, Tv } from 'lucide-react';
 
 // --- INTERFACES ---
 interface RewardCardProps {
@@ -49,7 +50,7 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
     const [loading, setLoading] = useState(false);
     const [claimedToday, setClaimedToday] = useState(false);
 
-    // Carga de datos inicial (CORREGIDO: Función dentro del efecto para evitar errores de hoisting y dependencias)
+    // Carga de datos inicial
     useEffect(() => {
         if (!user) return;
 
@@ -79,17 +80,16 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
         fetchUserData();
     }, [user]);
 
-    // 1. LÓGICA DE VIDEOS (CINE)
+    // 1. LÓGICA DE VIDEOS (GLOBAL)
     const handleWatchAd = async () => {
         if (loading || !user) return;
         
-        // Aquí iría tu SDK de anuncios real (Adgram/Adsgram)
-        const confirmWatch = window.confirm("📺 WATCH AD SIMULATION:\n\nWatch a 15-second video to progress towards a Lucky Ticket?");
+        const confirmWatch = window.confirm("📺 WATCH AD BOOSTER:\n\nWatch an ad to speed up your progress towards the next Ticket?\n\n(Tip: Ads watched in Shop & Arcade also count!)");
         if (!confirmWatch) return;
 
         setLoading(true);
         
-        // Simulación de delay
+        // Simulación de delay (Aquí iría tu SDK de Adsgram)
         setTimeout(async () => {
             const { data, error } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
             
@@ -99,7 +99,7 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
                 setVideoProgress(result.progress);
                 
                 if (result.rewarded) {
-                    alert("🎉 CONGRATULATIONS!\n\nYou watched 20 videos and earned +1 LUCKY TICKET!");
+                    alert("🎉 MILESTONE REACHED!\n\nYou watched 20 ads across the game and earned +1 LUCKY TICKET!");
                     setLuckyTickets(prev => prev + 1);
                 }
             }
@@ -128,7 +128,6 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
             setDailyStreak(result.new_streak);
             setClaimedToday(true);
 
-            // Sumar puntos al score global de la app
             if (result.points_earned > 0) {
                 setGlobalScore(prev => prev + result.points_earned);
             }
@@ -167,23 +166,26 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
             {/* SECCIÓN DE MISIONES */}
             <div style={{ display: 'flex', gap: '10px' }}>
                 
-                {/* 1. CINE (Videos) */}
+                {/* 1. AD MILESTONE (GLOBAL TRACKER) */}
                 <div className="glass-card" style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.03)', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                        <div style={{ background: '#FF512F', padding: '6px', borderRadius: '6px' }}><Play size={14} color="#fff" /></div>
+                        <div style={{ background: '#FF512F', padding: '6px', borderRadius: '6px' }}><Tv size={14} color="#fff" /></div>
                         <div>
-                            <div style={{ fontWeight: 'bold', fontSize: '11px' }}>CINEMA</div>
-                            <div style={{ fontSize: '8px', color: '#aaa' }}>20 Ads = 1 Ticket</div>
+                            <div style={{ fontWeight: 'bold', fontSize: '11px' }}>AD REWARDS</div>
+                            <div style={{ fontSize: '8px', color: '#aaa' }}>Any Ad = +1 Progress</div>
                         </div>
                     </div>
                     
                     <div style={{ marginBottom: '8px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', marginBottom: '2px', color: '#00F2FE' }}>
-                            <span>Progress</span>
+                            <span>Global Count</span>
                             <span>{videoProgress}/20</span>
                         </div>
                         <div style={{ width: '100%', height: '4px', background: '#333', borderRadius: '2px' }}>
                             <div style={{ width: `${(videoProgress / 20) * 100}%`, height: '100%', background: '#00F2FE', borderRadius: '2px', transition: 'width 0.3s' }}></div>
+                        </div>
+                        <div style={{fontSize:'7px', color:'#666', marginTop:'4px', fontStyle:'italic'}}>
+                            Ads in Shop, Arcade & Boosts also count!
                         </div>
                     </div>
 
@@ -193,7 +195,7 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
                         className="btn-cyber" 
                         style={{ width: '100%', padding: '6px', fontSize: '10px', background: loading ? '#333' : 'transparent', border: '1px solid #FF512F', color: '#FF512F' }}
                     >
-                        {loading ? '...' : 'WATCH AD'}
+                        {loading ? '...' : 'WATCH AD NOW'}
                     </button>
                 </div>
 
@@ -360,10 +362,10 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     return (
         <div style={{ padding: '0 15px', paddingBottom: '100px', height: '100%', overflowY: 'auto' }}>
             
-            {/* 🔥 AQUI ESTÁ EL CAMBIO: TICKET EMPIRE REEMPLAZA AL SOL 🔥 */}
+            {/* TICKET EMPIRE (AHORA GLOBAL TRACKER) */}
             <TicketEmpire setGlobalScore={setGlobalScore} />
 
-            {/* SQUAD DASHBOARD (SIN CAMBIOS) */}
+            {/* SQUAD DASHBOARD */}
             <div className="glass-card" style={{ padding: '10px', marginBottom: '10px', background: 'rgba(0, 242, 254, 0.05)', border: '1px solid rgba(0, 242, 254, 0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{display:'flex', gap:'15px', cursor:'pointer'}} onClick={handleOpenAgents}>
                     <div style={{textAlign:'center'}}>
@@ -390,7 +392,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
 
-            {/* BOUNTY BOARD (SIN CAMBIOS) */}
+            {/* BOUNTY BOARD */}
             <div className="glass-card" style={{ padding:'10px', marginBottom:'10px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px', borderBottom:'1px solid #333', paddingBottom:'5px' }}>
                     <h3 style={{ fontSize: '12px', margin: 0, color:'#aaa' }}>ACTIVE BOUNTIES</h3>
@@ -422,7 +424,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 <ChevronRight size={14} color="#aaa" />
             </button>
 
-            {/* MODAL 1: AGENTS LIST */}
+            {/* MODALS (Sin cambios) */}
             {showReferralList && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
                     <div className="glass-card" style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto', border: '1px solid #00F2FE', position: 'relative', padding:'15px' }}>
@@ -440,12 +442,6 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                             </div>
                         ) : (
                             <div style={{marginTop:'15px'}}>
-                                <div style={{display:'grid', gridTemplateColumns:'0.5fr 2fr 1fr 1fr', fontSize:'10px', color:'#666', marginBottom:'10px', paddingBottom:'5px', borderBottom:'1px solid #333'}}>
-                                    <div>#</div>
-                                    <div>AGENT</div>
-                                    <div style={{textAlign:'center'}}>INIT</div>
-                                    <div style={{textAlign:'center'}}>LVL 4</div>
-                                </div>
                                 {referralList.map((refUser, index) => (
                                     <div key={refUser.user_id} style={{display:'grid', gridTemplateColumns:'0.5fr 2fr 1fr 1fr', alignItems:'center', marginBottom:'10px', fontSize:'12px'}}>
                                         <div style={{color:'#aaa'}}>{index + 1}</div>
@@ -477,7 +473,6 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 </div>
             )}
 
-            {/* MODAL 2: MILESTONES */}
             {showMilestones && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                     <div className="glass-card" style={{ width: '100%', maxHeight: '70vh', overflowY: 'auto', border: '1px solid #FFD700', position: 'relative' }}>
