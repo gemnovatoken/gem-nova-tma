@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Target, Zap, Users, DollarSign, Video, Rocket, Lock } from 'lucide-react';
+import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Play, Calendar, Lock } from 'lucide-react';
 
-// Interfaces
+// --- INTERFACES ---
 interface RewardCardProps {
     icon: React.ReactNode;
     title: string;
@@ -36,127 +36,214 @@ interface SquadZoneProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
 
-interface SunRaidProps {
-    onTap: (amount: number) => void;
+// --- NUEVO COMPONENTE: TICKET EMPIRE (Reemplaza al Sol) ---
+interface TicketEmpireProps {
+    setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
 
-// --- 1. EL SOL (RAID CORE) ---
-const SunRaid: React.FC<SunRaidProps> = ({ onTap }) => {
-    const [hp, setHp] = useState(50000000);
-    const maxHp = 50000000;
-    const [scale, setScale] = useState(1);
-    const [damageDealt, setDamageDealt] = useState(0);
-    const [heat, setHeat] = useState(0);
-    const [overheated, setOverheated] = useState(false);
+const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
+    const { user } = useAuth();
+    const [luckyTickets, setLuckyTickets] = useState(0);
+    const [videoProgress, setVideoProgress] = useState(0); // 0 to 20
+    const [dailyStreak, setDailyStreak] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [claimedToday, setClaimedToday] = useState(false);
 
+    // Carga de datos inicial (CORREGIDO: Función dentro del efecto para evitar errores de hoisting y dependencias)
     useEffect(() => {
-        const interval = setInterval(() => {
-            setHeat(h => Math.max(0, h - 5));
-            if (heat === 0) setOverheated(false);
-        }, 200);
-        return () => clearInterval(interval);
-    }, [heat]);
+        if (!user) return;
 
-    const handleHit = () => {
-        if (overheated) return;
+        const fetchUserData = async () => {
+            const { data, error } = await supabase
+                .from('user_score')
+                .select('lucky_tickets, videos_watched_streak, daily_streak, last_login_date')
+                .eq('user_id', user.id)
+                .single();
+
+            if (error) {
+                console.error("Error fetching ticket data", error);
+                return;
+            }
+
+            if (data) {
+                setLuckyTickets(data.lucky_tickets || 0);
+                setVideoProgress(data.videos_watched_streak || 0);
+                setDailyStreak(data.daily_streak || 0);
+
+                // Verificar si ya reclamó hoy (formato YYYY-MM-DD)
+                const today = new Date().toISOString().split('T')[0];
+                setClaimedToday(data.last_login_date === today);
+            }
+        };
+
+        fetchUserData();
+    }, [user]);
+
+    // 1. LÓGICA DE VIDEOS (CINE)
+    const handleWatchAd = async () => {
+        if (loading || !user) return;
         
-        const damage = 150; 
-        onTap(damage); 
+        // Aquí iría tu SDK de anuncios real (Adgram/Adsgram)
+        const confirmWatch = window.confirm("📺 WATCH AD SIMULATION:\n\nWatch a 15-second video to progress towards a Lucky Ticket?");
+        if (!confirmWatch) return;
 
-        const newHeat = heat + 15;
-        if (newHeat >= 100) {
-            setOverheated(true);
-            setHeat(100);
-            if (window.navigator.vibrate) window.navigator.vibrate(500);
-        } else {
-            setHeat(newHeat);
-            if (window.navigator.vibrate) window.navigator.vibrate(10);
-            setHp(prev => Math.max(0, prev - damage));
-            setDamageDealt(prev => prev + damage);
-            setScale(0.95);
-            setTimeout(() => setScale(1), 50);
-        }
+        setLoading(true);
+        
+        // Simulación de delay
+        setTimeout(async () => {
+            const { data, error } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
+            
+            if (!error && data) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const result = data as any;
+                setVideoProgress(result.progress);
+                
+                if (result.rewarded) {
+                    alert("🎉 CONGRATULATIONS!\n\nYou watched 20 videos and earned +1 LUCKY TICKET!");
+                    setLuckyTickets(prev => prev + 1);
+                }
+            }
+            setLoading(false);
+        }, 2000);
     };
 
-    const hpPercent = (hp / maxHp) * 100;
+    // 2. LÓGICA DE DAILY STREAK
+    const handleDailyCheckIn = async () => {
+        if (loading || claimedToday || !user) return;
 
-    const handleSpecialAttack = (type: 'video' | 'ton') => {
-        if (type === 'video') {
-            if(!window.confirm("📺 Launch Solar Flare? (Watch Ad)")) return;
-            const dmg = 50000;
-            onTap(dmg);
-            setTimeout(() => {
-                setHp(prev => Math.max(0, prev - dmg));
-                alert(`🔥 SOLAR FLARE HIT! +${dmg.toLocaleString()} Pts`);
-            }, 2000);
-        } else {
-            if(!window.confirm("💎 Launch Void Asteroid? (Cost: 0.5 TON)")) return;
-            const dmg = 500000;
-            onTap(dmg);
-            alert(`☄️ ASTEROID IMPACT! +${dmg.toLocaleString()} Pts`);
-            setHp(prev => Math.max(0, prev - dmg));
+        setLoading(true);
+        const { data, error } = await supabase.rpc('claim_daily_streak', { p_user_id: user.id });
+
+        if (error) {
+            alert("Error claiming reward.");
+            setLoading(false);
+            return;
         }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = data as any;
+        
+        if (result.success) {
+            setLuckyTickets(prev => prev + result.tickets_earned);
+            setDailyStreak(result.new_streak);
+            setClaimedToday(true);
+
+            // Sumar puntos al score global de la app
+            if (result.points_earned > 0) {
+                setGlobalScore(prev => prev + result.points_earned);
+            }
+
+            let msg = `✅ DAILY CHECK-IN COMPLETE!\n\n🔥 Streak: ${result.new_streak} Days\n💎 Points: +${result.points_earned}`;
+            if (result.tickets_earned > 0) {
+                msg += `\n\n🎟️ BONUS: +${result.tickets_earned} LUCKY TICKETS EARNED!`;
+            }
+            alert(msg);
+        } else {
+            alert("⚠️ " + result.message);
+        }
+        setLoading(false);
     };
 
     return (
-        <div style={{ 
-            position: 'relative', height: '240px', margin: '5px 0 10px 0', 
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            background: 'radial-gradient(circle, rgba(255, 81, 47, 0.1) 0%, transparent 70%)',
-            borderRadius: '20px', border: '1px solid rgba(255, 81, 47, 0.3)'
-        }}>
-            <div style={{ position: 'absolute', top: 8, left: 12, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Target size={12} color="#FF512F" />
-                <span style={{ fontSize: '9px', color: '#FF512F', fontWeight: 'bold', letterSpacing: '1px' }}>TARGET LOCKED</span>
-            </div>
-            <div style={{ position: 'absolute', top: 8, right: 12, fontSize: '9px', color: '#aaa' }}>
-                 DMG: <span style={{color:'#fff'}}>{damageDealt.toLocaleString()}</span>
-            </div>
-
-            <div style={{
-                position: 'absolute', width: '180px', height: '180px', borderRadius: '50%',
-                border: '2px dashed rgba(255,255,255,0.1)', animation: 'spin 30s linear infinite'
-            }}></div>
-
-            <div onClick={handleHit} style={{
-                width: '120px', height: '120px', borderRadius: '50%',
-                background: overheated ? '#555' : 'radial-gradient(circle, #F09819 10%, #FF512F 90%)',
-                boxShadow: overheated ? 'none' : `0 0 ${hpPercent / 2}px #FF512F`, cursor: 'pointer',
-                transform: `scale(${scale})`, transition: 'transform 0.05s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: `4px solid ${overheated ? '#FF0000' : 'rgba(255, 255, 255, 0.4)'}`, zIndex: 2
+        <div style={{ marginBottom: '20px' }}>
+            {/* ENCABEZADO: TOTAL TICKETS */}
+            <div className="cyber-card" style={{ 
+                background: 'linear-gradient(135deg, #4A00E0 0%, #8E2DE2 100%)',
+                padding: '15px', borderRadius: '16px', textAlign: 'center', marginBottom: '15px',
+                boxShadow: '0 0 15px rgba(138, 43, 226, 0.3)', position: 'relative', overflow: 'hidden'
             }}>
-                <span style={{ fontSize: '36px', filter: 'drop-shadow(0 0 10px rgba(0,0,0,0.5))' }}>{overheated ? '🔥' : '☀️'}</span>
-            </div>
-
-            <div style={{ width: '50%', marginTop: '15px', textAlign: 'center' }}>
-                <div style={{ width: '100%', height: '4px', background: '#333', borderRadius: '2px', overflow: 'hidden' }}>
-                    <div style={{ width: `${hpPercent}%`, height: '100%', background: '#FF512F', transition: 'width 0.2s' }} />
+                <div style={{ position: 'absolute', top: -10, left: -10, width: '50px', height: '50px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%' }}></div>
+                
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                    <Ticket size={24} color="#fff" />
+                    <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.9 }}>LUCKY TICKETS</span>
                 </div>
-                <div style={{fontSize:'8px', color:'#aaa', marginTop:'2px'}}>{hpPercent.toFixed(1)}% HP</div>
+                <div style={{ fontSize: '36px', fontWeight: '900', textShadow: '0 2px 10px rgba(0,0,0,0.3)', lineHeight: '1' }}>
+                    {luckyTickets}
+                </div>
+                <div style={{ fontSize: '9px', opacity: 0.8, marginTop: '5px' }}>USE FOR LOTTERY & REWARDS</div>
             </div>
 
-            <div style={{ position:'absolute', bottom: 10, display:'flex', gap:'10px' }}>
-                 <button onClick={() => handleSpecialAttack('video')} className="glass-card" style={{
-                    padding:'4px 8px', display:'flex', gap:'4px', alignItems:'center', cursor:'pointer',
-                    border:'1px solid #E040FB', background:'rgba(224, 64, 251, 0.1)', borderRadius:'8px'
-                }}>
-                    <Video size={10} color="#E040FB"/> <span style={{fontSize:'8px', color:'#fff'}}>FLARE</span>
-                </button>
-                <button onClick={() => handleSpecialAttack('ton')} className="glass-card" style={{
-                    padding:'4px 8px', display:'flex', gap:'4px', alignItems:'center', cursor:'pointer',
-                    border:'1px solid #00F2FE', background:'rgba(0, 242, 254, 0.1)', borderRadius:'8px'
-                }}>
-                    <Rocket size={10} color="#00F2FE"/> <span style={{fontSize:'8px', color:'#fff'}}>VOID</span>
-                </button>
+            {/* SECCIÓN DE MISIONES */}
+            <div style={{ display: 'flex', gap: '10px' }}>
+                
+                {/* 1. CINE (Videos) */}
+                <div className="glass-card" style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.03)', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <div style={{ background: '#FF512F', padding: '6px', borderRadius: '6px' }}><Play size={14} color="#fff" /></div>
+                        <div>
+                            <div style={{ fontWeight: 'bold', fontSize: '11px' }}>CINEMA</div>
+                            <div style={{ fontSize: '8px', color: '#aaa' }}>20 Ads = 1 Ticket</div>
+                        </div>
+                    </div>
+                    
+                    <div style={{ marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', marginBottom: '2px', color: '#00F2FE' }}>
+                            <span>Progress</span>
+                            <span>{videoProgress}/20</span>
+                        </div>
+                        <div style={{ width: '100%', height: '4px', background: '#333', borderRadius: '2px' }}>
+                            <div style={{ width: `${(videoProgress / 20) * 100}%`, height: '100%', background: '#00F2FE', borderRadius: '2px', transition: 'width 0.3s' }}></div>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={handleWatchAd} 
+                        disabled={loading}
+                        className="btn-cyber" 
+                        style={{ width: '100%', padding: '6px', fontSize: '10px', background: loading ? '#333' : 'transparent', border: '1px solid #FF512F', color: '#FF512F' }}
+                    >
+                        {loading ? '...' : 'WATCH AD'}
+                    </button>
+                </div>
+
+                {/* 2. DAILY STREAK */}
+                <div className="glass-card" style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.03)', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                        <div style={{ background: '#4CAF50', padding: '6px', borderRadius: '6px' }}><Calendar size={14} color="#fff" /></div>
+                        <div>
+                            <div style={{ fontWeight: 'bold', fontSize: '11px' }}>STREAK</div>
+                            <div style={{ fontSize: '8px', color: '#aaa' }}>Day {dailyStreak}</div>
+                        </div>
+                    </div>
+
+                    {/* Mini Visualización de Días */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                        {[1, 2, 3, 4, 5, 6, 7].map(day => {
+                            const currentCycleDay = dailyStreak % 7 === 0 && dailyStreak > 0 ? 7 : dailyStreak % 7;
+                            const isActive = day <= currentCycleDay;
+                            return (
+                                <div key={day} style={{ 
+                                    width: '8px', height: '15px', borderRadius: '2px', 
+                                    background: isActive ? '#4CAF50' : '#333',
+                                    border: day === 7 ? '1px solid #FFD700' : 'none'
+                                }}></div>
+                            );
+                        })}
+                    </div>
+
+                    <button 
+                        onClick={handleDailyCheckIn} 
+                        disabled={claimedToday || loading}
+                        className="btn-cyber" 
+                        style={{ 
+                            width: '100%', padding: '6px', fontSize: '10px', 
+                            borderColor: claimedToday ? '#4CAF50' : '#4CAF50',
+                            background: claimedToday ? 'rgba(76, 175, 80, 0.2)' : 'transparent',
+                            color: '#4CAF50',
+                            opacity: claimedToday ? 0.8 : 1
+                        }}
+                    >
+                        {claimedToday ? 'CLAIMED' : 'CLAIM'}
+                    </button>
+                </div>
             </div>
-            
-            <style>{`@keyframes spin { 100% { transform: rotate(360deg); } }`}</style>
         </div>
     );
 };
 
-// --- COMPONENTE PRINCIPAL ---
+
+// --- COMPONENTE PRINCIPAL (SQUAD ZONE) ---
 export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const [referrals, setReferrals] = useState(0);
@@ -186,11 +273,6 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         return () => clearInterval(saveInterval);
     }, [user]);
 
-    const handleTapScore = (amount: number) => {
-        if (setGlobalScore) setGlobalScore(prev => prev + amount);
-        pointsQueue.current += amount;
-    };
-
     // 2. Carga Inicial de Datos
     useEffect(() => {
         if (!user) return;
@@ -214,12 +296,10 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         return () => clearInterval(interval);
     }, [user]);
 
-    // --- FUNCIONES DE REFERIDOS REFACTORIZADAS ---
+    // --- FUNCIONES DE REFERIDOS ---
 
-    // Función pura para cargar la lista desde el servidor
     const fetchReferralList = async () => {
         if(!user) return;
-        // Solo mostramos 'cargando' si la lista está vacía (para que el refresh silencioso no parpadee)
         if (referralList.length === 0) setLoadingList(true);
         
         const { data, error } = await supabase.rpc('get_my_referrals_list', { my_id: user.id });
@@ -227,23 +307,19 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         if(error) {
             console.error("Error loading list:", error);
         } else {
-            console.log("Lista actualizada:", data); // Debug
             setReferralList(data as ReferralUser[]);
         }
         setLoadingList(false);
     };
 
-    // Al abrir el modal
     const handleOpenAgents = () => {
         setShowReferralList(true);
         fetchReferralList();
     };
 
-    // Al reclamar recompensa
     const handleClaimReward = async (targetId: string, type: 'initial' | 'lvl4') => {
         if(!user) return;
         
-        // 1. Optimistic Update (Visual inmediato)
         setReferralList(prev => prev.map(u => {
             if(u.user_id === targetId) {
                 return {
@@ -255,7 +331,6 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
             return u;
         }));
 
-        // 2. Transacción SQL
         const { data, error } = await supabase.rpc('claim_referral_reward', {
             referral_user_id: targetId,
             reward_type: type,
@@ -264,14 +339,12 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
 
         if(error || !data) {
             alert("Error claiming reward.");
-            fetchReferralList(); // Revertir cambios si falla
+            fetchReferralList();
         } else {
-            // Éxito: Sumar puntos visualmente
             const amount = type === 'initial' ? 2500 : 5000;
             if (setGlobalScore) setGlobalScore(prev => prev + amount);
             if(window.navigator.vibrate) window.navigator.vibrate(200);
             
-            // 3. 🔥 RECARGA SILENCIOSA: Verificar con el servidor después de 1 segundo
             setTimeout(() => {
                 fetchReferralList();
             }, 1000);
@@ -286,9 +359,11 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
 
     return (
         <div style={{ padding: '0 15px', paddingBottom: '100px', height: '100%', overflowY: 'auto' }}>
-            <SunRaid onTap={handleTapScore} />
+            
+            {/* 🔥 AQUI ESTÁ EL CAMBIO: TICKET EMPIRE REEMPLAZA AL SOL 🔥 */}
+            <TicketEmpire setGlobalScore={setGlobalScore} />
 
-            {/* SQUAD DASHBOARD */}
+            {/* SQUAD DASHBOARD (SIN CAMBIOS) */}
             <div className="glass-card" style={{ padding: '10px', marginBottom: '10px', background: 'rgba(0, 242, 254, 0.05)', border: '1px solid rgba(0, 242, 254, 0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{display:'flex', gap:'15px', cursor:'pointer'}} onClick={handleOpenAgents}>
                     <div style={{textAlign:'center'}}>
@@ -315,7 +390,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
 
-            {/* BOUNTY BOARD */}
+            {/* BOUNTY BOARD (SIN CAMBIOS) */}
             <div className="glass-card" style={{ padding:'10px', marginBottom:'10px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px', borderBottom:'1px solid #333', paddingBottom:'5px' }}>
                     <h3 style={{ fontSize: '12px', margin: 0, color:'#aaa' }}>ACTIVE BOUNTIES</h3>

@@ -9,7 +9,6 @@ import { WalletRoadmap } from './components/WalletRoadmap';
 import { supabase } from './services/supabase';
 import { useAuth } from './hooks/useAuth';
 import { MissionZone } from './components/MissionZone';
-import { LotteryFloatingButton } from './components/LotteryFloatingButton';
 
 const GAME_CONFIG = {
     limit: { values: [500, 1000, 1500, 2000, 4000, 6000, 8500, 12000] },
@@ -234,8 +233,6 @@ export default function App() {
                     {currentTab === 'mine' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                             
-                            {/* 🔥 AQUÍ AGREGAMOS LA LOTERÍA FLOTANTE 🔥 */}
-                            <LotteryFloatingButton />
 
                             <div style={{ padding: '0 15px', marginBottom: '0', flexShrink: 0 }}>
                                 <MarketDashboard globalProgress={globalProgress} />
