@@ -9,13 +9,20 @@ interface LuckyWheelProps {
     onUpdateScore: Dispatch<SetStateAction<number>>;
 }
 
-// 1. CONFIGURACIÓN CENTRALIZADA (Orden: Manecillas del reloj empezando a las 12)
+// ✅ NUEVA INTERFAZ PARA SOLUCIONAR EL ERROR DE TIPO
+interface AdResponse {
+    success: boolean;
+    progress: number;
+    rewarded: boolean;
+}
+
+// 1. CONFIGURACIÓN CENTRALIZADA
 const WHEEL_ITEMS = [
-    { value: 5000, label: "5K", sub: "JACKPOT", color: "#FFD700", textCol: "#000" }, // 0-72 deg
-    { value: 500,  label: "500", sub: "",        color: "#222",    textCol: "#fff" }, // 72-144 deg
-    { value: 2000, label: "2K",  sub: "",        color: "#00F2FE", textCol: "#000" }, // 144-216 deg
-    { value: 0,    label: "FAIL",sub: "",        color: "#FF512F", textCol: "#fff" }, // 216-288 deg
-    { value: 1000, label: "1K",  sub: "",        color: "#E040FB", textCol: "#000" }  // 288-360 deg
+    { value: 5000, label: "5K", sub: "JACKPOT", color: "#FFD700", textCol: "#000" }, 
+    { value: 500,  label: "500", sub: "",        color: "#222",    textCol: "#fff" }, 
+    { value: 2000, label: "2K",  sub: "",        color: "#00F2FE", textCol: "#000" }, 
+    { value: 0,    label: "FAIL",sub: "",        color: "#FF512F", textCol: "#fff" }, 
+    { value: 1000, label: "1K",  sub: "",        color: "#E040FB", textCol: "#000" }  
 ];
 
 export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }) => {
@@ -44,15 +51,32 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
 
         const isFree = spinsUsed < freeSpins;
 
+        // --- LÓGICA DE VIDEO PUBLICITARIO ---
         if (!isFree) {
             if(!window.confirm(`📺 Watch Ad to Spin? (${maxSpins - spinsUsed} left)`)) return;
+            
             console.log("Watching Ad...");
+            // Simulación del video
             await new Promise(r => setTimeout(r, 2000));
+
+            // 🔥 INTEGRACIÓN TICKET EMPIRE: REGISTRAR VISTA DE VIDEO 🔥
+            try {
+                const { data: adResult, error: adError } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
+                
+                // ✅ SOLUCIÓN DEL ERROR: Usamos la interfaz 'AdResponse' en lugar de 'any'
+                const result = adResult as AdResponse;
+
+                if (!adError && result?.rewarded) {
+                    // console.log("Ticket ganado por ver video en Ruleta!");
+                }
+            } catch (err) {
+                console.error("Error registrando video para tickets:", err);
+            }
         }
 
         setSpinning(true);
 
-        // A. LLAMADA A SUPABASE
+        // A. LLAMADA A SUPABASE (Girar Ruleta)
         const { data, error } = await supabase.rpc('spin_wheel_v2', { user_id_in: user.id });
 
         if (error || !data || data.length === 0) {
@@ -64,25 +88,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
         const wonAmount = data[0].reward;
         const newSpins = data[0].new_spins_used;
 
-        // B. CÁLCULO MATEMÁTICO PERFECTO
-        // Buscamos el índice del premio ganado en nuestra configuración
+        // B. CÁLCULO MATEMÁTICO
         const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
-        
-        // Si por alguna razón el backend devuelve algo que no está en la lista, default al 0 (FAIL)
         const targetIndex = winningIndex !== -1 ? winningIndex : 3; 
 
-        const segmentAngle = 360 / WHEEL_ITEMS.length; // 72 grados
-        
-        // Queremos que el segmento ganador termine ARRIBA (donde está la flecha)
-        // Fórmula: 360 - (Indice * Angulo) - (Mitad del segmento para centrarlo)
-        // Ejemplo: Si gana indice 1 (72-144), queremos rotar hacia atrás ~108 grados.
+        const segmentAngle = 360 / WHEEL_ITEMS.length; 
         const centerOffset = segmentAngle / 2;
         const baseRotation = 360 - (targetIndex * segmentAngle) - centerOffset;
-        
-        // Añadimos aleatoriedad DENTRO del segmento (+/- 20 grados) para que no caiga siempre en el centro exacto
         const randomWobble = Math.floor(Math.random() * 40) - 20;
-
-        // Añadimos 5 vueltas completas (1800) para efecto visual
         const finalRotation = rotation + 1800 + baseRotation + randomWobble;
 
         setRotation(finalRotation);
@@ -105,7 +118,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
     const isFreeNext = spinsUsed < freeSpins;
     const isLimitReached = spinsUsed >= maxSpins;
 
-    // Generar el gradiente CSS dinámicamente basado en la config
     const conicGradient = `conic-gradient(
         ${WHEEL_ITEMS.map((item, i) => `${item.color} ${i * 72}deg ${(i + 1) * 72}deg`).join(', ')}
     )`;
@@ -141,21 +153,18 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
 
             <div style={{ position: 'relative', width: '320px', height: '320px', marginBottom: '40px' }}>
                 
-                {/* FLECHA INDICADORA */}
                 <div style={{
                     position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)',
                     width: '40px', height: '40px', background: '#fff', clipPath: 'polygon(50% 100%, 0 0, 100% 0)',
                     zIndex: 20, filter: 'drop-shadow(0 0 10px #fff)'
                 }}></div>
 
-                {/* Borde exterior animado */}
                 <div style={{
                     position:'absolute', top:'-10px', left:'-10px', right:'-10px', bottom:'-10px',
                     borderRadius:'50%', border:'2px dashed rgba(255,255,255,0.3)',
                     animation: 'spinSlow 10s linear infinite'
                 }}></div>
 
-                {/* LA RULETA */}
                 <div style={{
                     width: '100%', height: '100%', borderRadius: '50%',
                     border: '8px solid #1a1a1a', 
@@ -170,7 +179,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
                             key={i}
                             text={item.label} 
                             sub={item.sub} 
-                            angle={(i * 72) + 36} // 72deg por item, +36 para centrar el texto en el gajo
+                            angle={(i * 72) + 36} 
                             color={item.textCol} 
                         />
                     ))}
@@ -225,7 +234,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
 const WheelLabel = ({ text, sub, angle, color }: { text: string, sub?: string, angle: number, color: string }) => (
     <div style={{
         position: 'absolute', top: '50%', left: '50%',
-        // La magia de CSS: Rotamos al ángulo del gajo, subimos el texto hacia el borde (-110px), y rotamos el texto para que sea legible
         transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-110px)`,
         color: color, textAlign: 'center', width: '100px'
     }}>
