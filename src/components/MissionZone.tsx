@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-// 1. ELIMINADO 'Video' de los imports
 import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Coins, Gift, Zap, Tv } from 'lucide-react';
 import { MemoryGame, AsteroidGame, HackerGame } from './ArcadeGames';
 
-// ✅ 2. INTERFAZ PARA RESPUESTAS DE TRANSACCIÓN (Elimina el 'any')
+// Interfaz para la respuesta de la transacción de monedas
 interface TransactionResponse {
     success: boolean;
     new_coins?: number;
@@ -21,7 +20,13 @@ interface GameCardProps {
     onPlay: () => void;
 }
 
-export const MissionZone: React.FC = () => {
+// 🔥 CAMBIO 1: Definimos que MissionZone recibe la función para actualizar el score
+interface MissionZoneProps {
+    setGlobalScore: (val: number | ((prev: number) => number)) => void;
+}
+
+// 🔥 CAMBIO 2: Agregamos 'setGlobalScore' a los props del componente
+export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const [streak, setStreak] = useState(0);
     const [checkedInToday, setCheckedInToday] = useState(false);
@@ -60,8 +65,13 @@ export const MissionZone: React.FC = () => {
         if (checkedInToday || !user) return;
         const { data, error } = await supabase.rpc('daily_check_in', { user_id_in: user.id });
         if (!error && data && data[0].success) {
+            const reward = data[0].reward;
             if (window.navigator.vibrate) window.navigator.vibrate([50, 50, 50]);
-            alert(`✅ +${data[0].reward} PTS CLAIMED!`);
+            
+            // 🔥 CAMBIO 3: Actualizar puntaje visualmente al hacer Check-in
+            setGlobalScore(prev => prev + reward);
+            
+            alert(`✅ +${reward} PTS CLAIMED!`);
             loadData();
         } else {
             alert(data?.[0]?.message || "Error");
@@ -78,8 +88,6 @@ export const MissionZone: React.FC = () => {
             await new Promise(r => setTimeout(r, 2000));
 
             const { data, error } = await supabase.rpc('refill_arcade_coins_with_ad', { p_user_id: user.id });
-
-            // ✅ USO DE LA INTERFAZ (Sin 'any')
             const result = data as TransactionResponse;
 
             if (!error && result.success) {
@@ -101,8 +109,6 @@ export const MissionZone: React.FC = () => {
         }
 
         const { data } = await supabase.rpc('spend_arcade_coin', { p_user_id: user.id });
-        
-        // ✅ USO DE LA INTERFAZ (Sin 'any')
         const result = data as TransactionResponse;
 
         if (!result || result.success === false) {
@@ -113,11 +119,15 @@ export const MissionZone: React.FC = () => {
         }
     };
 
-    // 3. ELIMINADO 'gameId' QUE NO SE USABA
     const handleGameFinish = async (won: boolean, score: number) => {
         setActiveGame(null);
         if (won && user) {
+            // Guardar en base de datos
             await supabase.rpc('increment_score', { p_user_id: user.id, p_amount: score });
+            
+            // 🔥 CAMBIO 4: ¡Aquí está la magia! Actualizamos el puntaje global inmediatamente
+            setGlobalScore(prev => prev + score);
+            
             alert(`🏆 VICTORIA! Ganaste +${score} Puntos`);
         }
         loadData();
@@ -190,7 +200,6 @@ export const MissionZone: React.FC = () => {
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
             
-            {/* 3. ACTUALIZADA LA LLAMADA A handleGameFinish (sin gameId) */}
             {activeGame === 'memory' && <MemoryGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
             {activeGame === 'asteroid' && <AsteroidGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
             {activeGame === 'hacker' && <HackerGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
