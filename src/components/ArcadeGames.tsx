@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Crosshair } from 'lucide-react';
-import { supabase } from '../services/supabase'; // Asegúrate que la ruta sea correcta
+import { supabase } from '../services/supabase'; 
 import { useAuth } from '../hooks/useAuth';
 
-// ✅ INTERFAZ DEFINIDA PARA RESPUESTA DE VIDEO (Soluciona el error de "any")
+// ✅ INTERFAZ DEFINIDA PARA RESPUESTA DE VIDEO
 interface AdResponse {
     success: boolean;
     progress: number;
@@ -15,19 +15,17 @@ interface GameProps {
     onFinish: (won: boolean, score: number) => void;
 }
 
-// Helper para registrar videos (Línea Mágica Global)
+// Helper para registrar videos DENTRO del juego (Revivir/Tiempo Extra)
 const registerAdView = async (userId: string) => {
     try {
-        console.log("🎬 Registering Arcade Ad View...");
+        console.log("🎬 Registering In-Game Ad View...");
         const { data, error } = await supabase.rpc('register_ad_view', { p_user_id: userId });
         
-        // ✅ CORRECCIÓN DE TIPO: Convertimos la respuesta a 'AdResponse'
-        // Esto elimina el error 'Unexpected any'
+        // Corrección de tipo
         const result = data as AdResponse;
 
         if (!error && result?.rewarded) {
-            // Opcional: Feedback visual si ganó ticket
-            // alert("🎟️ +1 LUCKY TICKET EARNED!"); 
+            // Lógica interna si ganó ticket (opcional)
         }
     } catch (e) {
         console.error("Ad Error:", e);
@@ -46,14 +44,14 @@ const GameOverlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     </div>
 );
 
-// 🧠 JUEGO 1: MEMORIA (Con Retry por Video)
+// 🧠 JUEGO 1: MEMORIA
 export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const { user } = useAuth();
     const [pattern, setPattern] = useState<number[]>([]);
     const [selected, setSelected] = useState<number[]>([]);
     const [showing, setShowing] = useState(true);
     const [round, setRound] = useState(1);
-    const [hasRevived, setHasRevived] = useState(false); // Solo 1 revivir por juego
+    const [hasRevived, setHasRevived] = useState(false);
 
     const startRound = useCallback((currentRound: number) => {
         const newPattern = new Set<number>();
@@ -90,15 +88,14 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                 }
             }
         } else {
-            // 🔥 LÓGICA DE REVIVIR (VIDEO)
             if (!hasRevived && user) {
                 const wantRevive = window.confirm("🧠 MEMORY FAILED!\n\nWatch Ad to Retry this round?");
                 if (wantRevive) {
-                    await registerAdView(user.id); // Cuenta para el Ticket
+                    await registerAdView(user.id);
                     setHasRevived(true);
-                    setSelected([]); // Reiniciar selección
+                    setSelected([]);
                     alert("🔁 Retrying Round...");
-                    return; // No terminar el juego
+                    return;
                 }
             }
             onFinish(false, 0);
@@ -132,16 +129,14 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     );
 };
 
-// ☄️ JUEGO 2: ASTEROIDES (Con Tiempo Extra por Video)
+// ☄️ JUEGO 2: ASTEROIDES
 export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const { user } = useAuth();
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(15);
     const [asteroidPos, setAsteroidPos] = useState({ top: 40, left: 40 });
-    const [hasRevived, setHasRevived] = useState(false); // Solo 1 vez
+    const [hasRevived, setHasRevived] = useState(false);
     const scoreRef = useRef(0);
-    
-    // Refs para evitar problemas con closures en setInterval
     const timeLeftRef = useRef(15);
     const hasRevivedRef = useRef(false);
 
@@ -155,20 +150,17 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
         });
     }, []);
 
-    // Función para manejar el fin del tiempo
     const handleTimeUp = async () => {
         if (!hasRevivedRef.current && user) {
-            // Pausamos visualmente (aunque el intervalo sigue, lo manejamos con lógica)
             const wantMoreTime = window.confirm("⏳ TIME UP!\n\nWatch Ad for +10 seconds?");
             if (wantMoreTime) {
-                await registerAdView(user.id); // Cuenta para el Ticket
+                await registerAdView(user.id);
                 setHasRevived(true);
                 hasRevivedRef.current = true;
-                setTimeLeft(10); // Dar 10 segundos extra
-                return; // Continuar juego
+                setTimeLeft(10);
+                return;
             }
         }
-        // Fin del juego real
         onFinish(true, scoreRef.current * 100);
     };
 
@@ -177,9 +169,7 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
             setTimeLeft(prev => {
                 const newVal = prev - 1;
                 timeLeftRef.current = newVal;
-                
                 if (newVal <= 0) {
-                    // Importante: Limpiamos intervalo temporalmente para preguntar
                     clearInterval(timer);
                     handleTimeUp(); 
                     return 0;
@@ -187,13 +177,10 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                 return newVal;
             });
         }, 1000);
-        
         const spawnTimer = setTimeout(() => spawnAsteroid(), 0);
-        
-        // Si revivimos, necesitamos reiniciar el timer effect, por eso dependemos de hasRevived
         return () => { clearInterval(timer); clearTimeout(spawnTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [spawnAsteroid, hasRevived]); // Reinicia el timer si revive
+    }, [spawnAsteroid, hasRevived]);
 
     const hit = () => {
         if (timeLeft <= 0) return;
@@ -227,14 +214,13 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     );
 };
 
-// 🔐 JUEGO 3: HACKER (Con Segundo Intento por Video)
+// 🔐 JUEGO 3: HACKER
 export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const { user } = useAuth();
     const [targetZone, setTargetZone] = useState(50);
     const [cursorPos, setCursorPos] = useState(0);
     const [level, setLevel] = useState(1);
     const [hasRevived, setHasRevived] = useState(false);
-    
     const directionRef = useRef(1);
     const posRef = useRef(0);
     const requestRef = useRef<number>(0);
@@ -254,7 +240,6 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
 
     const handleLock = async () => {
         if (Math.abs(posRef.current - targetZone) < 10) {
-            // ACIERTO
             if (level >= 3) {
                 onFinish(true, 1500);
             } else { 
@@ -263,18 +248,14 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                 posRef.current = 0; 
             }
         } else {
-            // FALLO
             if (!hasRevived && user) {
-                // Pausamos animación (truco visual)
                 cancelAnimationFrame(requestRef.current);
-                
                 const wantRetry = window.confirm("🔐 BREACH DETECTED!\n\nWatch Ad to bypass security and retry level?");
                 if (wantRetry) {
-                    await registerAdView(user.id); // Cuenta para el Ticket
+                    await registerAdView(user.id);
                     setHasRevived(true);
-                    posRef.current = 0; // Reset posición
+                    posRef.current = 0;
                     alert("🛡️ SYSTEM BYPASSED. Retrying...");
-                    // Reactivamos animación al cambiar estado
                     return;
                 }
             }

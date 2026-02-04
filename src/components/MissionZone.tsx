@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Ticket, Video, Gift, Zap } from 'lucide-react';
+// 1. ELIMINADO 'Video' de los imports
+import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Coins, Gift, Zap, Tv } from 'lucide-react';
 import { MemoryGame, AsteroidGame, HackerGame } from './ArcadeGames';
+
+// ✅ 2. INTERFAZ PARA RESPUESTAS DE TRANSACCIÓN (Elimina el 'any')
+interface TransactionResponse {
+    success: boolean;
+    new_coins?: number;
+    message?: string;
+}
 
 interface GameCardProps {
     title: string;
@@ -17,20 +25,19 @@ export const MissionZone: React.FC = () => {
     const { user } = useAuth();
     const [streak, setStreak] = useState(0);
     const [checkedInToday, setCheckedInToday] = useState(false);
-    const [tickets, setTickets] = useState(3);
+    const [coins, setCoins] = useState(3);
+    const [loadingAd, setLoadingAd] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [activeGame, setActiveGame] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
         if(!user) return;
-        const { data } = await supabase.from('user_score').select('current_streak, last_check_in_date, tickets, last_ticket_reset').eq('user_id', user.id).single();
+        const { data } = await supabase.from('user_score').select('current_streak, last_check_in_date, arcade_coins').eq('user_id', user.id).single();
         if (data) {
             setStreak(data.current_streak);
             const today = new Date().toISOString().split('T')[0];
             if (data.last_check_in_date === today) setCheckedInToday(true);
-            
-            if (data.last_ticket_reset !== today) setTickets(3);
-            else setTickets(data.tickets);
+            setCoins(data.arcade_coins ?? 0);
         }
     }, [user]);
 
@@ -61,52 +68,61 @@ export const MissionZone: React.FC = () => {
         }
     };
 
+    const handleWatchAdForCoins = async () => {
+        if (!user || loadingAd) return;
+
+        if(window.confirm("📺 WATCH AD for +2 COINS?\n\n(Bonus: This ad counts towards your Lucky Ticket!)")) {
+            setLoadingAd(true);
+            console.log("Watching Ad...");
+            
+            await new Promise(r => setTimeout(r, 2000));
+
+            const { data, error } = await supabase.rpc('refill_arcade_coins_with_ad', { p_user_id: user.id });
+
+            // ✅ USO DE LA INTERFAZ (Sin 'any')
+            const result = data as TransactionResponse;
+
+            if (!error && result.success) {
+                setCoins(result.new_coins || 0);
+                alert("✅ +2 COINS ADDED!\n🎟️ Lucky Ticket progress updated!");
+            } else {
+                alert("Error watching ad.");
+            }
+            setLoadingAd(false);
+        }
+    };
+
     const handlePlayGame = async (gameId: string) => {
         if (!user) return;
         
-        // 1. SI NO TIENE TICKETS -> VER VIDEO
-        if (tickets <= 0) {
-            if(window.confirm("🎫 No tickets left!\n\nWatch Ad to get +2 Tickets?")) {
-                console.log("Watching Ad...");
-                
-                // Simulación de espera de anuncio
-                setTimeout(async () => {
-                    // 🔥 REGISTRO EN DASHBOARD: VIDEO ARCADE
-                    await supabase.from('game_logs').insert({
-                        user_id: user.id,
-                        event_type: 'video_arcade', // Esto cuenta para la métrica de Arcade
-                        metadata: { source: 'extra_tickets' } 
-                    });
-
-                    await supabase.rpc('add_tickets', { user_id_in: user.id, amount: 2 });
-                    alert("✅ +2 Tickets Added!");
-                    loadData();
-                }, 2000);
-            }
+        if (coins <= 0) {
+            handleWatchAdForCoins();
             return;
         }
 
-        // 2. GASTAR TICKET Y JUGAR
-        const { data } = await supabase.rpc('spend_ticket', { user_id_in: user.id });
-        if (data) {
-            setTickets(prev => prev - 1);
-            setActiveGame(gameId);
+        const { data } = await supabase.rpc('spend_arcade_coin', { p_user_id: user.id });
+        
+        // ✅ USO DE LA INTERFAZ (Sin 'any')
+        const result = data as TransactionResponse;
+
+        if (!result || result.success === false) {
+             handleWatchAdForCoins();
         } else {
-            alert("Error: Could not use ticket.");
+            setCoins(prev => prev - 1);
+            setActiveGame(gameId);
         }
     };
 
-    const handleGameFinish = async (won: boolean, score: number, gameId: string) => {
+    // 3. ELIMINADO 'gameId' QUE NO SE USABA
+    const handleGameFinish = async (won: boolean, score: number) => {
         setActiveGame(null);
         if (won && user) {
-            await supabase.rpc('play_minigame', { user_id_in: user.id, game_id: gameId, score_obtained: score });
+            await supabase.rpc('increment_score', { p_user_id: user.id, p_amount: score });
             alert(`🏆 VICTORIA! Ganaste +${score} Puntos`);
-        } else {
-            alert("❌ Perdiste. Intenta de nuevo.");
         }
+        loadData();
     };
 
-    // --- RENDERIZADO HOLOGRÁFICO ---
     const renderCalendarDays = () => {
         const days: React.ReactNode[] = [];
         const maxDayToShow = Math.max(7, streak + 4); 
@@ -152,9 +168,7 @@ export const MissionZone: React.FC = () => {
                             BONUS
                         </div>
                     )}
-                    
                     <span style={{fontSize:'9px', color:'#aaa', fontWeight:'bold'}}>DAY {i}</span>
-                    
                     <div style={{
                         width:'36px', height:'36px', borderRadius:'50%', background: isPast ? '#4CAF50' : 'rgba(0,0,0,0.3)',
                         display:'flex', alignItems:'center', justifyContent:'center', border:`1px solid ${borderColor}`
@@ -164,7 +178,6 @@ export const MissionZone: React.FC = () => {
                             (isToday ? <Zap size={18} color={iconColor} fill={iconColor} /> : <Calendar size={16} color="#444" />)
                         )}
                     </div>
-
                     <span style={{fontSize:'11px', fontWeight:'900', color: isToday ? '#fff' : (isMilestone ? '#E040FB' : '#888')}}>
                         +{reward}
                     </span>
@@ -177,9 +190,10 @@ export const MissionZone: React.FC = () => {
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
             
-            {activeGame === 'memory' && <MemoryGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s, 'Memory')} />}
-            {activeGame === 'asteroid' && <AsteroidGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s, 'Asteroid')} />}
-            {activeGame === 'hacker' && <HackerGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s, 'Hacker')} />}
+            {/* 3. ACTUALIZADA LA LLAMADA A handleGameFinish (sin gameId) */}
+            {activeGame === 'memory' && <MemoryGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
+            {activeGame === 'asteroid' && <AsteroidGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
+            {activeGame === 'hacker' && <HackerGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
 
             <div style={{textAlign:'center', marginBottom:'25px'}}>
                 <h2 style={{marginTop: 0, fontSize:'28px', marginBottom:'5px', color:'#fff'}}>🗺️ Expedition</h2>
@@ -222,11 +236,11 @@ export const MissionZone: React.FC = () => {
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px', borderBottom:'1px solid #333', paddingBottom:'10px' }}>
                 <h3 style={{ fontSize:'18px', margin:0 }}>🕹️ Arcade Zone</h3>
                 <div style={{ display:'flex', alignItems:'center', gap:'6px', background:'#111', padding:'6px 12px', borderRadius:'20px', border:'1px solid #333' }}>
-                    <Ticket size={14} color={tickets > 0 ? "#E040FB" : "#555"} />
-                    <span style={{fontSize:'12px', fontWeight:'bold', color: tickets > 0 ? "#fff" : "#555"}}>{tickets}</span>
-                    {tickets === 0 && (
-                        <button onClick={() => handlePlayGame('video_only')} style={{background:'none', border:'none', cursor:'pointer', padding:0, display:'flex'}}>
-                            <Video size={14} color="#4CAF50"/>
+                    <Coins size={14} color={coins > 0 ? "#E040FB" : "#555"} />
+                    <span style={{fontSize:'12px', fontWeight:'bold', color: coins > 0 ? "#fff" : "#555"}}>{coins} Coins</span>
+                    {coins === 0 && (
+                        <button onClick={handleWatchAdForCoins} style={{background:'none', border:'none', cursor:'pointer', padding:0, display:'flex', marginLeft:'5px'}}>
+                            <Tv size={14} color="#4CAF50"/>
                         </button>
                     )}
                 </div>
@@ -267,7 +281,6 @@ const GameCard: React.FC<GameCardProps> = ({ title, desc, reward, icon, color, o
         <div style={{ textAlign:'right' }}>
             <div style={{ fontSize:'14px', color:color, fontWeight:'900' }}>+{reward}</div>
             <div style={{ fontSize:'9px', color:'#555', marginTop:'2px' }}>REWARD</div>
-            {/* 🛡️ USAMOS PLAY AQUÍ PARA EVITAR EL ERROR */}
             <div style={{display:'none'}}><Play /></div> 
         </div>
     </div>
