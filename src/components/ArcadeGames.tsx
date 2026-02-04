@@ -1,10 +1,37 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Crosshair } from 'lucide-react';
+import { supabase } from '../services/supabase'; // Asegúrate que la ruta sea correcta
+import { useAuth } from '../hooks/useAuth';
+
+// ✅ INTERFAZ NUEVA PARA CORREGIR EL ERROR
+interface AdResponse {
+    success: boolean;
+    progress: number;
+    rewarded: boolean;
+}
 
 interface GameProps {
     onClose: () => void;
     onFinish: (won: boolean, score: number) => void;
 }
+
+// Helper para registrar videos (Línea Mágica Global)
+const registerAdView = async (userId: string) => {
+    try {
+        console.log("🎬 Registering Arcade Ad View...");
+        const { data, error } = await supabase.rpc('register_ad_view', { p_user_id: userId });
+        
+        // ✅ CORRECCIÓN: Usamos el tipo definido en lugar de 'any'
+        const result = data as AdResponse;
+
+        if (!error && result?.rewarded) {
+            // Opcional: Feedback visual si ganó ticket
+            // alert("🎟️ +1 LUCKY TICKET EARNED!"); 
+        }
+    } catch (e) {
+        console.error("Ad Error:", e);
+    }
+};
 
 // Estilo compartido
 const GameOverlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -18,12 +45,14 @@ const GameOverlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     </div>
 );
 
-// 🧠 JUEGO 1: MEMORIA
+// 🧠 JUEGO 1: MEMORIA (Con Retry por Video)
 export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
+    const { user } = useAuth();
     const [pattern, setPattern] = useState<number[]>([]);
     const [selected, setSelected] = useState<number[]>([]);
     const [showing, setShowing] = useState(true);
     const [round, setRound] = useState(1);
+    const [hasRevived, setHasRevived] = useState(false); // Solo 1 revivir por juego
 
     const startRound = useCallback((currentRound: number) => {
         const newPattern = new Set<number>();
@@ -41,7 +70,7 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
         return () => clearTimeout(t);
     }, [startRound]);
 
-    const handleTap = (index: number) => {
+    const handleTap = async (index: number) => {
         if (showing) return;
         if (selected.includes(index)) return;
 
@@ -51,7 +80,6 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
 
             if (newSelected.length === pattern.length) {
                 if (round >= 3) {
-                    // 📉 CAMBIO: Premio ajustado a 1,500
                     setTimeout(() => onFinish(true, 1500), 500);
                 } else {
                     setTimeout(() => {
@@ -61,6 +89,17 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                 }
             }
         } else {
+            // 🔥 LÓGICA DE REVIVIR (VIDEO)
+            if (!hasRevived && user) {
+                const wantRevive = window.confirm("🧠 MEMORY FAILED!\n\nWatch Ad to Retry this round?");
+                if (wantRevive) {
+                    await registerAdView(user.id); // Cuenta para el Ticket
+                    setHasRevived(true);
+                    setSelected([]); // Reiniciar selección
+                    alert("🔁 Retrying Round...");
+                    return; // No terminar el juego
+                }
+            }
             onFinish(false, 0);
         }
     };
@@ -92,16 +131,21 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     );
 };
 
-// ☄️ JUEGO 2: ASTEROIDES (Puntos por acierto)
+// ☄️ JUEGO 2: ASTEROIDES (Con Tiempo Extra por Video)
 export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
+    const { user } = useAuth();
     const [score, setScore] = useState(0);
     const [timeLeft, setTimeLeft] = useState(15);
     const [asteroidPos, setAsteroidPos] = useState({ top: 40, left: 40 });
+    const [hasRevived, setHasRevived] = useState(false); // Solo 1 vez
     const scoreRef = useRef(0);
-    const onFinishRef = useRef(onFinish);
+    
+    // Refs para evitar problemas con closures en setInterval
+    const timeLeftRef = useRef(15);
+    const hasRevivedRef = useRef(false);
 
     useEffect(() => { scoreRef.current = score; }, [score]);
-    useEffect(() => { onFinishRef.current = onFinish; }, [onFinish]);
+    useEffect(() => { hasRevivedRef.current = hasRevived; }, [hasRevived]);
 
     const spawnAsteroid = useCallback(() => {
         setAsteroidPos({ 
@@ -110,23 +154,48 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
         });
     }, []);
 
+    // Función para manejar el fin del tiempo
+    const handleTimeUp = async () => {
+        if (!hasRevivedRef.current && user) {
+            // Pausamos visualmente (aunque el intervalo sigue, lo manejamos con lógica)
+            const wantMoreTime = window.confirm("⏳ TIME UP!\n\nWatch Ad for +10 seconds?");
+            if (wantMoreTime) {
+                await registerAdView(user.id); // Cuenta para el Ticket
+                setHasRevived(true);
+                hasRevivedRef.current = true;
+                setTimeLeft(10); // Dar 10 segundos extra
+                return; // Continuar juego
+            }
+        }
+        // Fin del juego real
+        onFinish(true, scoreRef.current * 100);
+    };
+
     useEffect(() => {
         const timer = setInterval(() => {
             setTimeLeft(prev => {
-                if (prev <= 1) {
+                const newVal = prev - 1;
+                timeLeftRef.current = newVal;
+                
+                if (newVal <= 0) {
+                    // Importante: Limpiamos intervalo temporalmente para preguntar
                     clearInterval(timer);
-                    // 📉 CAMBIO: 15 segundos x 1 acierto/seg x 100pts = 1,500 pts aprox.
-                    onFinishRef.current(true, scoreRef.current * 100);
+                    handleTimeUp(); 
                     return 0;
                 }
-                return prev - 1;
+                return newVal;
             });
         }, 1000);
+        
         const spawnTimer = setTimeout(() => spawnAsteroid(), 0);
+        
+        // Si revivimos, necesitamos reiniciar el timer effect, por eso dependemos de hasRevived
         return () => { clearInterval(timer); clearTimeout(spawnTimer); };
-    }, [spawnAsteroid]); 
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [spawnAsteroid, hasRevived]); // Reinicia el timer si revive
 
     const hit = () => {
+        if (timeLeft <= 0) return;
         setScore(s => s + 1);
         spawnAsteroid();
     };
@@ -134,7 +203,7 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     return (
         <GameOverlay>
             <div style={{ width: '300px', display:'flex', justifyContent:'space-between', marginBottom:'10px', color:'#fff', fontWeight:'bold', fontSize:'18px' }}>
-                <span>⏳ {timeLeft}s</span>
+                <span style={{ color: timeLeft <= 5 ? '#FF0000' : '#fff' }}>⏳ {timeLeft}s</span>
                 <span style={{color:'#FF512F'}}>💥 {score}</span>
             </div>
             <div style={{textAlign:'center', color:'#888', marginBottom:'15px', fontSize:'12px'}}>TAP TARGETS (100 pts/hit)</div>
@@ -157,11 +226,14 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     );
 };
 
-// 🔐 JUEGO 3: HACKER
+// 🔐 JUEGO 3: HACKER (Con Segundo Intento por Video)
 export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
+    const { user } = useAuth();
     const [targetZone, setTargetZone] = useState(50);
     const [cursorPos, setCursorPos] = useState(0);
     const [level, setLevel] = useState(1);
+    const [hasRevived, setHasRevived] = useState(false);
+    
     const directionRef = useRef(1);
     const posRef = useRef(0);
     const requestRef = useRef<number>(0);
@@ -179,17 +251,34 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
         return () => cancelAnimationFrame(requestRef.current);
     }, [level]);
 
-    const handleLock = () => {
+    const handleLock = async () => {
         if (Math.abs(posRef.current - targetZone) < 10) {
+            // ACIERTO
             if (level >= 3) {
-                // 📉 CAMBIO: Premio ajustado a 1,500
                 onFinish(true, 1500);
             } else { 
                 setLevel(l => l + 1); 
                 setTargetZone(Math.random() * 80 + 10); 
                 posRef.current = 0; 
             }
-        } else onFinish(false, 0);
+        } else {
+            // FALLO
+            if (!hasRevived && user) {
+                // Pausamos animación (truco visual)
+                cancelAnimationFrame(requestRef.current);
+                
+                const wantRetry = window.confirm("🔐 BREACH DETECTED!\n\nWatch Ad to bypass security and retry level?");
+                if (wantRetry) {
+                    await registerAdView(user.id); // Cuenta para el Ticket
+                    setHasRevived(true);
+                    posRef.current = 0; // Reset posición
+                    alert("🛡️ SYSTEM BYPASSED. Retrying...");
+                    // Reactivamos animación al cambiar estado
+                    return;
+                }
+            }
+            onFinish(false, 0);
+        }
     };
 
     return (
@@ -200,7 +289,7 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                 <div style={{ position: 'absolute', left: `${targetZone}%`, width: '15%', height: '100%', background: 'rgba(0, 242, 254, 0.3)', transform: 'translateX(-50%)', borderLeft:'1px solid #00F2FE', borderRight:'1px solid #00F2FE' }} />
                 <div style={{ position: 'absolute', left: `${cursorPos}%`, width: '4px', height: '100%', background: '#fff', boxShadow: '0 0 10px #fff', transform: 'translateX(-50%)' }} />
             </div>
-            <button onClick={onClose} style={{marginTop:'50px', background:'none', border:'none', color:'#555'}}>Exit</button>
+            <button onClick={onClose} style={{marginTop:'50px', background:'none', border:'1px solid #555', color:'#555'}}>Exit</button>
         </GameOverlay>
     );
 };
