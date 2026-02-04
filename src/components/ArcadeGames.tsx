@@ -3,7 +3,7 @@ import { Crosshair } from 'lucide-react';
 import { supabase } from '../services/supabase'; // Asegúrate que la ruta sea correcta
 import { useAuth } from '../hooks/useAuth';
 
-// ✅ INTERFAZ DEFINIDA PARA RESPUESTA DE VIDEO
+// ✅ INTERFAZ DEFINIDA PARA RESPUESTA DE VIDEO (Soluciona el error de "any")
 interface AdResponse {
     success: boolean;
     progress: number;
@@ -21,7 +21,8 @@ const registerAdView = async (userId: string) => {
         console.log("🎬 Registering Arcade Ad View...");
         const { data, error } = await supabase.rpc('register_ad_view', { p_user_id: userId });
         
-        // ✅ CORRECCIÓN TIPO: Usamos 'AdResponse'
+        // ✅ CORRECCIÓN DE TIPO: Convertimos la respuesta a 'AdResponse'
+        // Esto elimina el error 'Unexpected any'
         const result = data as AdResponse;
 
         if (!error && result?.rewarded) {
