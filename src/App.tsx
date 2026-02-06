@@ -267,7 +267,12 @@ export default function App() {
                         </div>
                     )}
 
-                    {currentTab === 'mission' && <div style={{ animation: 'fadeIn 0.3s' }}><MissionZone /></div>}
+                    {currentTab === 'mission' && (
+                        <div style={{ animation: 'fadeIn 0.3s' }}>
+                            {/* 🔥 AQUÍ ESTABA EL ERROR: AHORA PASAMOS SETSCORE 🔥 */}
+                            <MissionZone setGlobalScore={setScore} />
+                        </div>
+                    )}
                     
                     {currentTab === 'squad' && (
                         <div style={{ padding: '20px', animation: 'fadeIn 0.3s' }}>
