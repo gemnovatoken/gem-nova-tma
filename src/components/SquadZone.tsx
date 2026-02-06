@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-// 👇 HE QUITADO 'Play' DE AQUÍ
-import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Calendar, Lock, Tv } from 'lucide-react';
+// Importamos Lock y Tv correctamente
+import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Calendar, Tv, Trophy, Timer, History, AlertCircle, Lock } from 'lucide-react';
 
 // --- INTERFACES ---
 interface RewardCardProps {
@@ -33,22 +33,222 @@ interface UserScoreData {
     referral_count: number;
 }
 
+// Unificamos las props. TicketEmpire usa las mismas que SquadZone.
 interface SquadZoneProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
 
-// --- NUEVO COMPONENTE: TICKET EMPIRE (Reemplaza al Sol) ---
-interface TicketEmpireProps {
-    setGlobalScore: (val: number | ((prev: number) => number)) => void;
+// ✅ INTERFAZ PARA RESPUESTA DE VIDEO
+interface AdResponse {
+    success: boolean;
+    progress: number;
+    rewarded: boolean;
 }
 
-const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
+// --- COMPONENTE: MODAL DE LOTERÍA ---
+interface LotteryModalProps {
+    onClose: () => void;
+    luckyTickets: number;
+    setLuckyTickets: React.Dispatch<React.SetStateAction<number>>;
+}
+
+const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTickets, setLuckyTickets }) => {
+    const { user } = useAuth();
+    const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
+    const [myEntries, setMyEntries] = useState(0); 
+    // Inicializamos con 35 directamente para evitar el error de setState en useEffect
+    const [soldTotal, setSoldTotal] = useState(35); 
+    const [loading, setLoading] = useState(false);
+
+    const MAX_TICKETS_GLOBAL = 50;
+    const PRIZE_POOL = 15; 
+
+    // useEffect eliminado porque ya inicializamos el estado arriba.
+    // Si necesitas cargar datos reales, hazlo aquí pero con una función async.
+
+    const handleBuyTicket = async (ticketSlot: number) => {
+        if (!user || loading) return;
+        setLoading(true);
+
+        try {
+            if (ticketSlot === 1) {
+                // --- TICKET 1: Cuesta 1 Lucky Ticket ---
+                if (luckyTickets < 1) {
+                    alert("❌ Insufficient Lucky Tickets! Watch ads to earn more.");
+                    setLoading(false);
+                    return;
+                }
+
+                // Aquí llamarías a supabase.rpc('spend_lucky_ticket'...)
+                // Simulamos éxito:
+                setLuckyTickets((prev: number) => prev - 1);
+                setMyEntries(1);
+                setSoldTotal((prev: number) => Math.min(prev + 1, MAX_TICKETS_GLOBAL));
+                alert("🎟️ TICKET #1 PURCHASED!\n\nYou are now in the draw for 15 TON.");
+
+            } else {
+                // --- TICKET 2 y 3: Cuesta TON (Con Descuento) ---
+                const basePrice = 0.50;
+                const discountPrice = 0.25;
+                const ticketCostForDiscount = 2; // Costo en Lucky Tickets para activar descuento
+
+                let finalPrice = basePrice;
+                let usedDiscount = false;
+
+                // Lógica de Descuento
+                if (luckyTickets >= ticketCostForDiscount) {
+                    const useDiscount = window.confirm(
+                        `💰 PAY LESS?\n\nStandard Price: ${basePrice} TON\n\n🔥 DEAL: Burn ${ticketCostForDiscount} Lucky Tickets to pay only ${discountPrice} TON?`
+                    );
+                    if (useDiscount) {
+                        finalPrice = discountPrice;
+                        usedDiscount = true;
+                    }
+                }
+
+                const confirmPurchase = window.confirm(`💸 CONFIRM PURCHASE\n\nBuy Ticket #${ticketSlot} for ${finalPrice} TON?`);
+                
+                if (confirmPurchase) {
+                    // Simulación de espera de Blockchain
+                    await new Promise(r => setTimeout(r, 1500));
+                    
+                    if (usedDiscount) {
+                        setLuckyTickets((prev: number) => prev - ticketCostForDiscount);
+                    }
+
+                    setMyEntries(ticketSlot);
+                    setSoldTotal((prev: number) => Math.min(prev + 1, MAX_TICKETS_GLOBAL));
+                    alert(`🎟️ TICKET #${ticketSlot} SECURED!\n\nGood luck!`);
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        setLoading(false);
+    };
+
+    return (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px' }}>
+            <div className="glass-card" style={{ width: '100%', maxWidth:'400px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #FFD700', position: 'relative', padding:'0', background: '#111' }}>
+                
+                {/* Header */}
+                <div style={{ padding: '15px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(90deg, rgba(255,215,0,0.1), transparent)' }}>
+                    <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
+                        <Trophy size={20} color="#FFD700" />
+                        <span style={{ fontWeight: 'bold', color: '#FFD700' }}>GEM LOTTERY</span>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aaa' }}><X /></button>
+                </div>
+
+                {/* Tabs */}
+                <div style={{ display: 'flex', borderBottom: '1px solid #333' }}>
+                    <button onClick={() => setActiveTab('active')} style={{ flex: 1, padding: '12px', background: activeTab === 'active' ? 'rgba(255,255,255,0.05)' : 'transparent', border: 'none', color: activeTab === 'active' ? '#fff' : '#555', fontWeight: 'bold', borderBottom: activeTab === 'active' ? '2px solid #FFD700' : 'none' }}>ACTIVE ROUND</button>
+                    <button onClick={() => setActiveTab('history')} style={{ flex: 1, padding: '12px', background: activeTab === 'history' ? 'rgba(255,255,255,0.05)' : 'transparent', border: 'none', color: activeTab === 'history' ? '#fff' : '#555', fontWeight: 'bold', borderBottom: activeTab === 'history' ? '2px solid #FFD700' : 'none' }}>HISTORY</button>
+                </div>
+
+                <div style={{ padding: '20px' }}>
+                    {activeTab === 'active' ? (
+                        <>
+                            {/* PRIZE CARD */}
+                            <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+                                <div style={{ fontSize: '12px', color: '#aaa', letterSpacing: '2px', marginBottom: '5px' }}>ROUND #1 PRIZE POOL</div>
+                                <div style={{ fontSize: '42px', fontWeight: '900', color: '#fff', textShadow: '0 0 20px #FFD700' }}>{PRIZE_POOL} TON</div>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#333', padding: '4px 10px', borderRadius: '15px', marginTop: '10px' }}>
+                                    <Timer size={12} color="#aaa" />
+                                    <span style={{ fontSize: '10px', color: '#fff' }}>Ends in 23h 45m</span>
+                                </div>
+                            </div>
+
+                            {/* PROGRESS BAR */}
+                            <div style={{ marginBottom: '30px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '5px', color: '#aaa' }}>
+                                    <span>Tickets Sold</span>
+                                    <span style={{ color: '#FFD700' }}>{soldTotal}/{MAX_TICKETS_GLOBAL}</span>
+                                </div>
+                                <div style={{ width: '100%', height: '8px', background: '#222', borderRadius: '4px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${(soldTotal / MAX_TICKETS_GLOBAL) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #FFD700, #FFA500)' }}></div>
+                                </div>
+                                {soldTotal >= 45 && <div style={{ fontSize: '10px', color: '#FF512F', marginTop: '5px', display:'flex', alignItems:'center', gap:'4px' }}><AlertCircle size={10}/> ALMOST SOLD OUT!</div>}
+                            </div>
+
+                            {/* BUY SECTION */}
+                            <h4 style={{ color: '#fff', marginBottom: '15px' }}>YOUR ENTRIES ({myEntries}/3)</h4>
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                
+                                {/* TICKET 1 */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: myEntries >= 1 ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255,255,255,0.05)', borderRadius: '10px', border: myEntries >= 1 ? '1px solid #4CAF50' : '1px solid #333' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: myEntries >= 1 ? '#4CAF50' : '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>1</div>
+                                        <div>
+                                            <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>Entry Ticket #1</div>
+                                            <div style={{ color: '#aaa', fontSize: '10px' }}>Cost: <span style={{ color: '#00F2FE' }}>1 Lucky Ticket</span></div>
+                                        </div>
+                                    </div>
+                                    {myEntries >= 1 ? <CheckCircle2 color="#4CAF50" size={20} /> : (
+                                        <button onClick={() => handleBuyTicket(1)} disabled={loading} style={{ background: '#00F2FE', border: 'none', borderRadius: '5px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
+                                            BUY
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* TICKET 2 */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: myEntries >= 2 ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255,255,255,0.05)', borderRadius: '10px', border: myEntries >= 2 ? '1px solid #4CAF50' : '1px solid #333', opacity: myEntries < 1 ? 0.5 : 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: myEntries >= 2 ? '#4CAF50' : '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>2</div>
+                                        <div>
+                                            <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>Entry Ticket #2</div>
+                                            <div style={{ color: '#aaa', fontSize: '10px' }}>Cost: <span style={{ color: '#FFD700' }}>0.50 TON</span></div>
+                                        </div>
+                                    </div>
+                                    {myEntries >= 2 ? <CheckCircle2 color="#4CAF50" size={20} /> : (
+                                        <button onClick={() => handleBuyTicket(2)} disabled={loading || myEntries < 1} style={{ background: myEntries < 1 ? '#555' : '#FFD700', border: 'none', borderRadius: '5px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: myEntries < 1 ? 'not-allowed' : 'pointer' }}>
+                                            BUY
+                                        </button>
+                                    )}
+                                </div>
+                                {myEntries === 1 && <div style={{ fontSize: '9px', color: '#E040FB', textAlign: 'center', marginTop: '-5px' }}>💡 Use 2 Lucky Tickets to pay only 0.25 TON!</div>}
+
+                                {/* TICKET 3 */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: myEntries >= 3 ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255,255,255,0.05)', borderRadius: '10px', border: myEntries >= 3 ? '1px solid #4CAF50' : '1px solid #333', opacity: myEntries < 2 ? 0.5 : 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: myEntries >= 3 ? '#4CAF50' : '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>3</div>
+                                        <div>
+                                            <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>Entry Ticket #3</div>
+                                            <div style={{ color: '#aaa', fontSize: '10px' }}>Cost: <span style={{ color: '#FFD700' }}>0.50 TON</span></div>
+                                        </div>
+                                    </div>
+                                    {myEntries >= 3 ? <CheckCircle2 color="#4CAF50" size={20} /> : (
+                                        <button onClick={() => handleBuyTicket(3)} disabled={loading || myEntries < 2} style={{ background: myEntries < 2 ? '#555' : '#FFD700', border: 'none', borderRadius: '5px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: myEntries < 2 ? 'not-allowed' : 'pointer' }}>
+                                            BUY
+                                        </button>
+                                    )}
+                                </div>
+
+                            </div>
+                        </>
+                    ) : (
+                        <div style={{ textAlign: 'center', color: '#555', marginTop: '50px' }}>
+                            <History size={40} />
+                            <p>No past lotteries yet.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- COMPONENTE: TICKET EMPIRE (Reemplaza al Sol) ---
+// Usamos SquadZoneProps para que coincida con lo que se espera
+const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const [luckyTickets, setLuckyTickets] = useState(0);
     const [videoProgress, setVideoProgress] = useState(0); // 0 to 20
     const [dailyStreak, setDailyStreak] = useState(0);
     const [loading, setLoading] = useState(false);
     const [claimedToday, setClaimedToday] = useState(false);
+    const [showLottery, setShowLottery] = useState(false);
 
     // Carga de datos inicial
     useEffect(() => {
@@ -94,13 +294,13 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
             const { data, error } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
             
             if (!error && data) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const result = data as any;
+                // CORRECCIÓN: Usamos la interfaz
+                const result = data as AdResponse;
                 setVideoProgress(result.progress);
                 
                 if (result.rewarded) {
                     alert("🎉 MILESTONE REACHED!\n\nYou watched 20 ads across the game and earned +1 LUCKY TICKET!");
-                    setLuckyTickets(prev => prev + 1);
+                    setLuckyTickets((prev: number) => prev + 1);
                 }
             }
             setLoading(false);
@@ -124,12 +324,12 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
         const result = data as any;
         
         if (result.success) {
-            setLuckyTickets(prev => prev + result.tickets_earned);
+            setLuckyTickets((prev: number) => prev + result.tickets_earned);
             setDailyStreak(result.new_streak);
             setClaimedToday(true);
 
             if (result.points_earned > 0) {
-                setGlobalScore(prev => prev + result.points_earned);
+                setGlobalScore((prev: number) => prev + result.points_earned);
             }
 
             let msg = `✅ DAILY CHECK-IN COMPLETE!\n\n🔥 Streak: ${result.new_streak} Days\n💎 Points: +${result.points_earned}`;
@@ -145,6 +345,9 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
 
     return (
         <div style={{ marginBottom: '20px' }}>
+            {/* Modal de Lotería */}
+            {showLottery && <LotteryModal onClose={() => setShowLottery(false)} luckyTickets={luckyTickets} setLuckyTickets={setLuckyTickets} />}
+
             {/* ENCABEZADO: TOTAL TICKETS */}
             <div className="cyber-card" style={{ 
                 background: 'linear-gradient(135deg, #4A00E0 0%, #8E2DE2 100%)',
@@ -160,7 +363,19 @@ const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
                 <div style={{ fontSize: '36px', fontWeight: '900', textShadow: '0 2px 10px rgba(0,0,0,0.3)', lineHeight: '1' }}>
                     {luckyTickets}
                 </div>
-                <div style={{ fontSize: '9px', opacity: 0.8, marginTop: '5px' }}>USE FOR LOTTERY & REWARDS</div>
+                
+                {/* 🔥 BOTÓN PARA ENTRAR A LA LOTERÍA 🔥 */}
+                <button 
+                    onClick={() => setShowLottery(true)}
+                    className="btn-neon" 
+                    style={{ 
+                        marginTop: '15px', width: '100%', background: '#FFD700', color: '#000', border: 'none', 
+                        fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                        boxShadow: '0 0 10px rgba(255, 215, 0, 0.5)' 
+                    }}
+                >
+                    <Trophy size={14} color="#000" /> ENTER LOTTERY
+                </button>
             </div>
 
             {/* SECCIÓN DE MISIONES */}
@@ -344,7 +559,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
             fetchReferralList();
         } else {
             const amount = type === 'initial' ? 2500 : 5000;
-            if (setGlobalScore) setGlobalScore(prev => prev + amount);
+            if (setGlobalScore) setGlobalScore((prev: number) => prev + amount);
             if(window.navigator.vibrate) window.navigator.vibrate(200);
             
             setTimeout(() => {
@@ -362,7 +577,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     return (
         <div style={{ padding: '0 15px', paddingBottom: '100px', height: '100%', overflowY: 'auto' }}>
             
-            {/* TICKET EMPIRE (AHORA GLOBAL TRACKER) */}
+            {/* TICKET EMPIRE CON EL NUEVO BOTÓN DE LOTERÍA */}
             <TicketEmpire setGlobalScore={setGlobalScore} />
 
             {/* SQUAD DASHBOARD */}
@@ -392,7 +607,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
 
-            {/* BOUNTY BOARD */}
+            {/* BOUNTY BOARD (SIN CAMBIOS) */}
             <div className="glass-card" style={{ padding:'10px', marginBottom:'10px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px', borderBottom:'1px solid #333', paddingBottom:'5px' }}>
                     <h3 style={{ fontSize: '12px', margin: 0, color:'#aaa' }}>ACTIVE BOUNTIES</h3>
@@ -424,7 +639,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 <ChevronRight size={14} color="#aaa" />
             </button>
 
-            {/* MODALS (Sin cambios) */}
+            {/* MODAL 1: AGENTS LIST */}
             {showReferralList && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
                     <div className="glass-card" style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto', border: '1px solid #00F2FE', position: 'relative', padding:'15px' }}>
@@ -442,6 +657,12 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                             </div>
                         ) : (
                             <div style={{marginTop:'15px'}}>
+                                <div style={{display:'grid', gridTemplateColumns:'0.5fr 2fr 1fr 1fr', fontSize:'10px', color:'#666', marginBottom:'10px', paddingBottom:'5px', borderBottom:'1px solid #333'}}>
+                                    <div>#</div>
+                                    <div>AGENT</div>
+                                    <div style={{textAlign:'center'}}>INIT</div>
+                                    <div style={{textAlign:'center'}}>LVL 4</div>
+                                </div>
                                 {referralList.map((refUser, index) => (
                                     <div key={refUser.user_id} style={{display:'grid', gridTemplateColumns:'0.5fr 2fr 1fr 1fr', alignItems:'center', marginBottom:'10px', fontSize:'12px'}}>
                                         <div style={{color:'#aaa'}}>{index + 1}</div>
@@ -473,6 +694,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 </div>
             )}
 
+            {/* MODAL 2: MILESTONES */}
             {showMilestones && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                     <div className="glass-card" style={{ width: '100%', maxHeight: '70vh', overflowY: 'auto', border: '1px solid #FFD700', position: 'relative' }}>
