@@ -33,13 +33,8 @@ interface UserScoreData {
     referral_count: number;
 }
 
-// Props compartidas
+// Unificamos las props para evitar errores de "Cannot find name"
 interface SquadZoneProps {
-    setGlobalScore: (val: number | ((prev: number) => number)) => void;
-}
-
-// Definimos explícitamente TicketEmpireProps igual que SquadZoneProps
-interface TicketEmpireProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
 
@@ -50,7 +45,7 @@ interface AdResponse {
     rewarded: boolean;
 }
 
-// Estructura de un boleto comprado
+// Estructura de un boleto comprado (Nuevo)
 interface MyTicket {
     code: string;
     date: string;
@@ -67,32 +62,36 @@ const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTickets, setL
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
     
-    // Ahora usamos un array de tickets reales
+    // Array de tickets reales
     const [myTickets, setMyTickets] = useState<MyTicket[]>([]); 
-    const [soldTotal, setSoldTotal] = useState(35); // Valor inicial seguro
+    const [soldTotal, setSoldTotal] = useState(0); 
     const [loading, setLoading] = useState(false);
 
     const MAX_TICKETS_GLOBAL = 50;
     const PRIZE_POOL = 15; 
 
-    // CARGAR DATOS REALES AL ABRIR EL MODAL (Soluciona que aparezca vacío)
-    useEffect(() => {
+    // 🔥 FUNCIÓN DE CARGA DE DATOS (Moviéndola fuera del useEffect para reusarla)
+    const fetchLotteryData = async () => {
         if (!user) return;
-        const fetchLotteryData = async () => {
-            // 1. Obtener mis boletos comprados desde la DB
-            const { data } = await supabase.rpc('get_my_lottery_tickets', { p_user_id: user.id });
-            
+        
+        // 1. Obtener mis boletos comprados desde la DB
+        const { data } = await supabase.rpc('get_my_lottery_tickets', { p_user_id: user.id });
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (data && (data as any).tickets) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            if (data && (data as any).tickets) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                setMyTickets((data as any).tickets);
-            }
+            setMyTickets((data as any).tickets);
+        }
 
-            // 2. Obtener total vendidos
-            const { count } = await supabase.from('lottery_entries').select('*', { count: 'exact', head: true }).eq('round_number', 1);
-            if (count !== null) setSoldTotal(count);
-        };
+        // 2. Obtener total vendidos
+        const { count } = await supabase.from('lottery_entries').select('*', { count: 'exact', head: true }).eq('round_number', 1);
+        if (count !== null) setSoldTotal(count);
+    };
+
+    // Carga inicial
+    useEffect(() => {
         fetchLotteryData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
     const handleBuyTicket = async (ticketSlot: number) => {
@@ -108,6 +107,7 @@ const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTickets, setL
                 costType = 'lucky_ticket';
                 costAmount = 1;
                 
+                // Validación local rápida
                 if (luckyTickets < 1) {
                     alert("❌ Insufficient Lucky Tickets! Watch ads to earn more.");
                     setLoading(false);
@@ -125,7 +125,6 @@ const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTickets, setL
             }
 
             // LLAMADA A SUPABASE PARA COMPRAR Y GUARDAR
-            // (Esto soluciona el error de que "no se guardó que ya compré")
             const { data, error } = await supabase.rpc('buy_lottery_ticket', { 
                 p_user_id: user.id, 
                 p_cost_type: costType, 
@@ -136,18 +135,18 @@ const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTickets, setL
             const result = data as any;
 
             if (!error && result.success) {
-                // Actualizar estado local de Tickets Lucky
+                // 1. Actualizar saldo visualmente
                 if (costType === 'lucky_ticket') {
-                    setLuckyTickets((prev: number) => prev - costAmount);
+                    setLuckyTickets((prev: number) => Math.max(0, prev - costAmount));
                 }
                 
-                // Agregar el nuevo ticket a la lista visual inmediatamente
-                setMyTickets(prev => [...prev, { code: result.ticket_code, date: new Date().toISOString() }]);
-                setSoldTotal(result.new_total); 
+                // 2. 🔥 RECARGAR DATOS DESDE LA DB (CLAVE PARA PERSISTENCIA) 🔥
+                await fetchLotteryData();
 
                 alert(`🎟️ SUCCESS!\n\nTicket Assigned: ${result.ticket_code}\nGood luck!`);
             } else {
-                alert("❌ Error: " + (result?.message || "Transaction failed"));
+                // Mensaje de error detallado
+                alert("❌ Error: " + (result?.message || error?.message || "Transaction failed"));
             }
 
         } catch (e) {
@@ -283,7 +282,7 @@ const TicketRow = ({ number, priceLabel, priceColor, isOwned, ticketCode, onBuy,
 );
 
 // --- COMPONENTE: TICKET EMPIRE ---
-const TicketEmpire: React.FC<TicketEmpireProps> = ({ setGlobalScore }) => {
+const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const [luckyTickets, setLuckyTickets] = useState(0);
     const [videoProgress, setVideoProgress] = useState(0); 
