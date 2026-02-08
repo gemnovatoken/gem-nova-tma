@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { X, Trophy, Timer, History, AlertCircle, CheckCircle2, Hash } from 'lucide-react';
+import { X, Trophy, Timer, History, AlertCircle, CheckCircle2, Hash, Ticket } from 'lucide-react';
 
 // --- INTERFACES ---
 interface MyTicket {
@@ -20,6 +20,7 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
     
+    // Array de tickets reales
     const [myTickets, setMyTickets] = useState<MyTicket[]>([]); 
     const [soldTotal, setSoldTotal] = useState(0); 
     const [loading, setLoading] = useState(false);
@@ -27,10 +28,11 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     const MAX_TICKETS_GLOBAL = 50;
     const PRIZE_POOL = 15; 
 
-    // Función para recargar datos desde la DB
+    // 🔥 FUNCIÓN DE CARGA DE DATOS
     const fetchLotteryData = async () => {
         if (!user) return;
         
+        // 1. Obtener mis boletos comprados desde la DB
         const { data } = await supabase.rpc('get_my_lottery_tickets', { p_user_id: user.id });
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,6 +41,7 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
             setMyTickets((data as any).tickets);
         }
 
+        // 2. Obtener total vendidos
         const { count } = await supabase.from('lottery_entries').select('*', { count: 'exact', head: true }).eq('round_number', 1);
         if (count !== null) setSoldTotal(count);
     };
@@ -56,8 +59,10 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
         try {
             let costType = 'ton';
             let costAmount = 0;
+            let burnAmount = 0; // Tickets extra a quemar por descuento
 
             if (ticketSlot === 1) {
+                // TICKET 1: Cuesta 1 Lucky Ticket
                 costType = 'lucky_ticket';
                 costAmount = 1;
                 
@@ -67,28 +72,54 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                     return;
                 }
             } else {
-                const confirm = window.confirm(`💸 Confirm purchase for Ticket #${ticketSlot}?`);
-                if (!confirm) {
+                // TICKET 2 y 3: Cuesta TON (Con Descuento Opcional)
+                const basePrice = 0.50;
+                const discountPrice = 0.25;
+                const ticketsNeededForDiscount = 2;
+
+                let finalPrice = basePrice;
+                let userWantsDiscount = false;
+
+                // Si tiene tickets suficientes, ofrecer descuento
+                if (luckyTickets >= ticketsNeededForDiscount) {
+                    userWantsDiscount = window.confirm(
+                        `🔥 DISCOUNT AVAILABLE!\n\nPay only ${discountPrice} TON instead of ${basePrice} TON?\n\nCost: Burn ${ticketsNeededForDiscount} Lucky Tickets.`
+                    );
+                    if (userWantsDiscount) {
+                        finalPrice = discountPrice;
+                        burnAmount = ticketsNeededForDiscount; // Aquí definimos que se restarán 2 tickets
+                    }
+                }
+
+                const confirmPurchase = window.confirm(`💸 CONFIRM PURCHASE\n\nBuy Ticket #${ticketSlot} for ${finalPrice} TON?`);
+                if (!confirmPurchase) {
                     setLoading(false);
                     return;
                 }
+                
+                // Simulación de transacción blockchain
                 await new Promise(r => setTimeout(r, 1000)); 
             }
 
+            // LLAMADA A SUPABASE (Ahora enviamos burnAmount)
             const { data, error } = await supabase.rpc('buy_lottery_ticket', { 
                 p_user_id: user.id, 
                 p_cost_type: costType, 
-                p_cost_amount: costAmount 
+                p_cost_amount: costAmount,
+                p_burn_amount: burnAmount // 🔥 Enviamos tickets extra a restar
             });
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const result = data as any;
 
             if (!error && result.success) {
-                if (costType === 'lucky_ticket') {
-                    setLuckyTickets((prev: number) => Math.max(0, prev - costAmount));
+                // Actualizar visualmente los tickets gastados
+                const totalTicketsSpent = costAmount + burnAmount;
+                if (totalTicketsSpent > 0) {
+                    setLuckyTickets((prev: number) => Math.max(0, prev - totalTicketsSpent));
                 }
-                await fetchLotteryData();
+                
+                await fetchLotteryData(); // Recargar para ver el código
                 alert(`🎟️ SUCCESS!\n\nTicket Assigned: ${result.ticket_code}\nGood luck!`);
             } else {
                 alert("❌ Error: " + (result?.message || error?.message || "Transaction failed"));
@@ -107,6 +138,7 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px' }}>
             <div className="glass-card" style={{ width: '100%', maxWidth:'400px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid #FFD700', position: 'relative', padding:'0', background: '#111' }}>
                 
+                {/* Header */}
                 <div style={{ padding: '15px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'linear-gradient(90deg, rgba(255,215,0,0.1), transparent)' }}>
                     <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
                         <Trophy size={20} color="#FFD700" />
@@ -115,6 +147,7 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                     <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#aaa' }}><X /></button>
                 </div>
 
+                {/* Tabs */}
                 <div style={{ display: 'flex', borderBottom: '1px solid #333' }}>
                     <button onClick={() => setActiveTab('active')} style={{ flex: 1, padding: '12px', background: activeTab === 'active' ? 'rgba(255,255,255,0.05)' : 'transparent', border: 'none', color: activeTab === 'active' ? '#fff' : '#555', fontWeight: 'bold', borderBottom: activeTab === 'active' ? '2px solid #FFD700' : 'none' }}>ACTIVE ROUND</button>
                     <button onClick={() => setActiveTab('history')} style={{ flex: 1, padding: '12px', background: activeTab === 'history' ? 'rgba(255,255,255,0.05)' : 'transparent', border: 'none', color: activeTab === 'history' ? '#fff' : '#555', fontWeight: 'bold', borderBottom: activeTab === 'history' ? '2px solid #FFD700' : 'none' }}>HISTORY</button>
@@ -123,6 +156,7 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                 <div style={{ padding: '20px' }}>
                     {activeTab === 'active' ? (
                         <>
+                            {/* PRIZE CARD */}
                             <div style={{ textAlign: 'center', marginBottom: '25px' }}>
                                 <div style={{ fontSize: '12px', color: '#aaa', letterSpacing: '2px', marginBottom: '5px' }}>ROUND #1 PRIZE POOL</div>
                                 <div style={{ fontSize: '42px', fontWeight: '900', color: '#fff', textShadow: '0 0 20px #FFD700' }}>{PRIZE_POOL} TON</div>
@@ -132,6 +166,7 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                                 </div>
                             </div>
 
+                            {/* PROGRESS BAR */}
                             <div style={{ marginBottom: '30px' }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '5px', color: '#aaa' }}>
                                     <span>Tickets Sold</span>
@@ -143,9 +178,11 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                                 {soldTotal >= 45 && <div style={{ fontSize: '10px', color: '#FF512F', marginTop: '5px', display:'flex', alignItems:'center', gap:'4px' }}><AlertCircle size={10}/> ALMOST SOLD OUT!</div>}
                             </div>
 
+                            {/* BUY SECTION */}
                             <h4 style={{ color: '#fff', marginBottom: '15px' }}>YOUR ENTRIES ({myEntriesCount}/3)</h4>
                             
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {/* TICKET 1 */}
                                 <TicketRow 
                                     number={1} 
                                     priceLabel="1 Lucky Ticket" 
@@ -155,6 +192,8 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                                     onBuy={() => handleBuyTicket(1)}
                                     disabled={loading}
                                 />
+
+                                {/* TICKET 2 */}
                                 <TicketRow 
                                     number={2} 
                                     priceLabel="0.50 TON" 
@@ -164,6 +203,8 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                                     onBuy={() => handleBuyTicket(2)}
                                     disabled={loading || myEntriesCount < 1}
                                 />
+
+                                {/* TICKET 3 */}
                                 <TicketRow 
                                     number={3} 
                                     priceLabel="0.50 TON" 
@@ -176,9 +217,25 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                             </div>
                         </>
                     ) : (
-                        <div style={{ textAlign: 'center', color: '#555', marginTop: '50px' }}>
-                            <History size={40} />
-                            <p>No past lotteries yet.</p>
+                        <div style={{ textAlign: 'center', color: '#555', marginTop: '20px' }}>
+                            {/* EJEMPLO DE CÓMO SE VERÍA UN TICKET EXPIRADO */}
+                            <div style={{background: 'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'10px', marginBottom:'20px', border:'1px solid #333'}}>
+                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
+                                    <span style={{color:'#aaa', fontSize:'12px'}}>ROUND #0 (Demo)</span>
+                                    <span style={{color:'#FF512F', fontSize:'12px', fontWeight:'bold'}}>EXPIRED</span>
+                                </div>
+                                <div style={{display:'flex', alignItems:'center', gap:'10px', opacity:0.6}}>
+                                    <Ticket size={20} color="#555"/>
+                                    <span style={{color:'#fff', fontWeight:'bold'}}>#T-000</span>
+                                </div>
+                                <div style={{marginTop:'10px', fontSize:'12px', color:'#aaa'}}>
+                                    Result: Not Winning
+                                </div>
+                            </div>
+                            <div style={{color:'#888', fontSize:'14px', fontStyle:'italic'}}>
+                                <History size={16} style={{ verticalAlign: 'middle', marginRight: '4px' }}/>
+                                "Good luck next time! 🍀"
+                            </div>
                         </div>
                     )}
                 </div>
@@ -194,12 +251,12 @@ const TicketRow = ({ number, priceLabel, priceColor, isOwned, ticketCode, onBuy,
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: isOwned ? '#4CAF50' : '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>{number}</div>
             <div>
                 <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>
-                    {isOwned ? <span style={{color:'#4CAF50'}}>ENTRY CONFIRMED</span> : `Entry Ticket #${number}`}
+                    {isOwned ? <span style={{color:'#4CAF50'}}>ACTIVE TICKET</span> : `Entry Ticket #${number}`}
                 </div>
                 <div style={{ color: '#aaa', fontSize: '10px' }}>
                     {isOwned ? (
                         <span style={{display:'flex', alignItems:'center', gap:'4px', color:'#fff'}}>
-                            <Hash size={10}/> Code: <span style={{color:'#FFD700', fontWeight:'bold'}}>{ticketCode}</span>
+                            <Hash size={10}/> Code: <span style={{color:'#FFD700', fontWeight:'bold', fontSize:'14px'}}>{ticketCode || "Generating..."}</span>
                         </span>
                     ) : (
                         <>Cost: <span style={{ color: priceColor }}>{priceLabel}</span></>
