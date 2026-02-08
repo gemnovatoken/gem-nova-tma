@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-// IMPORTAMOS EL NUEVO COMPONENTE DESDE LA OTRA CARPETA/ARCHIVO
+// IMPORTAMOS EL COMPONENTE DE LOTERÍA 
 import { LotteryModal } from './GemLottery'; 
 import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Calendar, Tv, Trophy, Lock } from 'lucide-react';
 
@@ -45,31 +45,44 @@ interface AdResponse {
     rewarded: boolean;
 }
 
-// --- COMPONENTE: TICKET EMPIRE ---
+// --- COMPONENTE: TICKET EMPIRE (SINCRONIZADO CON MISSION ZONE) ---
 const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const [luckyTickets, setLuckyTickets] = useState(0);
     const [videoProgress, setVideoProgress] = useState(0); 
-    const [dailyStreak, setDailyStreak] = useState(0);
+    
+    // 🔥 CAMBIO: Usamos los mismos nombres de estado que en MissionZone para claridad lógica
+    const [streak, setStreak] = useState(0); 
+    const [checkedInToday, setCheckedInToday] = useState(false);
+    
     const [loading, setLoading] = useState(false);
-    const [claimedToday, setClaimedToday] = useState(false);
     const [showLottery, setShowLottery] = useState(false);
 
+    // Carga de datos UNIFICADA (Sincronización)
     useEffect(() => {
         if (!user) return;
         const fetchUserData = async () => {
+            // 🔥 LEEMOS LAS MISMAS COLUMNAS QUE MISSION ZONE ('current_streak', 'last_check_in_date')
             const { data, error } = await supabase
                 .from('user_score')
-                .select('lucky_tickets, videos_watched_streak, daily_streak, last_login_date')
+                .select('lucky_tickets, videos_watched_streak, current_streak, last_check_in_date')
                 .eq('user_id', user.id)
                 .single();
 
             if (!error && data) {
                 setLuckyTickets(data.lucky_tickets || 0);
                 setVideoProgress(data.videos_watched_streak || 0);
-                setDailyStreak(data.daily_streak || 0);
+                
+                // Sincronizamos el streak con la base de datos
+                setStreak(data.current_streak || 0);
+                
+                // Verificamos si ya reclamó hoy (Igual que en MissionZone)
                 const today = new Date().toISOString().split('T')[0];
-                setClaimedToday(data.last_login_date === today);
+                if (data.last_check_in_date === today) {
+                    setCheckedInToday(true);
+                } else {
+                    setCheckedInToday(false);
+                }
             }
         };
         fetchUserData();
@@ -95,41 +108,58 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         }, 2000);
     };
 
+    // 🔥 FUNCIÓN DE CHECK-IN SINCRONIZADA 🔥
     const handleDailyCheckIn = async () => {
-        if (loading || claimedToday || !user) return;
+        if (loading || checkedInToday || !user) return;
         setLoading(true);
-        const { data, error } = await supabase.rpc('claim_daily_streak', { p_user_id: user.id });
-        if (error) {
-            alert("Error claiming reward.");
-            setLoading(false);
-            return;
-        }
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = data as any;
-        
-        if (result.success) {
-            setLuckyTickets((prev: number) => prev + result.tickets_earned);
-            setDailyStreak(result.new_streak);
-            setClaimedToday(true);
-            if (result.points_earned > 0) setGlobalScore((prev: number) => prev + result.points_earned);
-            alert(`✅ DAILY CHECK-IN COMPLETE!`);
+
+        // Usamos 'daily_check_in' (la misma que MissionZone)
+        const { data, error } = await supabase.rpc('daily_check_in', { user_id_in: user.id });
+
+        if (!error && data && data[0].success) {
+            const reward = data[0].reward;
+            
+            // Actualizamos estados locales
+            setStreak(prev => prev + 1);
+            setCheckedInToday(true);
+            setGlobalScore((prev: number) => prev + reward);
+
+            // Mensaje especial si es día 7 (Multiplo de 7)
+            if ((streak + 1) % 7 === 0) {
+                 alert(`🏆 7-DAY STREAK COMPLETED!\n\nBIG REWARD: +${reward} PTS & Possible Lucky Ticket!`);
+                 // Si tu lógica de backend da Lucky Ticket en el día 7, aquí podrías recargar los tickets:
+                 // setLuckyTickets(prev => prev + 1); 
+            } else {
+                 alert(`✅ DAILY CHECK-IN SUCCESS!\n\nStreak: ${streak + 1} Days\nReceived: +${reward} PTS`);
+            }
+        } else {
+            alert(data?.[0]?.message || "Error claiming reward.");
         }
         setLoading(false);
     };
 
+    // Lógica visual para la barra de 7 días
+    // Calculamos qué día del ciclo (1 al 7) toca mostrar
+    const currentCycleDay = streak % 7; 
+    // Si hoy ya reclamé, la barra de hoy debe estar llena. Si no, llena hasta ayer.
+    const activeBars = checkedInToday ? (currentCycleDay === 0 ? 7 : currentCycleDay) : currentCycleDay;
+    
+    // Detectar si el siguiente botón es el premio gordo (Día 7)
+    const isDay7Upcoming = (streak + 1) % 7 === 0;
+
     return (
         <div style={{ marginBottom: '20px' }}>
-            {/* AQUÍ LLAMAMOS AL MODAL QUE ESTÁ EN EL OTRO ARCHIVO */}
+            {/* Modal de Lotería */}
             {showLottery && <LotteryModal onClose={() => setShowLottery(false)} luckyTickets={luckyTickets} setLuckyTickets={setLuckyTickets} />}
 
-            {/* ENCABEZADO: TOTAL TICKETS */}
+            {/* ENCABEZADO: TOTAL TICKETS + BOTÓN DE LOTERÍA */}
             <div className="cyber-card" style={{ 
                 background: 'linear-gradient(135deg, #4A00E0 0%, #8E2DE2 100%)',
                 padding: '15px', borderRadius: '16px', textAlign: 'center', marginBottom: '15px',
                 boxShadow: '0 0 15px rgba(138, 43, 226, 0.3)', position: 'relative', overflow: 'hidden'
             }}>
                 <div style={{ position: 'absolute', top: -10, left: -10, width: '50px', height: '50px', background: 'rgba(255,255,255,0.1)', borderRadius: '50%' }}></div>
+                
                 <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
                     <Ticket size={24} color="#fff" />
                     <span style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '2px', opacity: 0.9 }}>LUCKY TICKETS</span>
@@ -138,7 +168,6 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                     {luckyTickets}
                 </div>
                 
-                {/* BOTÓN PARA ENTRAR A LA LOTERÍA */}
                 <button 
                     onClick={() => setShowLottery(true)}
                     className="btn-neon" 
@@ -152,7 +181,7 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 </button>
             </div>
 
-            {/* SECCIÓN DE MISIONES (INTACTA) */}
+            {/* SECCIÓN DE MISIONES */}
             <div style={{ display: 'flex', gap: '10px' }}>
                 
                 {/* 1. AD MILESTONE */}
@@ -172,45 +201,58 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                         <div style={{ width: '100%', height: '4px', background: '#333', borderRadius: '2px' }}>
                             <div style={{ width: `${(videoProgress / 20) * 100}%`, height: '100%', background: '#00F2FE', borderRadius: '2px', transition: 'width 0.3s' }}></div>
                         </div>
-                        <div style={{fontSize:'7px', color:'#666', marginTop:'4px', fontStyle:'italic'}}>
-                            Ads in Shop, Arcade & Boosts also count!
-                        </div>
                     </div>
                     <button onClick={handleWatchAd} disabled={loading} className="btn-cyber" style={{ width: '100%', padding: '6px', fontSize: '10px', background: loading ? '#333' : 'transparent', border: '1px solid #FF512F', color: '#FF512F' }}>
                         {loading ? '...' : 'WATCH AD NOW'}
                     </button>
                 </div>
 
-                {/* 2. DAILY STREAK */}
-                <div className="glass-card" style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.03)', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+                {/* 2. DAILY STREAK (AHORA SINCRONIZADO) */}
+                <div className="glass-card" style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.03)', display:'flex', flexDirection:'column', justifyContent:'space-between', border: isDay7Upcoming && !checkedInToday ? '1px solid #FFD700' : '1px solid #333' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <div style={{ background: '#4CAF50', padding: '6px', borderRadius: '6px' }}><Calendar size={14} color="#fff" /></div>
                         <div>
                             <div style={{ fontWeight: 'bold', fontSize: '11px' }}>STREAK</div>
-                            <div style={{ fontSize: '8px', color: '#aaa' }}>Day {dailyStreak}</div>
+                            <div style={{ fontSize: '8px', color: '#aaa' }}>Day {streak}</div>
                         </div>
                     </div>
+                    
+                    {/* Visualización de 7 días */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                         {[1, 2, 3, 4, 5, 6, 7].map(day => {
-                            const currentCycleDay = dailyStreak % 7 === 0 && dailyStreak > 0 ? 7 : dailyStreak % 7;
-                            const isActive = day <= currentCycleDay;
+                            const isActive = day <= activeBars;
                             return (
                                 <div key={day} style={{ 
                                     width: '8px', height: '15px', borderRadius: '2px', 
-                                    background: isActive ? '#4CAF50' : '#333',
-                                    border: day === 7 ? '1px solid #FFD700' : 'none'
+                                    background: isActive ? (day === 7 ? '#FFD700' : '#4CAF50') : '#333',
+                                    border: day === 7 ? '1px solid #FFD700' : 'none',
+                                    boxShadow: day === 7 && isActive ? '0 0 5px #FFD700' : 'none'
                                 }}></div>
                             );
                         })}
                     </div>
-                    <button onClick={handleDailyCheckIn} disabled={claimedToday || loading} className="btn-cyber" style={{ width: '100%', padding: '6px', fontSize: '10px', borderColor: claimedToday ? '#4CAF50' : '#4CAF50', background: claimedToday ? 'rgba(76, 175, 80, 0.2)' : 'transparent', color: '#4CAF50', opacity: claimedToday ? 0.8 : 1 }}>
-                        {claimedToday ? 'CLAIMED' : 'CLAIM'}
+
+                    <button 
+                        onClick={handleDailyCheckIn} 
+                        disabled={checkedInToday || loading}
+                        className="btn-cyber" 
+                        style={{ 
+                            width: '100%', padding: '6px', fontSize: '10px', 
+                            borderColor: checkedInToday ? '#4CAF50' : (isDay7Upcoming ? '#FFD700' : '#4CAF50'),
+                            background: checkedInToday ? 'rgba(76, 175, 80, 0.2)' : (isDay7Upcoming ? 'rgba(255, 215, 0, 0.2)' : 'transparent'),
+                            color: checkedInToday ? '#4CAF50' : (isDay7Upcoming ? '#FFD700' : '#4CAF50'),
+                            opacity: checkedInToday ? 0.8 : 1,
+                            fontWeight: isDay7Upcoming && !checkedInToday ? 'bold' : 'normal'
+                        }}
+                    >
+                        {checkedInToday ? 'CLAIMED' : (isDay7Upcoming ? 'CLAIM BONUS' : 'CLAIM')}
                     </button>
                 </div>
             </div>
         </div>
     );
 };
+
 
 // --- COMPONENTE PRINCIPAL (SQUAD ZONE) ---
 export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
@@ -225,6 +267,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const BOT_USERNAME = "Gnovatoken_bot"; 
     const inviteLink = user ? `https://t.me/${BOT_USERNAME}?start=${user.id}` : "Loading...";
 
+    // Guardado de puntos (Batching)
     useEffect(() => {
         if (!user) return;
         const saveInterval = setInterval(async () => {
@@ -238,6 +281,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         return () => clearInterval(saveInterval);
     }, [user]);
 
+    // Carga Inicial de Datos
     useEffect(() => {
         if (!user) return;
         const loadData = async () => {
@@ -278,21 +322,11 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         if(!user) return;
         setReferralList(prev => prev.map(u => {
             if(u.user_id === targetId) {
-                return {
-                    ...u,
-                    bonus_claimed_initial: type === 'initial' ? true : u.bonus_claimed_initial,
-                    bonus_claimed_lvl4: type === 'lvl4' ? true : u.bonus_claimed_lvl4
-                };
+                return { ...u, bonus_claimed_initial: type === 'initial' ? true : u.bonus_claimed_initial, bonus_claimed_lvl4: type === 'lvl4' ? true : u.bonus_claimed_lvl4 };
             }
             return u;
         }));
-
-        const { data, error } = await supabase.rpc('claim_referral_reward', {
-            referral_user_id: targetId,
-            reward_type: type,
-            my_id: user.id
-        });
-
+        const { data, error } = await supabase.rpc('claim_referral_reward', { referral_user_id: targetId, reward_type: type, my_id: user.id });
         if(error || !data) {
             alert("Error claiming reward.");
             fetchReferralList();
@@ -300,9 +334,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
             const amount = type === 'initial' ? 2500 : 5000;
             if (setGlobalScore) setGlobalScore((prev: number) => prev + amount);
             if(window.navigator.vibrate) window.navigator.vibrate(200);
-            setTimeout(() => {
-                fetchReferralList();
-            }, 1000);
+            setTimeout(() => { fetchReferralList(); }, 1000);
         }
     };
 
@@ -315,6 +347,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     return (
         <div style={{ padding: '0 15px', paddingBottom: '100px', height: '100%', overflowY: 'auto' }}>
             
+            {/* TICKET EMPIRE CON EL NUEVO BOTÓN DE LOTERÍA */}
             <TicketEmpire setGlobalScore={setGlobalScore} />
 
             {/* SQUAD DASHBOARD */}
