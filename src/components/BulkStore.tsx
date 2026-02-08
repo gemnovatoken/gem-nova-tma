@@ -20,12 +20,11 @@ interface PackNodeProps {
     disabled?: boolean;
 }
 
-// 👇 MODIFICACIÓN 1: Agregamos userLevel a la interfaz
 interface BulkStoreProps {
     onPurchaseSuccess?: (newScore: number) => void;
     score: number;
     setScore: (val: number) => void;
-    userLevel: number; // <--- IMPORTANTE
+    userLevel: number; 
 }
 
 const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
@@ -37,7 +36,6 @@ const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
     'blackhole': { ton: 100.0, pts: 70000000, label: "⚠️ GOD MODE" }
 };
 
-// 👇 MODIFICACIÓN 2: Recibimos userLevel aquí
 export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, setScore, userLevel }) => {
     const { user } = useAuth();
     const [tonConnectUI] = useTonConnectUI(); 
@@ -47,20 +45,16 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     const buyPack = async (packKey: string) => {
-        // 1. CAPTURE USER ID IMMEDIATELY (Snapshot)
-        // We store it in a local variable to prevent state changes during transaction
-        const safeUserId = user?.id;
-
-        console.log("👤 Snapshot User ID:", safeUserId);
-        
-        // 2. STRICT VALIDATION (Block if empty)
-        // If safeUserId is empty string "" or undefined, we STOP here.
-        if (!safeUserId || safeUserId.trim() === "" || safeUserId.length < 20) {
-            alert("⚠️ CRITICAL ERROR: Invalid User Session.\n\nThe app cannot identify your User ID. Please reload the Mini App to fix the session before spending money.");
-            return; // STOP! Do not open wallet.
+        // 🔒 1. VALIDACIÓN ESTRICTA DE USUARIO (Blindaje anti-error UUID)
+        if (!user || !user.id || user.id.trim() === "") {
+            alert("⚠️ CRITICAL ERROR: User Session Missing.\n\nPlease reload the app to authenticate before purchasing.");
+            return;
         }
 
-        // 3. CHECK WALLET CONNECTION
+        // Guardamos el ID en una constante segura
+        const targetUserId = user.id;
+
+        // 2. CHECK WALLET CONNECTION
         if (!tonConnectUI.connected) {
             alert("⚠️ Please connect your wallet first.");
             return;
@@ -78,7 +72,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         setLoading(true);
 
         try {
-            // 4. PREPARE TRANSACTION (Safe Math)
+            // 3. PREPARE TRANSACTION
             const amountInNano = (selectedPack.ton * 1000000000).toFixed(0);
 
             const transaction = {
@@ -91,22 +85,22 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 ],
             };
 
-            // 5. SEND TRANSACTION (Wallet Interaction)
+            // 4. SEND TRANSACTION (Wallet Interaction)
             console.log("🔌 Sending Transaction...");
             const result = await tonConnectUI.sendTransaction(transaction);
             
             console.log("✅ PAYMENT SUCCESSFUL. Hash:", result.boc);
 
-            // 6. SAVE TO DATABASE (Using safeUserId)
-            // We use 'safeUserId' here, NOT 'user.id', to guarantee it is not empty
-            const { data, error } = await supabase.rpc('register_purchase', {
-                p_user_id: safeUserId,  // <--- KEY FIX IS HERE
-                p_tx_hash: result.boc, 
-                p_amount_ton: selectedPack.ton,
-                p_points_awarded: selectedPack.pts
+            // 5. SAVE TO DATABASE (Usando la nueva función buy_points_pack)
+            // Usamos targetUserId que validamos arriba
+            const { data, error } = await supabase.rpc('buy_points_pack', {
+                p_user_id: targetUserId,    
+                p_points_amount: selectedPack.pts,
+                p_cost_ton: selectedPack.ton
             });
 
             if (error) {
+                // Si la DB falla aquí, es raro, pero mostramos el error crudo
                 throw new Error(`DB_ERROR: ${error.message}`);
             }
 
@@ -129,11 +123,11 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
             const errMsg = (err as any).message || JSON.stringify(err);
 
             if (errMsg.includes("User rejected")) {
-                alert("❌ Transaction cancelled by user.");
+                // No mostrar alerta si el usuario canceló voluntariamente
+                console.log("Transaction cancelled by user");
             } 
             else if (errMsg.includes("DB_ERROR")) {
-                // If this happens, take a screenshot. But with 'safeUserId', it shouldn't happen.
-                alert(`⚠️ PAYMENT SUCCESSFUL, BUT DB ERROR.\n\nPoints were not added automatically.\nError: ${errMsg}`);
+                alert(`⚠️ PAYMENT SUCCESSFUL, BUT DB ERROR.\n\nPoints were not added automatically.\nError: ${errMsg}\n\nPlease take a screenshot and contact support.`);
             } 
             else {
                 alert(`⚠️ Transaction Failed.\n\nReason: ${errMsg}`);
@@ -243,7 +237,6 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 <div className="circuit-vault" style={{ borderRadius: '20px', padding: '4px' }}>
                     <div style={{ background: 'rgba(0,0,0,0.95)', borderRadius: '16px', overflow: 'hidden', padding:'10px' }}>
                         
-                        {/* 👇 MODIFICACIÓN 3: ¡AQUÍ PASAMOS EL NIVEL! */}
                         <StakingBank 
                             key={refreshTrigger} 
                             globalScore={score} 
