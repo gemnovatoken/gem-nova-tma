@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { StakingBank } from './StakingBank';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
-// Agregamos iconos necesarios
-import { Zap, Cpu, Shield, Rocket, Lock, Play, Hexagon, Crown, History, X, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Zap, Cpu, Shield, Rocket, Lock, Play, Hexagon, Crown } from 'lucide-react';
 
 // 👇 PON AQUÍ TU WALLET REAL
 const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q'; 
@@ -28,14 +27,6 @@ interface BulkStoreProps {
     userLevel: number; 
 }
 
-// Interfaz para el historial
-interface PurchaseRecord {
-    hash: string;
-    ton: number;
-    points: number;
-    date: string;
-}
-
 const PACK_DATA: Record<string, { ton: number, pts: number, label: string }> = {
     'starter':   { ton: 0.15, pts: 100000,   label: "Initialize Protocol" },
     'pro':       { ton: 0.75, pts: 500000,   label: "Upgrade System" },
@@ -50,44 +41,20 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     const [tonConnectUI] = useTonConnectUI(); 
     const [loading, setLoading] = useState(false);
     
-    // Estados para Historial
-    const [showHistory, setShowHistory] = useState(false);
-    const [historyData, setHistoryData] = useState<PurchaseRecord[]>([]);
-    const [loadingHistory, setLoadingHistory] = useState(false);
-
     // Estado para recargar el banco visualmente
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-    // Función para cargar historial
-    const fetchHistory = async () => {
-        if (!user) return;
-        setLoadingHistory(true);
-        const { data } = await supabase.rpc('get_my_purchase_history', { p_user_id: user.id });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (data && (data as any).history) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setHistoryData((data as any).history);
-        }
-        setLoadingHistory(false);
-    };
-
-    // Cargar historial al abrir el modal
-    useEffect(() => {
-        if (showHistory) fetchHistory();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showHistory]);
-
     const buyPack = async (packKey: string) => {
-        // 1. CAPTURE USER ID IMMEDIATELY
-        const safeUserId = user?.id;
-
-        // 2. STRICT VALIDATION
-        if (!safeUserId || safeUserId.trim() === "" || safeUserId.length < 20) {
-            alert("⚠️ CRITICAL ERROR: User Session Missing.\n\nPlease reload the app.");
+        // 🔒 1. VALIDACIÓN ESTRICTA DE USUARIO (Blindaje anti-error UUID)
+        if (!user || !user.id || user.id.trim() === "") {
+            alert("⚠️ CRITICAL ERROR: User Session Missing.\n\nPlease reload the app to authenticate before purchasing.");
             return;
         }
 
-        // 3. CHECK WALLET
+        // Guardamos el ID en una constante segura
+        const targetUserId = user.id;
+
+        // 2. CHECK WALLET CONNECTION
         if (!tonConnectUI.connected) {
             alert("⚠️ Please connect your wallet first.");
             return;
@@ -98,18 +65,18 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         const selectedPack = PACK_DATA[packKey];
         if (!selectedPack) return;
 
-        // CONFIRMATION
+        // CONFIRMATION DIALOG
         const msg = `CONFIRM TRANSACTION:\n\nProtocol: ${selectedPack.label}\nCost: ${selectedPack.ton} TON\nReward: ${selectedPack.pts.toLocaleString()} Pts`;
         if (!window.confirm(msg)) return;
 
         setLoading(true);
 
         try {
-            // 4. PREPARE TRANSACTION
+            // 3. PREPARE TRANSACTION
             const amountInNano = (selectedPack.ton * 1000000000).toFixed(0);
 
             const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 600,
+                validUntil: Math.floor(Date.now() / 1000) + 600, // 10 minutes validity
                 messages: [
                     {
                         address: ADMIN_WALLET_ADDRESS,
@@ -118,20 +85,24 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 ],
             };
 
-            // 5. SEND TRANSACTION
+            // 4. SEND TRANSACTION (Wallet Interaction)
             console.log("🔌 Sending Transaction...");
             const result = await tonConnectUI.sendTransaction(transaction);
+            
             console.log("✅ PAYMENT SUCCESSFUL. Hash:", result.boc);
 
-            // 6. SAVE TO DATABASE
-            const { data, error } = await supabase.rpc('register_purchase', {
-                p_user_id: safeUserId, 
-                p_tx_hash: result.boc, 
-                p_amount_ton: selectedPack.ton,
-                p_points_awarded: selectedPack.pts
+            // 5. SAVE TO DATABASE (Usando la nueva función buy_points_pack)
+            // Usamos targetUserId que validamos arriba
+            const { data, error } = await supabase.rpc('buy_points_pack', {
+                p_user_id: targetUserId,    
+                p_points_amount: selectedPack.pts,
+                p_cost_ton: selectedPack.ton
             });
 
-            if (error) throw new Error(`DB_ERROR: ${error.message}`);
+            if (error) {
+                // Si la DB falla aquí, es raro, pero mostramos el error crudo
+                throw new Error(`DB_ERROR: ${error.message}`);
+            }
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const response = data as any;
@@ -147,14 +118,16 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
 
         } catch (err) {
             console.error("❌ Transaction Flow Error:", err);
+            
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const errMsg = (err as any).message || JSON.stringify(err);
 
             if (errMsg.includes("User rejected")) {
-                console.log("Transaction cancelled");
+                // No mostrar alerta si el usuario canceló voluntariamente
+                console.log("Transaction cancelled by user");
             } 
             else if (errMsg.includes("DB_ERROR")) {
-                alert(`⚠️ PAYMENT SUCCESSFUL, BUT DB ERROR.\n\nError: ${errMsg}`);
+                alert(`⚠️ PAYMENT SUCCESSFUL, BUT DB ERROR.\n\nPoints were not added automatically.\nError: ${errMsg}\n\nPlease take a screenshot and contact support.`);
             } 
             else {
                 alert(`⚠️ Transaction Failed.\n\nReason: ${errMsg}`);
@@ -171,66 +144,10 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         }
     }
 
-    // Helper para acortar Hash
-    const formatHash = (hash: string) => {
-        if (!hash) return "Unknown";
-        return hash.substring(0, 6) + "..." + hash.substring(hash.length - 4);
-    };
-
     return (
         <div className="cyber-bg" style={{ minHeight: '100%', paddingBottom: '120px', paddingTop: '20px' }}>
             
             <div className="data-stream"></div>
-
-            {/* MODAL DE HISTORIAL */}
-            {showHistory && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-                    background: 'rgba(0,0,0,0.9)', zIndex: 10000,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
-                }}>
-                    <div className="glass-card" style={{ width: '100%', maxWidth: '400px', maxHeight: '80vh', overflowY: 'auto', border: '1px solid #00F2FE', background: '#050505', padding: '0' }}>
-                        <div style={{ padding: '15px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0, 242, 254, 0.1)' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#00F2FE' }}>
-                                <History size={18} />
-                                <span style={{ fontWeight: 'bold', fontFamily: 'monospace' }}>TRANSACTION_LOG</span>
-                            </div>
-                            <button onClick={() => setShowHistory(false)} style={{ background: 'none', border: 'none', color: '#aaa', cursor: 'pointer' }}><X /></button>
-                        </div>
-                        <div style={{ padding: '15px' }}>
-                            {loadingHistory ? (
-                                <p style={{ color: '#aaa', textAlign: 'center', fontFamily: 'monospace' }}>DECRYPTING LOGS...</p>
-                            ) : historyData.length === 0 ? (
-                                <p style={{ color: '#555', textAlign: 'center', marginTop: '20px' }}>No transactions found.</p>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                    {historyData.map((tx, idx) => (
-                                        <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid #333' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
-                                                <span style={{ color: '#4CAF50', fontWeight: 'bold', fontSize: '14px', display:'flex', alignItems:'center', gap:'4px' }}>
-                                                    <CheckCircle2 size={12}/> +{tx.points.toLocaleString()} PTS
-                                                </span>
-                                                <span style={{ color: '#fff', fontSize: '12px' }}>{tx.ton} TON</span>
-                                            </div>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '10px', color: '#aaa' }}>
-                                                <span>{new Date(tx.date).toLocaleDateString()}</span>
-                                                <a 
-                                                    href={`https://tonviewer.com/transaction/${tx.hash}`} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    style={{ color: '#00F2FE', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '3px' }}
-                                                >
-                                                    {formatHash(tx.hash)} <ExternalLink size={10} />
-                                                </a>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* HEADER */}
             <div style={{ textAlign: 'center', marginBottom: '50px', position: 'relative', zIndex: 2 }}>
@@ -241,22 +158,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                     &lt;NET_STORE /&gt;
                 </h2>
                 <div style={{width: '100px', height: '2px', background: '#00F2FE', margin: '10px auto', boxShadow: '0 0 10px #00F2FE'}}></div>
-                
-                <div style={{display:'flex', justifyContent:'center', alignItems:'center', gap:'15px', marginBottom:'15px'}}>
-                    <p style={{ color: '#aaa', fontSize: '10px', margin:0 }}>SECURE CONNECTION: ENCRYPTED</p>
-                    
-                    {/* BOTÓN DE HISTORIAL */}
-                    <button 
-                        onClick={() => setShowHistory(true)}
-                        style={{
-                            background: 'rgba(0, 242, 254, 0.1)', border: '1px solid #00F2FE', 
-                            color: '#00F2FE', borderRadius: '5px', padding: '4px 8px', 
-                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10px'
-                        }}
-                    >
-                        <History size={12} /> LOGS
-                    </button>
-                </div>
+                <p style={{ color: '#aaa', fontSize: '10px', marginBottom: '15px' }}>SECURE CONNECTION: ENCRYPTED</p>
                 
                 <div style={{ display: 'flex', justifyContent: 'center', transform: 'scale(0.85)' }}>
                     <TonConnectButton />
