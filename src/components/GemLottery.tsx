@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { X, Trophy, Timer, History, AlertCircle, CheckCircle2, Hash, Ticket } from 'lucide-react';
+// Agregamos Wallet y Save a los iconos
+import { X, Trophy, Timer, History, AlertCircle, CheckCircle2, Hash, Ticket, Wallet, Save } from 'lucide-react';
 
 // --- INTERFACES ---
 interface MyTicket {
@@ -25,6 +26,11 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     const [soldTotal, setSoldTotal] = useState(0); 
     const [loading, setLoading] = useState(false);
 
+    // --- NUEVOS ESTADOS PARA LUCKY WALLET ---
+    const [luckyWalletInput, setLuckyWalletInput] = useState('');
+    const [savedLuckyWallet, setSavedLuckyWallet] = useState<string | null>(null);
+    const [isSavingWallet, setIsSavingWallet] = useState(false);
+
     const MAX_TICKETS_GLOBAL = 50;
     const PRIZE_POOL = 15; 
 
@@ -44,6 +50,18 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
         // 2. Obtener total vendidos
         const { count } = await supabase.from('lottery_entries').select('*', { count: 'exact', head: true }).eq('round_number', 1);
         if (count !== null) setSoldTotal(count);
+
+        // 3. 🔥 OBTENER LUCKY WALLET GUARDADA 🔥
+        const { data: userData } = await supabase
+            .from('user_score')
+            .select('lucky_wallet')
+            .eq('user_id', user.id)
+            .single();
+        
+        if (userData && userData.lucky_wallet) {
+            setSavedLuckyWallet(userData.lucky_wallet);
+            setLuckyWalletInput(userData.lucky_wallet); // Pre-llenar input
+        }
     };
 
     // Carga inicial
@@ -52,11 +70,48 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
+    // --- NUEVA FUNCIÓN: GUARDAR WALLET ---
+    const handleSaveWallet = async () => {
+        if (!user || isSavingWallet) return;
+        
+        // Validación básica de longitud de wallet TON
+        if (luckyWalletInput.length < 20) {
+            alert("⚠️ Please enter a valid TON wallet address.");
+            return;
+        }
+
+        setIsSavingWallet(true);
+        
+        // Llamamos al RPC que creamos en el paso anterior
+        const { error } = await supabase.rpc('set_lucky_wallet', { 
+            p_user_id: user.id, 
+            p_wallet: luckyWalletInput 
+        });
+
+        if (!error) {
+            setSavedLuckyWallet(luckyWalletInput);
+            alert("✅ Reward Wallet Saved Successfully!");
+        } else {
+            console.error(error);
+            alert("Error saving wallet.");
+        }
+        setIsSavingWallet(false);
+    };
+
     const handleBuyTicket = async (ticketSlot: number) => {
         if (!user || loading) return;
         setLoading(true);
 
         try {
+            // Si no ha guardado wallet, advertimos (opcional, pero recomendado)
+            if (!savedLuckyWallet && luckyWalletInput.length < 20) {
+                const proceed = window.confirm("⚠️ You haven't saved a Reward Wallet yet.\n\nWe need it to send you the prize if you win.\n\nDo you want to proceed anyway?");
+                if (!proceed) {
+                    setLoading(false);
+                    return;
+                }
+            }
+
             let costType = 'ton';
             let costAmount = 0;
             let burnAmount = 0; // Tickets extra a quemar por descuento
@@ -101,12 +156,16 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                 await new Promise(r => setTimeout(r, 1000)); 
             }
 
-            // LLAMADA A SUPABASE (Ahora enviamos burnAmount)
+            // Usamos la wallet guardada o el input actual o 'not_provided'
+            const walletToSend = savedLuckyWallet || luckyWalletInput || 'not_provided';
+
+            // LLAMADA A SUPABASE
             const { data, error } = await supabase.rpc('buy_lottery_ticket', { 
                 p_user_id: user.id, 
                 p_cost_type: costType, 
                 p_cost_amount: costAmount,
-                p_burn_amount: burnAmount // 🔥 Enviamos tickets extra a restar
+                p_burn_amount: burnAmount,
+                p_wallet_address: walletToSend // Enviamos la wallet
             });
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -182,38 +241,46 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                             <h4 style={{ color: '#fff', marginBottom: '15px' }}>YOUR ENTRIES ({myEntriesCount}/3)</h4>
                             
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {/* TICKET 1 */}
-                                <TicketRow 
-                                    number={1} 
-                                    priceLabel="1 Lucky Ticket" 
-                                    priceColor="#00F2FE" 
-                                    isOwned={myEntriesCount >= 1} 
-                                    ticketCode={myTickets[0]?.code}
-                                    onBuy={() => handleBuyTicket(1)}
-                                    disabled={loading}
-                                />
+                                <TicketRow number={1} priceLabel="1 Lucky Ticket" priceColor="#00F2FE" isOwned={myEntriesCount >= 1} ticketCode={myTickets[0]?.code} onBuy={() => handleBuyTicket(1)} disabled={loading} />
+                                <TicketRow number={2} priceLabel="0.50 TON" priceColor="#FFD700" isOwned={myEntriesCount >= 2} ticketCode={myTickets[1]?.code} onBuy={() => handleBuyTicket(2)} disabled={loading || myEntriesCount < 1} />
+                                <TicketRow number={3} priceLabel="0.50 TON" priceColor="#FFD700" isOwned={myEntriesCount >= 3} ticketCode={myTickets[2]?.code} onBuy={() => handleBuyTicket(3)} disabled={loading || myEntriesCount < 2} />
+                            </div>
 
-                                {/* TICKET 2 */}
-                                <TicketRow 
-                                    number={2} 
-                                    priceLabel="0.50 TON" 
-                                    priceColor="#FFD700" 
-                                    isOwned={myEntriesCount >= 2} 
-                                    ticketCode={myTickets[1]?.code}
-                                    onBuy={() => handleBuyTicket(2)}
-                                    disabled={loading || myEntriesCount < 1}
-                                />
-
-                                {/* TICKET 3 */}
-                                <TicketRow 
-                                    number={3} 
-                                    priceLabel="0.50 TON" 
-                                    priceColor="#FFD700" 
-                                    isOwned={myEntriesCount >= 3} 
-                                    ticketCode={myTickets[2]?.code}
-                                    onBuy={() => handleBuyTicket(3)}
-                                    disabled={loading || myEntriesCount < 2}
-                                />
+                            {/* 🔥 NUEVA SECCIÓN: LUCKY WALLET REWARD 🔥 */}
+                            <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid #333' }}>
+                                <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px'}}>
+                                    <Wallet size={16} color="#E040FB" />
+                                    <span style={{fontSize:'12px', fontWeight:'bold', color:'#fff'}}>REWARD WALLET</span>
+                                </div>
+                                <p style={{fontSize:'10px', color:'#aaa', marginBottom:'10px'}}>
+                                    Add your TON wallet address here to receive the prize if you win! 
+                                </p>
+                                
+                                <div style={{display:'flex', gap:'5px'}}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Paste your UQ... wallet address"
+                                        value={luckyWalletInput}
+                                        onChange={(e) => setLuckyWalletInput(e.target.value)}
+                                        style={{
+                                            flex: 1, padding: '10px', borderRadius: '8px', 
+                                            border: '1px solid #333', background: '#222', color: '#fff', fontSize: '11px', outline:'none'
+                                        }}
+                                    />
+                                    <button 
+                                        onClick={handleSaveWallet}
+                                        disabled={isSavingWallet}
+                                        className="btn-cyber"
+                                        style={{padding:'0 15px', color:'#E040FB', borderColor:'#E040FB', background: savedLuckyWallet === luckyWalletInput && savedLuckyWallet !== '' ? 'rgba(224, 64, 251, 0.1)' : 'transparent'}}
+                                    >
+                                        {isSavingWallet ? '...' : (savedLuckyWallet === luckyWalletInput && savedLuckyWallet !== '' ? <CheckCircle2 size={16}/> : <Save size={16}/>)}
+                                    </button>
+                                </div>
+                                {savedLuckyWallet && (
+                                    <div style={{fontSize:'9px', color:'#4CAF50', marginTop:'5px', display:'flex', alignItems:'center', gap:'4px'}}>
+                                        <CheckCircle2 size={10}/> Wallet saved securely for rewards.
+                                    </div>
+                                )}
                             </div>
                         </>
                     ) : (
