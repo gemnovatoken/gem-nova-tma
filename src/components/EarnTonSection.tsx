@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 
-// --- ESTILOS CSS ACTUALIZADOS ---
+// --- ESTILOS CSS ACTUALIZADOS (INTACTOS) ---
 const styles = `
   .ton-wrapper {
     width: 100%; font-family: 'Inter', sans-serif;
@@ -153,7 +153,6 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
   const [walletAddress, setWalletAddress] = useState<string>('');
 
   // --- CONFIGURACIÓN DE METAS (CICLOS) ---
-  // Aquí definimos "cuánto cuesta" ganar 1 ticket en cada categoría
   const TARGETS = {
     ads: 15,          // 15 videos = 1 ticket
     bulk: 500000,     // 500k puntos = 1 ticket
@@ -169,7 +168,6 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
     const fetchTicketStats = async () => {
       try {
         setLoading(true);
-        // Llamamos a la función SQL que devuelve datos crudos y tickets calculados
         const { data, error } = await supabase.rpc('get_mission_stats', { target_user_id: userId });
 
         if (error) throw error;
@@ -199,14 +197,34 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
   const totalTickets = Object.values(stats).reduce((acc, curr) => acc + curr.tickets, 0);
   const progressPercent = Math.min((totalTickets / TOTAL_TICKETS_GOAL) * 100, 100);
 
+  // 🔥 LÓGICA DE RETIRO ACTUALIZADA: "1TON_wallet" 🔥
   const handleWithdrawRequest = async () => {
-    if (!walletAddress) return alert("Enter address");
+    if (!walletAddress || walletAddress.length < 20) {
+        return alert("Please enter a valid TON wallet address.");
+    }
+    
     try {
-      await supabase.from('withdrawals').insert([{ user_id: userId, wallet_address: walletAddress, status: 'pending' }]);
-      setWithdrawStep(3);
+      // Usamos la nueva función RPC segura que guarda la wallet como "wallet_1ton"
+      // y crea la solicitud de retiro al mismo tiempo.
+      const { data, error } = await supabase.rpc('request_ton_withdrawal', {
+          p_user_id: userId, 
+          p_wallet: walletAddress
+      });
+
+      if (error) throw error;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = data as any;
+      
+      if (res.success) {
+          setWithdrawStep(3);
+      } else {
+          alert("Error: " + res.message);
+      }
+
     } catch (error) {
-        console.error("Withdraw error:", error); // 🔥 CORREGIDO: Usamos 'error' aquí
-        alert("Error sending request");
+        console.error("Withdraw error:", error);
+        alert("Error sending request. Please try again.");
     }
   };
 
@@ -335,7 +353,7 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
                     </p>
                   </div>
 
-                  <label style={{ color: '#aaa', fontSize: '12px', fontWeight: 'bold' }}>TON WALLET ADDRESS</label>
+                  <label style={{ color: '#aaa', fontSize: '12px', fontWeight: 'bold' }}>TON WALLET ADDRESS (1TON_wallet)</label>
                   <input type="text" placeholder="UQBj..." className="input-field"
                     value={walletAddress} onChange={(e) => setWalletAddress(e.target.value)}
                   />
