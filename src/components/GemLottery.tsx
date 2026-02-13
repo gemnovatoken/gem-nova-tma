@@ -246,7 +246,8 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                 p_cost_amount: costAmount,
                 p_burn_amount: burnAmount,
                 p_wallet_address: walletToSend,
-                p_tx_hash: txHash // Enviamos el recibo
+                p_tx_hash: txHash, // Enviamos el recibo
+                p_ton_amount: tonAmount // 🔥 AQUÍ AGREGAMOS EL MONTO (0, 0.25 o 0.50)
             });
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
