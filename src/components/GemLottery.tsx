@@ -35,32 +35,33 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     const PRIZE_POOL = 15; 
 
     // 🔥 FUNCIÓN DE CARGA DE DATOS
+    // 🔥 FUNCIÓN DE CARGA DE DATOS CORREGIDA 🔥
     const fetchLotteryData = async () => {
         if (!user) return;
         
-        // 1. Obtener mis boletos comprados desde la DB
-        const { data } = await supabase.rpc('get_my_lottery_tickets', { p_user_id: user.id });
+        // 1. Obtener MIS boletos (Esto está bien, son mis datos privados)
+        const { data: userTickets } = await supabase.rpc('get_my_lottery_tickets', { p_user_id: user.id });
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (data && (data as any).tickets) {
+        if (userTickets && (userTickets as any).tickets) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            setMyTickets((data as any).tickets);
+            setMyTickets((userTickets as any).tickets);
         }
 
-        // 2. Obtener total vendidos
-        const { count } = await supabase.from('lottery_entries').select('*', { count: 'exact', head: true }).eq('round_number', 1);
-        if (count !== null) setSoldTotal(count);
-
-        // 3. 🔥 OBTENER LUCKY WALLET GUARDADA 🔥
-        const { data: userData } = await supabase
-            .from('user_score')
-            .select('lucky_wallet')
-            .eq('user_id', user.id)
-            .single();
+        // 2. 🔥 OBTENER EL TOTAL VENDIDO USANDO EL RPC (EL TÚNEL) 🔥
+        // NO USAR: supabase.from('lottery_entries').select... (Eso da 0 por seguridad)
+        const { data: statusData, error } = await supabase.rpc('get_lottery_status', { p_round: 1 });
         
-        if (userData && userData.lucky_wallet) {
-            setSavedLuckyWallet(userData.lucky_wallet);
-            setLuckyWalletInput(userData.lucky_wallet); // Pre-llenar input
+        if (error) {
+            console.error("Error trayendo status:", error);
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const status = statusData as any;
+
+        if (status) {
+            console.log("Tickets vendidos recibidos:", status.sold); // Mira la consola para verificar
+            setSoldTotal(status.sold); // Esto actualizará la barra a 14/50
         }
     };
 
