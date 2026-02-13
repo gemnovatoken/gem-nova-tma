@@ -13,6 +13,7 @@
     "@supabase/supabase-js": "^2.81.1",
     "@telegram-apps/sdk-react": "^3.3.9",
     "@tonconnect/ui-react": "^2.3.1",
+    "canvas-confetti": "^1.9.4",
     "framer-motion": "^12.23.24",
     "lucide-react": "^0.554.0",
     "react": "^19.2.0",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
