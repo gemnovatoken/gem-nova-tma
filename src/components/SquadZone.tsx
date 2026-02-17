@@ -263,8 +263,6 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const [showReferralList, setShowReferralList] = useState(false);
     const [referralList, setReferralList] = useState<ReferralUser[]>([]);
     const [loadingList, setLoadingList] = useState(false);
-    
-    // 🔥 NUEVO ESTADO PARA EL CÓDIGO DE REFERIDO 🔥
     const [referralCode, setReferralCode] = useState<string | null>(null);
 
     const pointsQueue = useRef(0);
@@ -274,6 +272,32 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const inviteLink = user 
         ? `https://t.me/${BOT_USERNAME}?start=${referralCode || user.id}` 
         : "Loading...";
+
+    // ==========================================
+    // 🚀 LÓGICA NUEVA: CAPTURA DE REFERIDO 🚀
+    // ==========================================
+    useEffect(() => {
+        const captureReferrer = async () => {
+            if (!user) return;
+
+            // 1. Intentamos obtener el 'start_param' que Telegram inyecta en la WebApp
+            // "@ts-expect-error"
+            const tg = window.Telegram?.WebApp;
+            const startParam = tg?.initDataUnsafe?.start_param;
+
+            if (startParam && startParam !== user.id) {
+                console.log("Referrer detected:", startParam);
+                // 2. Llamamos a una función RPC en Supabase para vincularlos
+                // Esta función debe encargarse de poner el valor en 'referred_by'
+                await supabase.rpc('register_referral_on_load', { 
+                    p_user_id: user.id, 
+                    p_referrer_id: startParam 
+                });
+            }
+        };
+        captureReferrer();
+    }, [user]);
+    // ==========================================
 
     // Guardado de puntos (Batching)
     useEffect(() => {
@@ -309,12 +333,11 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 if (!rpcError) setReferrals(Number(count) || 0);
 
                 // 3. 🔥 OBTENER O CREAR CÓDIGO DE REFERIDO BONITO 🔥
-                // Llamamos a la nueva función SQL que creamos
                 const { data: codeData } = await supabase.rpc('get_or_create_referral_code', { p_user_id: user.id });
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                if (codeData && (codeData as any).code) {
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    setReferralCode((codeData as any).code);
+                // "@ts-expect-error"
+                if (codeData && codeData.code) {
+                    // "@ts-expect-error"
+                    setReferralCode(codeData.code);
                 }
 
             } catch (e) { console.error("Error crítico:", e); }
