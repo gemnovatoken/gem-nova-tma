@@ -58,6 +58,16 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const [loading, setLoading] = useState(false);
     const [showLottery, setShowLottery] = useState(false);
 
+    // 🔥 EVENTO PARA RECIBIR TICKETS RETROACTIVOS DESDE SQUADZONE SIN CAMBIAR PROPS 🔥
+    useEffect(() => {
+        const handleAddTickets = ((e: CustomEvent) => {
+            setLuckyTickets(prev => prev + e.detail);
+        }) as EventListener;
+        
+        window.addEventListener('addLuckyTickets', handleAddTickets);
+        return () => window.removeEventListener('addLuckyTickets', handleAddTickets);
+    }, []);
+
     // Carga de datos UNIFICADA (Sincronización)
     useEffect(() => {
         if (!user) return;
@@ -346,6 +356,48 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         const interval = setInterval(loadData, 10000);
         return () => clearInterval(interval);
     }, [user]);
+
+    // 🔥 LÓGICA NUEVA: ENTREGAR TICKETS RETROACTIVOS Y NUEVOS POR REFERIDO 🔥
+    useEffect(() => {
+        if (!user || referrals === 0) return;
+        
+        const syncReferralTickets = async () => {
+            const storedKey = `retro_tickets_synced_${user.id}`;
+            const syncedCount = Number(localStorage.getItem(storedKey) || 0);
+            
+            // Si tiene más referidos que los tickets que ya hemos procesado
+            if (referrals > syncedCount) {
+                const ticketsToAdd = referrals - syncedCount;
+                
+                // Traemos sus tickets actuales de la BD para sumarle los nuevos
+                const { data, error } = await supabase
+                    .from('user_score')
+                    .select('lucky_tickets')
+                    .eq('user_id', user.id)
+                    .single();
+                    
+                if (!error && data) {
+                    const newTotal = (data.lucky_tickets || 0) + ticketsToAdd;
+                    
+                    // Guardamos el nuevo total en Supabase
+                    const { error: updateError } = await supabase
+                        .from('user_score')
+                        .update({ lucky_tickets: newTotal })
+                        .eq('user_id', user.id);
+                        
+                    if (!updateError) {
+                        // Marcamos localmente que ya le dimos estos tickets
+                        localStorage.setItem(storedKey, String(referrals));
+                        // Disparamos el evento para que TicketEmpire se actualice visualmente al instante
+                        window.dispatchEvent(new CustomEvent('addLuckyTickets', { detail: ticketsToAdd }));
+                    }
+                }
+            }
+        };
+        
+        syncReferralTickets();
+    }, [user, referrals]);
+    // ==========================================
 
     const fetchReferralList = async () => {
         if(!user) return;
