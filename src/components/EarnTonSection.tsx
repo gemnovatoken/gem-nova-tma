@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 
 // --- ESTILOS CSS ACTUALIZADOS (INTACTOS) ---
@@ -8,7 +8,6 @@ const styles = `
     margin-bottom: 80px; margin-top: 20px; padding: 0 16px; box-sizing: border-box;
   }
 
-  /* ENTRY BANNER (Intacto) */
   .entry-banner {
     background: linear-gradient(135deg, #0088cc 0%, #005577 100%);
     border-radius: 20px; padding: 20px; color: white; cursor: pointer;
@@ -26,7 +25,6 @@ const styles = `
   .progress-fill { height: 100%; background: linear-gradient(90deg, #7FDBFF, #fff); transition: width 0.5s ease; box-shadow: 0 0 10px #7FDBFF; }
   .banner-footer { font-size: 12px; color: rgba(255,255,255,0.8); text-align: center; margin-top: 10px; position: relative; z-index: 2; }
 
-  /* MODAL */
   .modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px); z-index: 9999;
@@ -54,7 +52,6 @@ const styles = `
   .big-bar-fill { height: 100%; background: linear-gradient(90deg, #0088cc, #00E5FF); position: relative; transition: width 0.5s ease; }
   .modal-scroll-area { padding: 20px; overflow-y: auto; }
 
-  /* --- NUEVAS BARRAS DE MISIONES (CYBERPUNK) --- */
   .mission-bar-card {
     background: #1E1E20; border: 1px solid #333; border-radius: 16px;
     padding: 12px; margin-bottom: 12px; position: relative; overflow: hidden;
@@ -76,7 +73,6 @@ const styles = `
     border-radius: 9px; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
   }
-  /* Efecto de brillo en la barra */
   .mission-progress-bar::after {
     content: ''; position: absolute; top: 0; left: 0; bottom: 0; right: 0;
     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
@@ -92,7 +88,6 @@ const styles = `
 
   .mission-desc { font-size: 10px; color: #888; margin-top: 6px; display: flex; justify-content: space-between; }
 
-  /* BOTONES */
   .action-btn {
     width: 100%; padding: 16px; border-radius: 14px; border: none;
     font-size: 16px; font-weight: 800; color: white; cursor: pointer;
@@ -104,7 +99,6 @@ const styles = `
   .btn-blue { background: #0088cc; }
   .btn-text { background: transparent; color: #888; font-size: 13px; margin-top: 10px; }
   
-  /* INPUT */
   .input-field {
     width: 100%; background: #000; border: 1px solid #444; color: white;
     padding: 14px; border-radius: 12px; font-family: monospace; margin-top: 5px;
@@ -117,23 +111,14 @@ const styles = `
   @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 `;
 
-interface EarnTonSectionProps {
-  userId: string;
-}
+interface EarnTonSectionProps { userId: string; }
+interface MissionData { raw: number; tickets: number; }
+interface AllStats { ads: MissionData; bulk: MissionData; staking: MissionData; level: MissionData; social: MissionData; referral: MissionData; }
 
-// Estructura de Datos para Barras Cíclicas
-interface MissionData {
-  raw: number;    // Dato Crudo (ej: 34 videos vistos)
-  tickets: number; // Tickets Ganados (ej: 2 tickets)
-}
-
-interface AllStats {
-  ads: MissionData;
-  bulk: MissionData;
-  staking: MissionData;
-  level: MissionData;
-  social: MissionData;
-  referral: MissionData;
+// Definimos interfaz para evitar el error de 'any'
+interface WithdrawResponse {
+  success: boolean;
+  message?: string;
 }
 
 const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
@@ -152,15 +137,14 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
   const [withdrawStep, setWithdrawStep] = useState<number>(1);
   const [walletAddress, setWalletAddress] = useState<string>('');
 
-  // --- CONFIGURACIÓN DE METAS (CICLOS) ---
-  const TARGETS = {
-    ads: 15,          // 15 videos = 1 ticket
-    bulk: 500000,     // 500k puntos = 1 ticket
-    staking: 1000000, // 1M staking = 1 ticket
-    level: 1,         // 1 nivel = 1 ticket
-    referral: 1,      // 1 amigo = 1 ticket
-    social: 1         // 1 tarea = 1 ticket
-  };
+  // TARGETS y CAPS envueltos en useMemo para corregir error de dependencias exhaustivas
+  const TARGETS = useMemo(() => ({
+    ads: 25, bulk: 500000, staking: 1000000, level: 1, referral: 1, social: 1 
+  }), []);
+
+  const CAPS = useMemo(() => ({
+    ads: 3, bulk: 3, staking: 3, level: 8, referral: 8
+  }), []);
 
   const TOTAL_TICKETS_GOAL = 20;
 
@@ -169,17 +153,16 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
       try {
         setLoading(true);
         const { data, error } = await supabase.rpc('get_mission_stats', { target_user_id: userId });
-
         if (error) throw error;
 
         if (data && data.length > 0) {
           const r = data[0];
           setStats({
-            ads: { raw: r.raw_ads, tickets: r.tickets_ads },
-            bulk: { raw: r.raw_bulk, tickets: r.tickets_bulk },
-            staking: { raw: r.raw_staking, tickets: r.tickets_staking },
-            level: { raw: r.raw_level, tickets: r.tickets_level },
-            referral: { raw: r.raw_referrals, tickets: r.tickets_referral },
+            ads: { raw: r.raw_ads, tickets: Math.min(r.tickets_ads, CAPS.ads) },
+            bulk: { raw: r.raw_bulk, tickets: Math.min(r.tickets_bulk, CAPS.bulk) },
+            staking: { raw: r.raw_staking, tickets: Math.min(r.tickets_staking, CAPS.staking) },
+            level: { raw: r.raw_level, tickets: Math.min(r.tickets_level, CAPS.level) },
+            referral: { raw: r.raw_referrals, tickets: Math.min(r.tickets_referral, CAPS.referral) },
             social: { raw: r.tickets_social, tickets: r.tickets_social },
           });
         }
@@ -191,37 +174,30 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
     };
 
     if (userId) fetchTicketStats();
-    if (showModal && userId) fetchTicketStats();
-  }, [showModal, userId]);
+  }, [userId, showModal, CAPS]);
 
   const totalTickets = Object.values(stats).reduce((acc, curr) => acc + curr.tickets, 0);
   const progressPercent = Math.min((totalTickets / TOTAL_TICKETS_GOAL) * 100, 100);
 
-  // 🔥 LÓGICA DE RETIRO ACTUALIZADA: "1TON_wallet" 🔥
   const handleWithdrawRequest = async () => {
     if (!walletAddress || walletAddress.length < 20) {
         return alert("Please enter a valid TON wallet address.");
     }
     
     try {
-      // Usamos la nueva función RPC segura que guarda la wallet como "wallet_1ton"
-      // y crea la solicitud de retiro al mismo tiempo.
       const { data, error } = await supabase.rpc('request_ton_withdrawal', {
           p_user_id: userId, 
           p_wallet: walletAddress
       });
 
       if (error) throw error;
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = data as any;
+      const res = data as WithdrawResponse;
       
       if (res.success) {
           setWithdrawStep(3);
       } else {
           alert("Error: " + res.message);
       }
-
     } catch (error) {
         console.error("Withdraw error:", error);
         alert("Error sending request. Please try again.");
@@ -235,13 +211,13 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
       {/* ENTRY BANNER */}
       <div className="entry-banner" onClick={() => setShowModal(true)}>
         <div className="banner-header">
-          <h3 className="banner-title">💎 1 FREE TON</h3>
+          <h3 className="banner-title">💎 MISSION 1 TON</h3>
           <span className="banner-badge">{totalTickets}/{TOTAL_TICKETS_GOAL}</span>
         </div>
         <div className="progress-bg">
           <div className="progress-fill" style={{ width: `${progressPercent}%` }}></div>
         </div>
-        <p className="banner-footer">Tap to view missions & claim reward ✨</p>
+        <p className="banner-footer">Collect 20 Golden Vouchers to claim ✨</p>
       </div>
 
       {showModal && (
@@ -253,7 +229,7 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
               <h2 className="modal-title">MISSION <span>TON</span> 💎</h2>
               <div className="big-progress-container">
                 <div className="progress-info">
-                  <span>Goal Progress</span>
+                  <span>Golden Vouchers</span>
                   <span style={{ color: totalTickets >= TOTAL_TICKETS_GOAL ? '#2ecc71' : '#0088cc' }}>
                     {Math.floor(progressPercent)}%
                   </span>
@@ -262,7 +238,7 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
                   <div className="big-bar-fill" style={{ width: `${progressPercent}%` }}></div>
                 </div>
                 <div style={{ textAlign: 'center', fontSize: '10px', color: '#666', marginTop: '5px' }}>
-                  {totalTickets} / {TOTAL_TICKETS_GOAL} Golden Tickets
+                  {totalTickets} / {TOTAL_TICKETS_GOAL} Vouchers
                 </div>
               </div>
             </div>
@@ -272,59 +248,11 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
                 <>
                   {loading ? <div style={{textAlign:'center', color:'#666'}}>Loading...</div> : (
                     <div>
-                      {/* BARRA DE VIDEOS (CÍCLICA: 15 por Ticket) */}
-                      <MissionBar 
-                        label="Watch Ads" 
-                        icon="📺"
-                        raw={stats.ads.raw} 
-                        ticketGoal={TARGETS.ads} 
-                        ticketsEarned={stats.ads.tickets}
-                        desc="1 Ticket every 15 videos watched"
-                      />
-
-                      {/* BARRA DE TIENDA (CÍCLICA: 500k por Ticket) */}
-                      <MissionBar 
-                        label="Bulk Store" 
-                        icon="🛒"
-                        raw={stats.bulk.raw} 
-                        ticketGoal={TARGETS.bulk} 
-                        ticketsEarned={stats.bulk.tickets}
-                        desc="1 Ticket every 500k pts spent"
-                        isCurrency
-                      />
-
-                      {/* BARRA DE STAKING (CÍCLICA: 1M por Ticket) */}
-                      <MissionBar 
-                        label="Staking Volume" 
-                        icon="🏦"
-                        raw={stats.staking.raw} 
-                        ticketGoal={TARGETS.staking} 
-                        ticketsEarned={stats.staking.tickets}
-                        desc="1 Ticket every 1M pts staked"
-                        isCurrency
-                      />
-
-                      {/* NIVEL (NO CÍCLICO VISUALMENTE, SIEMPRE LLENO) */}
-                      <MissionBar 
-                        label="Mining Rig Level" 
-                        icon="⚡"
-                        raw={stats.level.raw} 
-                        ticketGoal={TARGETS.level} 
-                        ticketsEarned={stats.level.tickets}
-                        desc="1 Ticket per Level reached"
-                        forceFull={true} 
-                      />
-
-                      {/* REFERIDOS (SIEMPRE LLENO VISUALMENTE PARA MOTIVAR) */}
-                      <MissionBar 
-                        label="Referrals" 
-                        icon="👥"
-                        raw={stats.referral.raw} 
-                        ticketGoal={TARGETS.referral} 
-                        ticketsEarned={stats.referral.tickets}
-                        desc="1 Ticket per Friend invited"
-                        forceFull={true}
-                      />
+                      <MissionBar label="Referrals" icon="👥" raw={stats.referral.raw} ticketGoal={TARGETS.referral} ticketsEarned={stats.referral.tickets} maxTickets={CAPS.referral} desc="1 Voucher per Friend invited" />
+                      <MissionBar label="Watch Ads" icon="📺" raw={stats.ads.raw} ticketGoal={TARGETS.ads} ticketsEarned={stats.ads.tickets} maxTickets={CAPS.ads} desc="1 Voucher every 25 videos" />
+                      <MissionBar label="Staking Volume" icon="🏦" raw={stats.staking.raw} ticketGoal={TARGETS.staking} ticketsEarned={stats.staking.tickets} maxTickets={CAPS.staking} desc="1 Voucher every 1M pts staked" isCurrency />
+                      <MissionBar label="Bulk Store" icon="🛒" raw={stats.bulk.raw} ticketGoal={TARGETS.bulk} ticketsEarned={stats.bulk.tickets} maxTickets={CAPS.bulk} desc="1 Voucher every 500k pts spent" isCurrency />
+                      <MissionBar label="Mining Rig Level" icon="⚡" raw={stats.level.raw} ticketGoal={TARGETS.level} ticketsEarned={stats.level.tickets} maxTickets={CAPS.level} desc="1 Voucher per Level reached" />
 
                       <div style={{ marginTop: '20px', borderTop: '1px solid #333', paddingTop: '15px' }}>
                         <button
@@ -352,11 +280,8 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
                       ⚠️ <strong>Review Required:</strong> We verify all withdrawals manually. Processing takes 24-48 hours.
                     </p>
                   </div>
-
-                  <label style={{ color: '#aaa', fontSize: '12px', fontWeight: 'bold' }}>TON WALLET ADDRESS (1TON_wallet)</label>
-                  <input type="text" placeholder="UQBj..." className="input-field"
-                    value={walletAddress} onChange={(e) => setWalletAddress(e.target.value)}
-                  />
+                  <label style={{ color: '#aaa', fontSize: '12px', fontWeight: 'bold' }}>TON WALLET ADDRESS</label>
+                  <input type="text" placeholder="UQBj..." className="input-field" value={walletAddress} onChange={(e) => setWalletAddress(e.target.value)} />
                   <button onClick={handleWithdrawRequest} className="action-btn btn-blue" style={{ marginTop: '20px' }}>SUBMIT REQUEST 🚀</button>
                   <button onClick={() => setWithdrawStep(1)} className="action-btn btn-text">Cancel</button>
                 </div>
@@ -380,43 +305,44 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
   );
 };
 
-// --- NUEVO COMPONENTE: BARRA DE MISIÓN ---
-const MissionBar: React.FC<{
-  label: string; icon: string; raw: number; ticketGoal: number; ticketsEarned: number; desc: string; isCurrency?: boolean; forceFull?: boolean;
-}> = ({ label, icon, raw, ticketGoal, ticketsEarned, desc, isCurrency, forceFull }) => {
+interface MissionBarProps {
+  label: string; 
+  icon: string; 
+  raw: number; 
+  ticketGoal: number; 
+  ticketsEarned: number; 
+  desc: string; 
+  maxTickets: number; 
+  isCurrency?: boolean;
+}
+
+const MissionBar: React.FC<MissionBarProps> = ({ label, icon, raw, ticketGoal, ticketsEarned, desc, maxTickets, isCurrency }) => {
+  const isCompleted = ticketsEarned >= maxTickets;
+  const currentProgressInCycle = isCompleted ? ticketGoal : (raw % ticketGoal);
+  const percentage = (currentProgressInCycle / ticketGoal) * 100;
   
-  // Cálculo del progreso cíclico (Ej: si raw=17 y goal=15, el progreso es 2)
-  const currentProgress = raw % ticketGoal; 
-  // Porcentaje visual: Si forceFull es true (ej: niveles), se ve siempre llena. Si no, calcula el % del ciclo actual.
-  const percentage = forceFull ? 100 : (currentProgress / ticketGoal) * 100;
-  
-  // Formateador de números (k, M)
   const formatNum = (n: number) => isCurrency ? (n >= 1000000 ? `${(n/1000000).toFixed(1)}M` : `${(n/1000).toFixed(0)}k`) : n;
 
   return (
     <div className="mission-bar-card">
       <div className="mission-header">
-        <div className="mission-title">
-          <span>{icon} {label}</span>
-        </div>
-        <div className="mission-tickets-earned">
-          {ticketsEarned} 🎟️ EARNED
+        <div className="mission-title"><span>{icon} {label}</span></div>
+        <div className="mission-tickets-earned" style={{ color: isCompleted ? '#2ecc71' : '#00E5FF', borderColor: isCompleted ? '#2ecc71' : '#00E5FF' }}>
+          {ticketsEarned} / {maxTickets} 🎫
         </div>
       </div>
-
-      {/* Track de la Barra */}
       <div className="mission-progress-track">
-        <div className="mission-progress-bar" style={{ width: `${percentage}%` }}></div>
-        
-        {/* Texto Overlay (Ej: 2 / 15) */}
+        <div className="mission-progress-bar" style={{ 
+          width: `${percentage}%`,
+          background: isCompleted ? 'linear-gradient(90deg, #2ecc71, #27ae60)' : 'linear-gradient(90deg, #2ecc71, #00E5FF)'
+        }}></div>
         <div className="mission-text-overlay">
-          {forceFull ? 'ONGOING REWARD' : `${formatNum(currentProgress)} / ${formatNum(ticketGoal)}`}
+          {isCompleted ? 'MAX REACHED' : `${formatNum(currentProgressInCycle)} / ${formatNum(ticketGoal)}`}
         </div>
       </div>
-
       <div className="mission-desc">
         <span>{desc}</span>
-        <span style={{color:'#fff'}}>Total: {isCurrency ? raw.toLocaleString() : raw}</span>
+        <span style={{color:'#fff'}}>Total: {isCurrency ? formatNum(raw) : raw}</span>
       </div>
     </div>
   );
