@@ -279,8 +279,10 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const BOT_USERNAME = "Gnovatoken_bot"; 
 
     // 🔥 MODIFICAMOS EL LINK: Usamos el código si existe, si no, el ID
+    // ✅ EL LINK NUEVO (Abre la app directo e inyecta el código)
+// SUSTITUYE "app" POR EL SHORT NAME DE TU MINI APP EN BOTFATHER
     const inviteLink = user 
-        ? `https://t.me/${BOT_USERNAME}?start=${referralCode || user.id}` 
+        ? `https://t.me/${BOT_USERNAME}/app?startapp=${referralCode || user.id}` 
         : "Loading...";
 
     // Guardado de puntos (Batching)
