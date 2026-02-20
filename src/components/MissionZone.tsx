@@ -311,11 +311,11 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                     
                     <CommunityTaskCard 
                         title="Read Gnova News" 
-                        desc="@gnovaofiicialnews"
+                        desc="@gnovaofficialnews"
                         reward={500} 
                         claimed={newsClaimedToday}
                         isLoading={claimingTask === 'news'}
-                        onClick={() => handleCommunityTask('news', 'https://t.me/gnovaofiicialnews')}
+                        onClick={() => handleCommunityTask('news', 'https://t.me/gnovaofficialnews')}
                         icon={<Tv size={18} color="#00F2FE"/>}
                         color="#00F2FE"
                     />
