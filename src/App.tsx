@@ -59,6 +59,47 @@ export default function App() {
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
+
+    // =========================================================================
+    // 🚀 NUEVA CAPTURA GLOBAL DE REFERIDO (Milisegundo 1 al abrir la app) 🚀
+    // =========================================================================
+    useEffect(() => {
+        const captureReferralGlobal = async () => {
+            // 1. Esperamos a que el usuario esté logueado en Supabase
+            if (!user) return; 
+
+            // 2. Validamos que no se haya procesado ya en esta misma sesión
+            if (sessionStorage.getItem('referral_checked')) return;
+
+            // 3. Obtenemos el parámetro directamente de Telegram
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
+            const startParam = tg?.initDataUnsafe?.start_param;
+
+            if (startParam && startParam !== user.id) {
+                console.log("🚀 Referrer detected globally:", startParam);
+                
+                const { error } = await supabase.rpc('register_referral_on_load', { 
+                    p_user_id: user.id, 
+                    p_referrer_code: startParam 
+                });
+
+                if (error) {
+                    console.error("❌ Error guardando el referido global:", error);
+                } else {
+                    console.log("✅ Referido global guardado con éxito en la BD (Lucky Ticket Entregado)");
+                }
+            }
+
+            // 4. Marcamos la sesión para no repetir la llamada a la BD
+            sessionStorage.setItem('referral_checked', 'true');
+        };
+
+        captureReferralGlobal();
+    }, [user]);
+    // =========================================================================
+
+
     // AUTO-SAVE
     const saveProgress = useCallback(async () => {
         if (!user || !canSave) return; 

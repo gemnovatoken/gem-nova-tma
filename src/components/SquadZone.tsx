@@ -283,32 +283,6 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         ? `https://t.me/${BOT_USERNAME}?start=${referralCode || user.id}` 
         : "Loading...";
 
-    // ==========================================
-    // 🚀 LÓGICA NUEVA: CAPTURA DE REFERIDO 🚀
-    // ==========================================
-    useEffect(() => {
-        const captureReferrer = async () => {
-            if (!user) return;
-
-            // 1. Intentamos obtener el 'start_param' que Telegram inyecta en la WebApp
-            // "@ts-expect-error"
-            const tg = window.Telegram?.WebApp;
-            const startParam = tg?.initDataUnsafe?.start_param;
-
-            if (startParam && startParam !== user.id) {
-                console.log("Referrer detected:", startParam);
-                // 2. Llamamos a una función RPC en Supabase para vincularlos
-                // Esta función debe encargarse de poner el valor en 'referred_by'
-                await supabase.rpc('register_referral_on_load', { 
-                    p_user_id: user.id, 
-                    p_referrer_id: startParam 
-                });
-            }
-        };
-        captureReferrer();
-    }, [user]);
-    // ==========================================
-
     // Guardado de puntos (Batching)
     useEffect(() => {
         if (!user) return;
