@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Coins, Gift, Zap, Tv } from 'lucide-react';
+import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Coins, Gift, Zap, Tv, MessageCircle } from 'lucide-react';
 import { MemoryGame, AsteroidGame, HackerGame } from './ArcadeGames';
 
 // Interfaz para la respuesta de la transacción de monedas
@@ -20,12 +20,22 @@ interface GameCardProps {
     onPlay: () => void;
 }
 
-// 🔥 CAMBIO 1: Definimos que MissionZone recibe la función para actualizar el score
 interface MissionZoneProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
 
-// 🔥 CAMBIO 2: Agregamos 'setGlobalScore' a los props del componente
+// 🔥 NUEVA INTERFAZ: Para solucionar el error "any" en CommunityTaskCard
+interface CommunityTaskCardProps {
+    title: string;
+    desc: string;
+    reward: number;
+    claimed: boolean;
+    isLoading: boolean;
+    onClick: () => void;
+    icon: React.ReactNode;
+    color: string;
+}
+
 export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const [streak, setStreak] = useState(0);
@@ -35,13 +45,30 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [activeGame, setActiveGame] = useState<string | null>(null);
 
+    // 🔥 NUEVOS ESTADOS PARA DAILY BOUNTIES
+    const [newsClaimedToday, setNewsClaimedToday] = useState(false);
+    const [globalClaimedToday, setGlobalClaimedToday] = useState(false);
+    const [claimingTask, setClaimingTask] = useState<string | null>(null);
+
     const loadData = useCallback(async () => {
         if(!user) return;
-        const { data } = await supabase.from('user_score').select('current_streak, last_check_in_date, arcade_coins').eq('user_id', user.id).single();
-        if (data) {
-            setStreak(data.current_streak);
+        // 🔥 Agregamos last_news_claim y last_global_claim a la consulta
+        const { data, error } = await supabase
+            .from('user_score')
+            .select('current_streak, last_check_in_date, arcade_coins, last_news_claim, last_global_claim')
+            .eq('user_id', user.id)
+            .single();
+            
+        if (!error && data) {
+            setStreak(data.current_streak || 0);
             const today = new Date().toISOString().split('T')[0];
+            
             if (data.last_check_in_date === today) setCheckedInToday(true);
+            
+            // Verificamos si ya cobró las misiones de comunidad hoy
+            if (data.last_news_claim === today) setNewsClaimedToday(true);
+            if (data.last_global_claim === today) setGlobalClaimedToday(true);
+            
             setCoins(data.arcade_coins ?? 0);
         }
     }, [user]);
@@ -68,14 +95,50 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
             const reward = data[0].reward;
             if (window.navigator.vibrate) window.navigator.vibrate([50, 50, 50]);
             
-            // 🔥 CAMBIO 3: Actualizar puntaje visualmente al hacer Check-in
             setGlobalScore(prev => prev + reward);
-            
             alert(`✅ +${reward} PTS CLAIMED!`);
             loadData();
         } else {
             alert(data?.[0]?.message || "Error");
         }
+    };
+
+    // 🔥 NUEVA LÓGICA: Procesar Misiones de Comunidad
+    const handleCommunityTask = async (taskType: 'news' | 'global', url: string) => {
+        if (!user || claimingTask) return;
+        
+        // 1. Abrimos el enlace de Telegram nativamente si es posible
+        // @ts-expect-error Explicacion: TypeScript no conoce el objeto global de Telegram
+        if (window.Telegram?.WebApp?.openTelegramLink) {
+             // @ts-expect-error Explicacion: Usamos openTelegramLink nativo de la app
+             window.Telegram.WebApp.openTelegramLink(url);
+        } else {
+             window.open(url, '_blank');
+        }
+
+        setClaimingTask(taskType);
+        
+        // 2. Simulamos 3 segundos de verificación para que el usuario vaya y regrese
+        setTimeout(async () => {
+            const today = new Date().toISOString().split('T')[0];
+            const columnToUpdate = taskType === 'news' ? 'last_news_claim' : 'last_global_claim';
+            
+            // Aumentamos los puntos en la DB
+            await supabase.rpc('increment_score', { p_user_id: user.id, p_amount: 500 });
+            // Registramos que ya cobró hoy
+            await supabase.from('user_score').update({ [columnToUpdate]: today }).eq('user_id', user.id);
+            
+            // Actualizamos la UI visualmente
+            if (taskType === 'news') setNewsClaimedToday(true);
+            else setGlobalClaimedToday(true);
+            
+            setGlobalScore(prev => prev + 500);
+            
+            if (window.navigator.vibrate) window.navigator.vibrate(200);
+            alert(`✅ +500 PTS CLAIMED for visiting ${taskType === 'news' ? 'Gnova News' : 'Gnova Global'}!`);
+            
+            setClaimingTask(null);
+        }, 3000);
     };
 
     const handleWatchAdForCoins = async () => {
@@ -122,12 +185,8 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     const handleGameFinish = async (won: boolean, score: number) => {
         setActiveGame(null);
         if (won && user) {
-            // Guardar en base de datos
             await supabase.rpc('increment_score', { p_user_id: user.id, p_amount: score });
-            
-            // 🔥 CAMBIO 4: ¡Aquí está la magia! Actualizamos el puntaje global inmediatamente
             setGlobalScore(prev => prev + score);
-            
             alert(`🏆 VICTORIA! Ganaste +${score} Puntos`);
         }
         loadData();
@@ -242,6 +301,39 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                 )}
             </div>
 
+            {/* 🔥 NUEVA SECCIÓN: DAILY BOUNTIES (MISIONES DE COMUNIDAD) */}
+            <div style={{ marginBottom: '35px' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px', borderBottom:'1px solid #333', paddingBottom:'8px' }}>
+                    <h3 style={{ fontSize:'16px', margin:0, color: '#fff' }}>📢 Daily Bounties</h3>
+                    <span style={{ fontSize:'10px', color:'#FFD700', background:'rgba(255, 215, 0, 0.1)', padding:'2px 6px', borderRadius:'4px' }}>Resets in 24h</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    
+                    <CommunityTaskCard 
+                        title="Read Gnova News" 
+                        desc="@gnovaofiicialnews"
+                        reward={500} 
+                        claimed={newsClaimedToday}
+                        isLoading={claimingTask === 'news'}
+                        onClick={() => handleCommunityTask('news', 'https://t.me/gnovaofiicialnews')}
+                        icon={<Tv size={18} color="#00F2FE"/>}
+                        color="#00F2FE"
+                    />
+                    
+                    <CommunityTaskCard 
+                        title="Check Gnova Global" 
+                        desc="@gnovaglobal"
+                        reward={500} 
+                        claimed={globalClaimedToday}
+                        isLoading={claimingTask === 'global'}
+                        onClick={() => handleCommunityTask('global', 'https://t.me/gnovaglobal')}
+                        icon={<MessageCircle size={18} color="#E040FB"/>}
+                        color="#E040FB"
+                    />
+
+                </div>
+            </div>
+
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px', borderBottom:'1px solid #333', paddingBottom:'10px' }}>
                 <h3 style={{ fontSize:'18px', margin:0 }}>🕹️ Arcade Zone</h3>
                 <div style={{ display:'flex', alignItems:'center', gap:'6px', background:'#111', padding:'6px 12px', borderRadius:'20px', border:'1px solid #333' }}>
@@ -269,6 +361,8 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     );
 };
 
+// --- COMPONENTES AUXILIARES ---
+
 const GameCard: React.FC<GameCardProps> = ({ title, desc, reward, icon, color, onPlay }) => (
     <div className="glass-card" style={{ 
         display:'flex', alignItems:'center', justifyContent:'space-between', padding:'15px', 
@@ -292,5 +386,41 @@ const GameCard: React.FC<GameCardProps> = ({ title, desc, reward, icon, color, o
             <div style={{ fontSize:'9px', color:'#555', marginTop:'2px' }}>REWARD</div>
             <div style={{display:'none'}}><Play /></div> 
         </div>
+    </div>
+);
+
+// 🔥 COMPONENTE NUEVO Y CORREGIDO
+const CommunityTaskCard: React.FC<CommunityTaskCardProps> = ({ title, desc, reward, claimed, isLoading, onClick, icon, color }) => (
+    <div className="glass-card" style={{ 
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', 
+        background: claimed ? 'rgba(76, 175, 80, 0.05)' : 'rgba(255,255,255,0.03)', 
+        border: claimed ? '1px solid rgba(76, 175, 80, 0.3)' : '1px solid #333', 
+        opacity: claimed ? 0.6 : 1,
+        transition: 'all 0.3s'
+    }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ background: `rgba(${parseInt(color.slice(1,3),16)}, ${parseInt(color.slice(3,5),16)}, ${parseInt(color.slice(5,7),16)}, 0.1)`, padding: '8px', borderRadius: '10px' }}>
+                {icon}
+            </div>
+            <div>
+                <div style={{ fontWeight: 'bold', fontSize: '13px', color: '#fff' }}>{title}</div>
+                <div style={{ fontSize: '10px', color: '#aaa' }}>{desc}</div>
+            </div>
+        </div>
+        <button 
+            onClick={onClick} 
+            disabled={claimed || isLoading}
+            className={claimed ? '' : 'btn-neon'}
+            style={{ 
+                padding: '8px 15px', fontSize: '12px', borderRadius: '8px', fontWeight: 'bold',
+                background: claimed ? 'transparent' : '#FFD700', 
+                color: claimed ? '#4CAF50' : '#000',
+                border: claimed ? '1px solid #4CAF50' : 'none',
+                boxShadow: claimed ? 'none' : '0 0 10px rgba(255, 215, 0, 0.4)',
+                cursor: claimed ? 'default' : (isLoading ? 'wait' : 'pointer'),
+                minWidth: '70px', display: 'flex', justifyContent: 'center'
+            }}>
+            {isLoading ? '...' : claimed ? 'DONE ✓' : `+${reward}`}
+        </button>
     </div>
 );
