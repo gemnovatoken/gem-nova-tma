@@ -3,7 +3,7 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { StakingBank } from './StakingBank';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
-import { Zap, Cpu, Shield, Rocket, Lock, Play, Hexagon, Crown, History, X, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Zap, Cpu, Shield, Rocket, Hexagon, Crown, History, X, ExternalLink, CheckCircle2 } from 'lucide-react';
 
 // 👇 PON AQUÍ TU WALLET REAL
 const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q'; 
@@ -14,7 +14,6 @@ interface PackNodeProps {
     price: string;
     color: string;
     icon: React.ReactNode;
-    isLocked?: boolean;
     onClick: () => void;
     side: 'left' | 'right';
     disabled?: boolean;
@@ -168,13 +167,6 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
         }
     };
 
-    const unlockPack = (packName: string) => {
-        if(window.confirm(`🔒 SECURE NODE DETECTED.\n\nWatch Ad-Stream to decrypt access to ${packName}?`)) {
-            console.log("Playing Ad for:", packName);
-            alert("🔓 Decrypting... Node Access Granted.");
-        }
-    }
-
     return (
         <div className="cyber-bg" style={{ minHeight: '100%', paddingBottom: '120px', paddingTop: '20px' }}>
             
@@ -260,7 +252,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 </div>
             </div>
 
-            {/* NODOS DE COMPRA */}
+            {/* NODOS DE COMPRA (AHORA TODOS DIRECTOS) */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '50px', padding: '0 20px', position: 'relative' }}>
                 
                 {loading && (
@@ -289,22 +281,22 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 <PackNode 
                     title="WHALE_SERVER" points="1M" price="1.50 TON" 
                     color="#FFD700" icon={<Shield size={20}/>} side="left"
-                    isLocked={false} 
                     onClick={() => buyPack('whale')} disabled={loading}
                 />
 
                 <PackNode 
                     title="TYCOON_CORE" points="5M" price="7.50 TON" 
                     color="#E040FB" icon={<Rocket size={20}/>} side="right"
-                    isLocked={true} onClick={() => unlockPack('TYCOON')}
+                    onClick={() => buyPack('tycoon')} disabled={loading}
                 />
 
                 <PackNode 
                     title="EMPEROR_SYS" points="17M" price="25 TON" 
                     color="#FF512F" icon={<Crown size={20}/>} side="left"
-                    isLocked={true} onClick={() => unlockPack('EMPEROR')}
+                    onClick={() => buyPack('emperor')} disabled={loading}
                 />
 
+                {/* BOTÓN GOD MODE AHORA COMPRA DIRECTO */}
                 <div style={{ position: 'relative', zIndex: 2, margin: '40px 0' }}>
                     <div className="cyber-card" style={{ 
                         textAlign: 'center', padding: '30px', border: '2px solid #fff', 
@@ -315,9 +307,14 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                         <h3 style={{margin:0, color:'#fff', fontSize:'24px', letterSpacing:'4px'}}>BLACK_HOLE</h3>
                         <p style={{color:'#aaa', fontSize:'10px', margin:'5px 0'}}>DATA INJECTION: 70M PTS</p>
                         
-                        <button className="btn-cyber" style={{width:'100%', padding:'15px', fontSize:'16px', marginTop:'15px', background:'#fff', color:'#000'}} onClick={() => unlockPack('BLACKHOLE')}>
+                        <button 
+                            className="btn-cyber" 
+                            style={{width:'100%', padding:'15px', fontSize:'16px', marginTop:'15px', background:'#fff', color:'#000'}} 
+                            onClick={() => buyPack('blackhole')}
+                            disabled={loading}
+                        >
                             <span style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'10px'}}>
-                                <Lock size={16}/> UNLOCK [100 TON]
+                                💎 BUY NOW [100 TON]
                             </span>
                         </button>
                     </div>
@@ -351,7 +348,8 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     );
 };
 
-const PackNode: React.FC<PackNodeProps> = ({ title, points, price, color, icon, isLocked, onClick, side, disabled }) => (
+// Componente PackNode Simplificado (Sin candados)
+const PackNode: React.FC<PackNodeProps> = ({ title, points, price, color, icon, onClick, side, disabled }) => (
     <div style={{ 
         display: 'flex', 
         justifyContent: side === 'left' ? 'flex-start' : 'flex-end',
@@ -386,24 +384,15 @@ const PackNode: React.FC<PackNodeProps> = ({ title, points, price, color, icon, 
                 <div style={{color:color, display:'flex', alignItems:'center', gap:'5px', fontSize:'12px', fontWeight:'bold', fontFamily:'monospace'}}>
                     {icon} {title}
                 </div>
-                {isLocked && <Lock size={14} color="#FF512F" />}
             </div>
 
             <div style={{fontSize:'24px', fontWeight:'900', color:'#fff', textShadow:`0 0 10px ${color}40`}}>
                 {points}
             </div>
             
-            {isLocked ? (
-                <button className="btn-cyber" style={{fontSize:'10px', padding:'8px', borderColor:'#FF512F', color:'#FF512F'}}>
-                    <span style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'5px'}}>
-                        <Play size={10}/> WATCH TO UNLOCK
-                    </span>
-                </button>
-            ) : (
-                <button className="btn-cyber" style={{fontSize:'12px', padding:'8px', borderColor:color, color:color}}>
-                    {price}
-                </button>
-            )}
+            <button className="btn-cyber" style={{fontSize:'12px', padding:'8px', borderColor:color, color:color}}>
+                {price}
+            </button>
         </div>
     </div>
 );
