@@ -134,11 +134,23 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
             setCheckedInToday(true);
             setGlobalScore((prev: number) => prev + reward);
 
-            // Mensaje especial si es día 7 (Multiplo de 7)
+            // 🔥 NUEVA LÓGICA: 3 Lucky Tickets en el Día 7 🔥
             if ((streak + 1) % 7 === 0) {
-                 alert(`🏆 7-DAY STREAK COMPLETED!\n\nBIG REWARD: +${reward} PTS & Possible Lucky Ticket!`);
-                 // Si tu lógica de backend da Lucky Ticket en el día 7, aquí podrías recargar los tickets:
-                 // setLuckyTickets(prev => prev + 1); 
+                 // Leemos el valor más reciente de la BD para evitar sobrescribir con datos viejos
+                 const { data: currentData } = await supabase
+                     .from('user_score')
+                     .select('lucky_tickets')
+                     .eq('user_id', user.id)
+                     .single();
+                 
+                 const currentTickets = currentData?.lucky_tickets || luckyTickets;
+                 const newTotalTickets = currentTickets + 3;
+
+                 // Actualizamos la base de datos y el estado local
+                 await supabase.from('user_score').update({ lucky_tickets: newTotalTickets }).eq('user_id', user.id);
+                 setLuckyTickets(newTotalTickets);
+
+                 alert(`🏆 7-DAY STREAK COMPLETED!\n\nBIG REWARD: +${reward} PTS & +3 LUCKY TICKETS! 🎟️`);
             } else {
                  alert(`✅ DAILY CHECK-IN SUCCESS!\n\nStreak: ${streak + 1} Days\nReceived: +${reward} PTS`);
             }
@@ -396,7 +408,8 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 return { ...u, bonus_claimed_initial: type === 'initial' ? true : u.bonus_claimed_initial, bonus_claimed_lvl4: type === 'lvl4' ? true : u.bonus_claimed_lvl4 };
             }
             return u;
-        }));
+        }
+        ));
         const { data, error } = await supabase.rpc('claim_referral_reward', { referral_user_id: targetId, reward_type: type, my_id: user.id });
         if(error || !data) {
             alert("Error claiming reward.");
