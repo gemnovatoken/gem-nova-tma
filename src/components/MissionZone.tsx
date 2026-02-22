@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Coins, Gift, Zap, Tv, MessageCircle } from 'lucide-react';
+// 🔥 Añadimos Map y X a las importaciones de lucide-react
+import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Coins, Gift, Zap, Tv, MessageCircle, Map, X } from 'lucide-react';
 import { MemoryGame, AsteroidGame, HackerGame } from './ArcadeGames';
+// 🔥 Importamos el componente MillionPath
+import { MillionPath } from './MillionPath';
 
 interface TransactionResponse {
     success: boolean;
@@ -43,6 +46,9 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     const [loadingAd, setLoadingAd] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const [activeGame, setActiveGame] = useState<string | null>(null);
+
+    // 🔥 NUEVO ESTADO: Controla si el modal del mapa está abierto o cerrado
+    const [showPathModal, setShowPathModal] = useState(false);
 
     // 🔥 ESTADOS ACTUALIZADOS (Sistema Anti-Trampas: Go -> Verify)
     const [newsStatus, setNewsStatus] = useState<'idle' | 'pending' | 'claimed'>('idle');
@@ -279,6 +285,23 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
             
+            {/* 🔥 NUEVO: MODAL DE PANTALLA COMPLETA DE LA RUTA DEL MILLÓN */}
+            {showPathModal && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9000,
+                    background: '#0a0a0a', overflowY: 'auto', display: 'flex', flexDirection: 'column'
+                }}>
+                    <div style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button onClick={() => setShowPathModal(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer' }}>
+                            <X size={24} />
+                        </button>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <MillionPath setGlobalScore={setGlobalScore} />
+                    </div>
+                </div>
+            )}
+
             {activeGame === 'memory' && <MemoryGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
             {activeGame === 'asteroid' && <AsteroidGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
             {activeGame === 'hacker' && <HackerGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
@@ -321,6 +344,33 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                 )}
             </div>
 
+            {/* 🔥 NUEVO: BANNER DORADO PARA ABRIR LA RUTA DEL MILLÓN */}
+            <div 
+                onClick={() => setShowPathModal(true)}
+                className="glass-card"
+                style={{
+                    marginBottom: '35px', padding: '0', overflow: 'hidden', cursor: 'pointer',
+                    background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)',
+                    border: '1px solid #FFD700', boxShadow: '0 0 15px rgba(255, 215, 0, 0.2)'
+                }}
+            >
+                <div style={{ padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <div style={{ background: '#FFD700', padding: '10px', borderRadius: '12px', color: '#000' }}>
+                            <Map size={24} />
+                        </div>
+                        <div>
+                            <div style={{ color: '#FFD700', fontWeight: '900', fontSize: '16px', letterSpacing: '1px' }}>THE 2.5M PATH</div>
+                            <div style={{ color: '#aaa', fontSize: '10px' }}>ULTIMATE PROTOCOL ACTIVATED</div>
+                        </div>
+                    </div>
+                    <Play size={20} color="#FFD700" fill="#FFD700" />
+                </div>
+                <div style={{ background: 'rgba(255, 215, 0, 0.2)', padding: '5px', textAlign: 'center', fontSize: '10px', color: '#FFD700', fontWeight: 'bold' }}>
+                    TAP TO OPEN MISSION MAP
+                </div>
+            </div>
+
             {/* 🔥 SECCIÓN: DAILY BOUNTIES */}
             <div style={{ marginBottom: '35px' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px', borderBottom:'1px solid #333', paddingBottom:'8px' }}>
@@ -331,11 +381,11 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                     
                     <CommunityTaskCard 
                         title="Read Gnova News" 
-                        desc="@gnovaofficialnews"
+                        desc="@gnovaofiicialnews"
                         reward={500} 
                         status={newsStatus}
                         isLoading={claimingTask === 'news'}
-                        onGo={() => handleTaskGo('news', 'https://t.me/gnovaofficialnews')}
+                        onGo={() => handleTaskGo('news', 'https://t.me/gnovaofiicialnews')}
                         onVerify={() => handleTaskVerify('news')}
                         icon={<Tv size={18} color="#00F2FE"/>}
                         color="#00F2FE"
