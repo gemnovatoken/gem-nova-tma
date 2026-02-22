@@ -235,6 +235,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
+    // 🔥 NUEVA FUNCIÓN: INICIAR RETO DE INVITADOS (Con Copywriting "Gnova System")
     const handleGateInviteClick = async () => {
         if (!user || loading) return;
         setLoading(true);
@@ -252,8 +253,8 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 setProgress(prev => ({ ...prev, gate_invite_start_value: currentRefs }));
             }
 
-            // Textos de marketing que avisan sobre los bonos para el invitado
-            const shareText = `🏆 Join me on Gnova to win 5,000,000 Pts!\n\n🎁 Use my link to get:\n- 5,000 Pts Bonus\n- 1 Lucky Ticket\n- 1 Golden Ticket\n\nMine crypto before launch! 🚀`;
+            // 🔥 TEXTO DE MARKETING ACTUALIZADO ("GNOVA SYSTEM IS LIVE") 🔥
+            const shareText = `🔥 GNOVA SYSTEM IS LIVE! 🔥\n\nI need backup to unlock the 5,000,000 PTS Premium Jackpot! 💎\n\n🎁 Use my VIP Link to instantly claim your 5,000 PTS Welcome Bonus!\n\nJoin my squad, mine crypto, and let's win together! 🚀👇`;
             
             // @ts-expect-error Typescript config
             if (window.Telegram?.WebApp?.openTelegramLink) {
