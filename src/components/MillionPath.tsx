@@ -15,6 +15,7 @@ interface PathProgress {
     task_b_start_value: number | null;
     reward_5k_claimed: boolean;
     premium_rewards_claimed: number;
+    gate_invite_start_value: number | null; // 🔥 NUEVO: Para contar los referidos desde 0 en el peaje
 }
 
 interface MillionPathProps {
@@ -70,7 +71,8 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const [tonConnectUI] = useTonConnectUI();
     const [progress, setProgress] = useState<PathProgress>({ 
         current_level: 1, task_a_done: false, task_b_done: false, is_completed: false, 
-        task_a_start_value: null, task_b_start_value: null, reward_5k_claimed: false, premium_rewards_claimed: 0 
+        task_a_start_value: null, task_b_start_value: null, reward_5k_claimed: false, premium_rewards_claimed: 0,
+        gate_invite_start_value: null 
     });
     const [loading, setLoading] = useState(false);
     
@@ -87,11 +89,11 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         if (!user) return;
         const { data, error } = await supabase.from('user_million_path').select('*').eq('user_id', user.id).single();
         if (data) {
-            // 🔥 Aseguramos que los booleanos no lleguen como null o undefined
             setProgress({ 
                 ...data, 
                 premium_rewards_claimed: data.premium_rewards_claimed || 0,
-                reward_5k_claimed: data.reward_5k_claimed || false 
+                reward_5k_claimed: data.reward_5k_claimed || false,
+                gate_invite_start_value: data.gate_invite_start_value ?? null
             });
         } else if (error?.code === 'PGRST116') {
             await supabase.from('user_million_path').insert([{ user_id: user.id }]);
@@ -115,10 +117,10 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         return () => clearInterval(interval);
     }, [loadProgress, loadLiveStats]);
 
+    // 🔥 PRECIOS DEL PEAJE (ACTUALIZADOS A 2 Y 3 REFERIDOS)
     const getGateCost = (level: number) => {
-        if (level <= 5) return { ton: 0.35, refs: 1 };
-        if (level <= 8) return { ton: 0.35, refs: 1 };
-        return { ton: 0.45, refs: 2 };
+        if (level <= 8) return { ton: 0.35, refs: 2 };
+        return { ton: 0.45, refs: 3 };
     };
 
     const getStatValueByType = (type: string): number => {
@@ -194,22 +196,17 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 1. COBRO DE 5K A PRUEBA DE GLITCH
     const handleClaimBaseReward = async () => {
         if (!user || loading || progress.reward_5k_claimed) return;
         setLoading(true);
         try {
-            // PASO A: Intentamos actualizar la base de datos PRIMERO
             const { error: updateError } = await supabase.from('user_million_path').update({ reward_5k_claimed: true }).eq('user_id', user.id);
-            
             if (updateError) {
                 console.error(updateError);
                 alert("⚠️ Database Error: Could not verify claim state. Please refresh the app.");
                 setLoading(false);
-                return; // Si falla, ABORTA. No le da los puntos.
+                return;
             }
-
-            // PASO B: Si la DB se guardó bien, le damos los puntos.
             await supabase.rpc('increment_score', { p_user_id: user.id, p_amount: 5000 });
             setGlobalScore(prev => prev + 5000);
             setProgress(prev => ({ ...prev, reward_5k_claimed: true }));
@@ -221,11 +218,9 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         setLoading(false);
     };
 
-    // 🔥 2. PAGAR EL PEAJE
     const handlePayGateToAdvance = async () => {
         if (!tonConnectUI.connected) return alert("⚠️ Please connect your wallet first.");
         const cost = getGateCost(progress.current_level);
-        
         if (!window.confirm(`🔓 PREMIUM GATE\n\nPay ${cost.ton} TON to unlock Level ${progress.current_level + 1} and your Premium Reward?`)) return;
 
         setLoading(true);
@@ -241,6 +236,65 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
+    // 🔥 NUEVA FUNCIÓN: INICIAR RETO DE INVITADOS (Guarda el estado y genera el link)
+    const handleGateInviteClick = async () => {
+        if (!user || loading) return;
+        setLoading(true);
+        try {
+            // 1. Obtener código de referido
+            const { data: codeData } = await supabase.rpc('get_or_create_referral_code', { p_user_id: user.id });
+            // "@ts-expect-error Typescript window config"
+            const refCode = codeData?.code || user.id;
+            const inviteLink = `https://t.me/Gnovatoken_bot/app?startapp=${refCode}`;
+
+            // 2. Obtener referidos actuales
+            const { data: countData } = await supabase.rpc('get_my_referrals', { my_id: user.id });
+            const currentRefs = Number(countData) || 0;
+
+            // 3. Guardar el estado inicial en la BD para que empiece a contar desde cero
+            await supabase.from('user_million_path').update({ gate_invite_start_value: currentRefs }).eq('user_id', user.id);
+            setProgress(prev => ({ ...prev, gate_invite_start_value: currentRefs }));
+
+            // 4. Mandar a Telegram
+            const shareText = `🏆 I'm on my way to 5,000,000 Pts on Gnova! Join my squad and mine crypto!`;
+            // @ts-expect-error Typescript window config
+            if (window.Telegram?.WebApp?.openTelegramLink) {
+                // @ts-expect-error Typescript window config
+                window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${inviteLink}&text=${encodeURIComponent(shareText)}`);
+            } else {
+                window.open(`https://t.me/share/url?url=${inviteLink}&text=${encodeURIComponent(shareText)}`, '_blank');
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error starting invite task.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // 🔥 NUEVA FUNCIÓN: VERIFICAR INVITADOS (Comprueba si entraron los requeridos)
+    const handleVerifyGateInvites = async () => {
+        if (!user || loading || progress.gate_invite_start_value === null) return;
+        setLoading(true);
+        try {
+            const { data: countData } = await supabase.rpc('get_my_referrals', { my_id: user.id });
+            const currentRefs = Number(countData) || 0;
+            const refsGained = Math.max(0, currentRefs - progress.gate_invite_start_value);
+            const cost = getGateCost(progress.current_level);
+
+            if (refsGained >= cost.refs) {
+                await advanceLevel();
+            } else {
+                alert(`❌ Invites Incomplete\n\nProgress: ${refsGained} / ${cost.refs} New Agents\n\nKeep sharing your link!`);
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error verifying invites.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const advanceLevel = async () => {
         const isFinal = progress.current_level === 10;
         if (isFinal) {
@@ -250,7 +304,12 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
             setLoading(false);
         } else {
             const nextLevel = progress.current_level + 1;
-            const updates = { current_level: nextLevel, task_a_done: false, task_b_done: false, task_a_start_value: null, task_b_start_value: null, reward_5k_claimed: false };
+            // 🔥 Se resetea el gate_invite_start_value para el próximo nivel
+            const updates = { 
+                current_level: nextLevel, task_a_done: false, task_b_done: false, 
+                task_a_start_value: null, task_b_start_value: null, reward_5k_claimed: false,
+                gate_invite_start_value: null
+            };
             await supabase.from('user_million_path').update(updates).eq('user_id', user!.id);
             setProgress(prev => ({ ...prev, ...updates }));
             
@@ -260,7 +319,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 COBRO PREMIUM (Las cajas de 250k/2.75M)
     const handleClaimPremiumReward = async () => {
         if (!user || loading) return;
         setLoading(true);
@@ -381,7 +439,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const gateCost = getGateCost(progress.current_level);
     const hasUnclaimedPremium = (progress.is_completed && progress.premium_rewards_claimed < 10) || (!progress.is_completed && progress.premium_rewards_claimed < progress.current_level - 1);
 
-    // 🔥 CÁLCULO DE LA BARRA MAESTRA DE 5M
     const totalClaimed = progress.premium_rewards_claimed < 10 
         ? progress.premium_rewards_claimed * 250000 
         : 5000000;
@@ -397,7 +454,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
 
-            {/* 🔥 MASTER PROGRESS BAR (LA NUEVA BARRA DE 5 MILLONES) 🔥 */}
+            {/* MASTER PROGRESS BAR */}
             <div className="glass-card" style={{ padding: '15px', marginBottom: '25px', background: 'rgba(255, 215, 0, 0.05)', border: '1px solid rgba(255, 215, 0, 0.3)' }}>
                 <div style={{ textAlign: 'center', fontSize: '10px', color: '#FFD700', letterSpacing: '1px', marginBottom: '8px', fontWeight: '900' }}>
                     ULTIMATE REWARD POOL
@@ -411,7 +468,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
 
-            {/* PREMIUM REWARD TRACK (SCROLL HORIZONTAL) */}
+            {/* PREMIUM REWARD TRACK */}
             <div style={{ marginBottom: '30px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <h4 style={{ color: '#00F2FE', fontSize: '12px', margin: 0, letterSpacing: '1px' }}>PREMIUM REWARDS</h4>
@@ -484,7 +541,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                         />
                     </div>
 
-                    {/* PEAJE PREMIUM */}
+                    {/* PEAJE PREMIUM ACTUALIZADO */}
                     {progress.task_a_done && progress.task_b_done && (
                         <div style={{ marginTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '15px' }}>
                             {!progress.reward_5k_claimed ? (
@@ -495,8 +552,21 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                                 <div>
                                     <div style={{ textAlign: 'center', fontSize: '10px', color: '#FFD700', marginBottom: '10px', fontWeight: 'bold' }}>🔓 PREMIUM GATE TO UNLOCK NEXT LEVEL</div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                        <button onClick={handlePayGateToAdvance} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#FFD700', color: '#FFD700', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}><Zap size={14} /> PAY {gateCost.ton} TON</button>
-                                        <button onClick={() => alert(`Redirecting...\n\nInvite ${gateCost.refs} new friend to bypass the TON fee.`)} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#E040FB', color: '#E040FB', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}><Users size={14} /> INVITE {gateCost.refs}</button>
+                                        <button onClick={handlePayGateToAdvance} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#FFD700', color: '#FFD700', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
+                                            <Zap size={14} /> PAY {gateCost.ton} TON
+                                        </button>
+                                        
+                                        {/* 🔥 BOTÓN INTELIGENTE DE INVITACIÓN 🔥 */}
+                                        {progress.gate_invite_start_value === null ? (
+                                            <button onClick={handleGateInviteClick} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#E040FB', color: '#E040FB', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
+                                                <Users size={14} /> INVITE {gateCost.refs}
+                                            </button>
+                                        ) : (
+                                            <button onClick={handleVerifyGateInvites} disabled={loading} className="btn-cyber" style={{ background: '#E040FB', color: '#fff', border: 'none', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer', boxShadow: '0 0 10px rgba(224, 64, 251, 0.5)' }}>
+                                                VERIFY REFS
+                                            </button>
+                                        )}
+
                                     </div>
                                 </div>
                             )}
