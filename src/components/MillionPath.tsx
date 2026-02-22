@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
-// 🔥 Añadido el icono 'Gift' para las cajas de recompensa
 import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Medal, Play, ChevronDown, ChevronUp, Gift } from 'lucide-react';
 
 const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
@@ -15,7 +14,7 @@ interface PathProgress {
     task_a_start_value: number | null;
     task_b_start_value: number | null;
     reward_5k_claimed: boolean;
-    premium_rewards_claimed: number; // 🔥 NUEVO: Controla qué cajitas de 250k ya cobró
+    premium_rewards_claimed: number;
 }
 
 interface MillionPathProps {
@@ -51,18 +50,17 @@ interface LiveStats {
     starter_pack_bought: boolean;
 }
 
-// Configuración de las tareas con sus METAS (targetAmount)
 const PATH_STEPS = [
     { lvl: 1, title: "Onboarding", taskA: { desc: "Get 5,000 New Pts", target: 5000, type: 'score' }, taskB: { desc: "Do Daily Check-in Today", target: 1, type: 'checkin' } },
-    { lvl: 2, title: "Financial Literacy", taskA: { desc: "Gain 20,000 Total Wealth", target: 20000, type: 'wealth' }, taskB: { desc: "Complete 1 Daily Bounty", target: 1, type: 'bounty' } },
-    { lvl: 3, title: "Effort Filter", taskA: { desc: "Get 1 New Lucky Ticket", target: 1, type: 'ticket' }, taskB: { desc: "Start 1 Active Staking", target: 1, type: 'staking' } },
-    { lvl: 4, title: "In-App Engagement", taskA: { desc: "Upgrade Account Level", target: 1, type: 'level' }, taskB: { desc: "Play 10 Arcade Games", target: 10, type: 'arcade' } },
+    { lvl: 2, title: "Financial Literacy", taskA: { desc: "Reach 20,000 Total Wealth", target: 20000, type: 'wealth' }, taskB: { desc: "Complete 1 Daily Bounty", target: 1, type: 'bounty' } },
+    { lvl: 3, title: "Effort Filter", taskA: { desc: "Hold 1 Lucky Ticket", target: 1, type: 'ticket' }, taskB: { desc: "Have 1 Active Staking", target: 1, type: 'staking' } },
+    { lvl: 4, title: "In-App Engagement", taskA: { desc: "Reach Account Level 3", target: 3, type: 'level' }, taskB: { desc: "Play 10 New Arcade Games", target: 10, type: 'arcade' } },
     { lvl: 5, title: "Medium Commitment", taskA: { desc: "Reach 3-Day Streak", target: 3, type: 'streak' }, taskB: { desc: "Play Lottery Event", target: 1, type: 'lottery' } },
-    { lvl: 6, title: "Economic Filter", taskA: { desc: "Start 2 Active Stakings", target: 2, type: 'staking' }, taskB: { desc: "Get 2 New Lucky Tickets", target: 2, type: 'ticket' } },
-    { lvl: 7, title: "Wealth Growth", taskA: { desc: "Gain 500k Total Wealth", target: 500000, type: 'wealth' }, taskB: { desc: "Complete Both Bounties", target: 2, type: 'bounty' } },
-    { lvl: 8, title: "Network Expansion", taskA: { desc: "Upgrade to Level 4", target: 4, type: 'level_static' }, taskB: { desc: "Play 15 Arcade Games", target: 15, type: 'arcade' } },
+    { lvl: 6, title: "Economic Filter", taskA: { desc: "Have 2 Active Stakings", target: 2, type: 'staking' }, taskB: { desc: "Hold 2 Lucky Tickets", target: 2, type: 'ticket' } },
+    { lvl: 7, title: "Wealth Growth", taskA: { desc: "Reach 500k Total Wealth", target: 500000, type: 'wealth' }, taskB: { desc: "Complete Both Bounties", target: 2, type: 'bounty' } },
+    { lvl: 8, title: "Network Expansion", taskA: { desc: "Reach Account Level 4", target: 4, type: 'level_static' }, taskB: { desc: "Play 15 New Arcade Games", target: 15, type: 'arcade' } },
     { lvl: 9, title: "The Time Wall", taskA: { desc: "Reach 5-Day Streak", target: 5, type: 'streak' }, taskB: { desc: "Invite 2 New Agents", target: 2, type: 'referral' } },
-    { lvl: 10, title: "The Final Boss", taskA: { desc: "Buy Starter Node", target: 1, type: 'buy' }, taskB: { desc: "Get 3 New Lucky Tickets", target: 3, type: 'ticket' } }
+    { lvl: 10, title: "The Final Boss", taskA: { desc: "Buy Starter Node", target: 1, type: 'buy' }, taskB: { desc: "Hold 3 Lucky Tickets", target: 3, type: 'ticket' } }
 ];
 
 const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy'];
@@ -89,7 +87,12 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         if (!user) return;
         const { data, error } = await supabase.from('user_million_path').select('*').eq('user_id', user.id).single();
         if (data) {
-            setProgress({ ...data, premium_rewards_claimed: data.premium_rewards_claimed || 0 });
+            // 🔥 Aseguramos que los booleanos no lleguen como null o undefined
+            setProgress({ 
+                ...data, 
+                premium_rewards_claimed: data.premium_rewards_claimed || 0,
+                reward_5k_claimed: data.reward_5k_claimed || false 
+            });
         } else if (error?.code === 'PGRST116') {
             await supabase.from('user_million_path').insert([{ user_id: user.id }]);
         }
@@ -98,35 +101,11 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const loadLiveStats = useCallback(async () => {
         if (!user) return;
         try {
-            const { data: u } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
-            const { data: s } = await supabase.from('stakes').select('amount').eq('user_id', user.id).eq('status', 'active');
-            
-            if (u) {
-                const today = new Date().toISOString().split('T')[0];
-                const activeStakesCount = s ? s.length : 0;
-                const stakesTotal = s ? s.reduce((acc, curr) => acc + (curr.amount || 0), 0) : 0;
-                const level = Math.min(u.multitap_level || 1, u.limit_level || 1, u.speed_level || 1);
-                
-                let bountiesDone = 0;
-                if (u.last_news_claim === today) bountiesDone++;
-                if (u.last_global_claim === today) bountiesDone++;
-
-                setLiveStats({
-                    score: u.score || 0,
-                    total_wealth: (u.score || 0) + stakesTotal,
-                    lucky_tickets: u.lucky_tickets || 0,
-                    active_stakes: activeStakesCount,
-                    user_level: level,
-                    arcade_games_played: u.arcade_games_played || 0, 
-                    current_streak: u.current_streak || 0,
-                    lottery_played: u.lottery_played || 0, 
-                    bounties_done_today: bountiesDone,
-                    checked_in_today: u.last_check_in_date === today,
-                    starter_pack_bought: u.starter_pack_bought || false, 
-                    new_referrals_since_lvl9: u.new_referrals_since_lvl9 || 0 
-                });
+            const { data: userData } = await supabase.rpc('get_user_full_stats_for_path', { p_user_id: user.id });
+            if (userData && userData[0]) {
+                setLiveStats(userData[0] as LiveStats); 
             }
-        } catch (e) { console.error("Error loading live stats", e); }
+        } catch (e) { console.error(e); }
     }, [user]);
 
     useEffect(() => {
@@ -136,7 +115,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         return () => clearInterval(interval);
     }, [loadProgress, loadLiveStats]);
 
-    // 🔥 PRECIOS DEL PEAJE
     const getGateCost = (level: number) => {
         if (level <= 5) return { ton: 0.35, refs: 1 };
         if (level <= 8) return { ton: 0.35, refs: 1 };
@@ -216,17 +194,30 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 1. COBRAR LOS 5K BASE AL TERMINAR TAREAS
+    // 🔥 1. COBRO DE 5K A PRUEBA DE GLITCH
     const handleClaimBaseReward = async () => {
-        if (!user || loading) return;
+        if (!user || loading || progress.reward_5k_claimed) return;
         setLoading(true);
         try {
+            // PASO A: Intentamos actualizar la base de datos PRIMERO
+            const { error: updateError } = await supabase.from('user_million_path').update({ reward_5k_claimed: true }).eq('user_id', user.id);
+            
+            if (updateError) {
+                console.error(updateError);
+                alert("⚠️ Database Error: Could not verify claim state. Please refresh the app.");
+                setLoading(false);
+                return; // Si falla, ABORTA. No le da los puntos.
+            }
+
+            // PASO B: Si la DB se guardó bien, le damos los puntos.
             await supabase.rpc('increment_score', { p_user_id: user.id, p_amount: 5000 });
-            await supabase.from('user_million_path').update({ reward_5k_claimed: true }).eq('user_id', user.id);
             setGlobalScore(prev => prev + 5000);
             setProgress(prev => ({ ...prev, reward_5k_claimed: true }));
+            
             alert("✅ +5,000 PTS SECURED!\n\nNow unlock the Premium Gate to advance and claim your Premium Reward!");
-        } catch { alert("Error claiming."); }
+        } catch { 
+            alert("Error claiming. Please try again."); 
+        }
         setLoading(false);
     };
 
@@ -269,7 +260,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 NUEVA LÓGICA DE COBRO PREMIUM (Las cajas de 250k/2.75M)
+    // 🔥 COBRO PREMIUM (Las cajas de 250k/2.75M)
     const handleClaimPremiumReward = async () => {
         if (!user || loading) return;
         setLoading(true);
@@ -318,7 +309,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 RENDER DE LA BARRA PREMIUM
     const renderPremiumTrack = () => {
         const boxes = [];
         for (let i = 1; i <= 10; i++) {
@@ -389,9 +379,13 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
 
     const currentStepConfig = PATH_STEPS[Math.min(progress.current_level - 1, 9)];
     const gateCost = getGateCost(progress.current_level);
-    
-    // Validar si tiene algún premio pendiente de cobrar
     const hasUnclaimedPremium = (progress.is_completed && progress.premium_rewards_claimed < 10) || (!progress.is_completed && progress.premium_rewards_claimed < progress.current_level - 1);
+
+    // 🔥 CÁLCULO DE LA BARRA MAESTRA DE 5M
+    const totalClaimed = progress.premium_rewards_claimed < 10 
+        ? progress.premium_rewards_claimed * 250000 
+        : 5000000;
+    const progressPercent = (totalClaimed / 5000000) * 100;
 
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
@@ -403,7 +397,21 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
 
-            {/* 🔥 PREMIUM REWARD TRACK (SCROLL HORIZONTAL) */}
+            {/* 🔥 MASTER PROGRESS BAR (LA NUEVA BARRA DE 5 MILLONES) 🔥 */}
+            <div className="glass-card" style={{ padding: '15px', marginBottom: '25px', background: 'rgba(255, 215, 0, 0.05)', border: '1px solid rgba(255, 215, 0, 0.3)' }}>
+                <div style={{ textAlign: 'center', fontSize: '10px', color: '#FFD700', letterSpacing: '1px', marginBottom: '8px', fontWeight: '900' }}>
+                    ULTIMATE REWARD POOL
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', fontWeight: 'bold', marginBottom: '5px' }}>
+                    <span style={{ color: '#fff' }}>{totalClaimed.toLocaleString()} <span style={{fontSize:'9px', color:'#aaa'}}>CLAIMED</span></span>
+                    <span style={{ color: '#FFD700' }}>5,000,000 PTS</span>
+                </div>
+                <div style={{ width: '100%', height: '10px', background: 'rgba(0,0,0,0.5)', borderRadius: '5px', overflow: 'hidden', border: '1px solid #444' }}>
+                    <div style={{ width: `${progressPercent}%`, height: '100%', background: 'linear-gradient(90deg, #FF8C00, #FFD700)', boxShadow: '0 0 10px rgba(255, 215, 0, 0.5)', transition: 'width 0.5s ease-in-out' }}></div>
+                </div>
+            </div>
+
+            {/* PREMIUM REWARD TRACK (SCROLL HORIZONTAL) */}
             <div style={{ marginBottom: '30px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <h4 style={{ color: '#00F2FE', fontSize: '12px', margin: 0, letterSpacing: '1px' }}>PREMIUM REWARDS</h4>
@@ -418,7 +426,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
 
-            {/* 🔥 HISTORIAL (Niveles Completados) */}
+            {/* HISTORIAL (Niveles Completados) */}
             {progress.current_level > 1 && (
                 <div style={{ marginBottom: '30px' }}>
                     <h4 style={{ color: '#4CAF50', fontSize: '12px', marginBottom: '10px', letterSpacing: '1px' }}>COMPLETED NODES</h4>
