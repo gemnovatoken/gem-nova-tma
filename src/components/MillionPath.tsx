@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
-import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Medal, Play, ChevronDown, ChevronUp } from 'lucide-react';
+// 🔥 Añadido el icono 'Gift' para las cajas de recompensa
+import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Medal, Play, ChevronDown, ChevronUp, Gift } from 'lucide-react';
 
 const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
@@ -13,6 +14,8 @@ interface PathProgress {
     is_completed: boolean;
     task_a_start_value: number | null;
     task_b_start_value: number | null;
+    reward_5k_claimed: boolean;
+    premium_rewards_claimed: number; // 🔥 NUEVO: Controla qué cajitas de 250k ya cobró
 }
 
 interface MillionPathProps {
@@ -51,7 +54,7 @@ interface LiveStats {
 // Configuración de las tareas con sus METAS (targetAmount)
 const PATH_STEPS = [
     { lvl: 1, title: "Onboarding", taskA: { desc: "Get 5,000 New Pts", target: 5000, type: 'score' }, taskB: { desc: "Do Daily Check-in Today", target: 1, type: 'checkin' } },
-    { lvl: 2, title: "Financial Literacy", taskA: { desc: "Gain 20,000 Total Wealth", target: 20000, type: 'wealth' }, taskB: { desc: "Complete 1 Daily Bounty", target: 1, type: 'bounty' } }, // 🔥 CAMBIO: 20k Total Wealth
+    { lvl: 2, title: "Financial Literacy", taskA: { desc: "Gain 20,000 Total Wealth", target: 20000, type: 'wealth' }, taskB: { desc: "Complete 1 Daily Bounty", target: 1, type: 'bounty' } },
     { lvl: 3, title: "Effort Filter", taskA: { desc: "Get 1 New Lucky Ticket", target: 1, type: 'ticket' }, taskB: { desc: "Start 1 Active Staking", target: 1, type: 'staking' } },
     { lvl: 4, title: "In-App Engagement", taskA: { desc: "Upgrade Account Level", target: 1, type: 'level' }, taskB: { desc: "Play 10 Arcade Games", target: 10, type: 'arcade' } },
     { lvl: 5, title: "Medium Commitment", taskA: { desc: "Reach 3-Day Streak", target: 3, type: 'streak' }, taskB: { desc: "Play Lottery Event", target: 1, type: 'lottery' } },
@@ -62,19 +65,20 @@ const PATH_STEPS = [
     { lvl: 10, title: "The Final Boss", taskA: { desc: "Buy Starter Node", target: 1, type: 'buy' }, taskB: { desc: "Get 3 New Lucky Tickets", target: 3, type: 'ticket' } }
 ];
 
+const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy'];
+
 export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const [tonConnectUI] = useTonConnectUI();
-    const [progress, setProgress] = useState<PathProgress>({ current_level: 1, task_a_done: false, task_b_done: false, is_completed: false, task_a_start_value: null, task_b_start_value: null });
+    const [progress, setProgress] = useState<PathProgress>({ 
+        current_level: 1, task_a_done: false, task_b_done: false, is_completed: false, 
+        task_a_start_value: null, task_b_start_value: null, reward_5k_claimed: false, premium_rewards_claimed: 0 
+    });
     const [loading, setLoading] = useState(false);
     
     const [showEpicWin, setShowEpicWin] = useState(false); 
-    const [hasClaimedReward, setHasClaimedReward] = useState(false); 
-    
-    // 🔥 NUEVO ESTADO: Para controlar qué nivel completado está desplegado
     const [expandedLevel, setExpandedLevel] = useState<number | null>(null);
     
-    // Estadísticas inicializadas en 0
     const [liveStats, setLiveStats] = useState<LiveStats>({
         score: 0, total_wealth: 0, lucky_tickets: 0, active_stakes: 0, user_level: 1,
         arcade_games_played: 0, current_streak: 0, lottery_played: 0, bounties_done_today: 0,
@@ -85,20 +89,16 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         if (!user) return;
         const { data, error } = await supabase.from('user_million_path').select('*').eq('user_id', user.id).single();
         if (data) {
-            setProgress(data);
-            if (data.is_completed) setHasClaimedReward(true);
+            setProgress({ ...data, premium_rewards_claimed: data.premium_rewards_claimed || 0 });
         } else if (error?.code === 'PGRST116') {
             await supabase.from('user_million_path').insert([{ user_id: user.id }]);
         }
     }, [user]);
 
-    // NUEVO SISTEMA DE LECTURA DIRECTA (Frontend Computing)
     const loadLiveStats = useCallback(async () => {
         if (!user) return;
         try {
-            // 1. Leemos el usuario directamente
             const { data: u } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
-            // 2. Leemos sus stakings
             const { data: s } = await supabase.from('stakes').select('amount').eq('user_id', user.id).eq('status', 'active');
             
             if (u) {
@@ -132,38 +132,17 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     useEffect(() => {
         loadProgress();
         loadLiveStats();
-        // Polling rápido: Revisa cada 3 segundos
         const interval = setInterval(loadLiveStats, 3000);
         return () => clearInterval(interval);
     }, [loadProgress, loadLiveStats]);
 
-    const getSkipCost = (level: number) => {
-        if (level <= 5) return { ton: 0.10, refs: 1 };
-        if (level <= 8) return { ton: 0.15, refs: 1 };
-        return { ton: 0.20, refs: 2 };
+    // 🔥 PRECIOS DEL PEAJE
+    const getGateCost = (level: number) => {
+        if (level <= 5) return { ton: 0.35, refs: 1 };
+        if (level <= 8) return { ton: 0.35, refs: 1 };
+        return { ton: 0.45, refs: 2 };
     };
 
-    const handleSkipWithTON = async () => {
-        if (!tonConnectUI.connected) return alert("⚠️ Please connect your wallet first.");
-        const cost = getSkipCost(progress.current_level);
-        
-        if (!window.confirm(`⚠️ OVERRIDE PROTOCOL\n\nSkip Level ${progress.current_level} for ${cost.ton} TON?`)) return;
-
-        setLoading(true);
-        try {
-            const amountInNano = (cost.ton * 1000000000).toFixed(0);
-            const transaction = { validUntil: Math.floor(Date.now() / 1000) + 600, messages: [{ address: ADMIN_WALLET_ADDRESS, amount: amountInNano }] };
-            await tonConnectUI.sendTransaction(transaction);
-            await advanceLevel();
-        } catch (err) {
-            console.error(err);
-            alert("Transaction cancelled or failed.");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Helper para mapear el tipo de tarea
     const getStatValueByType = (type: string): number => {
         switch(type) {
             case 'score': return liveStats.score;
@@ -183,7 +162,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // FUNCIÓN START
     const handleStartTask = async (taskLetter: 'A' | 'B', type: string) => {
         if (!user || loading) return;
         setLoading(true);
@@ -202,7 +180,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // FUNCIÓN VERIFY
     const handleVerifyTask = async (taskLetter: 'A' | 'B', type: string, target: number) => {
         if (!user || loading) return;
         setLoading(true);
@@ -215,7 +192,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
             let passed = false;
             let progressAmount = 0;
 
-            if (type === 'level_static' || type === 'streak' || type === 'checkin' || type === 'buy') {
+            if (STATIC_TYPES.includes(type)) {
                 progressAmount = currentValue;
                 passed = currentValue >= target;
             } else {
@@ -239,37 +216,85 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
+    // 🔥 1. COBRAR LOS 5K BASE AL TERMINAR TAREAS
+    const handleClaimBaseReward = async () => {
+        if (!user || loading) return;
+        setLoading(true);
+        try {
+            await supabase.rpc('increment_score', { p_user_id: user.id, p_amount: 5000 });
+            await supabase.from('user_million_path').update({ reward_5k_claimed: true }).eq('user_id', user.id);
+            setGlobalScore(prev => prev + 5000);
+            setProgress(prev => ({ ...prev, reward_5k_claimed: true }));
+            alert("✅ +5,000 PTS SECURED!\n\nNow unlock the Premium Gate to advance and claim your Premium Reward!");
+        } catch { alert("Error claiming."); }
+        setLoading(false);
+    };
+
+    // 🔥 2. PAGAR EL PEAJE
+    const handlePayGateToAdvance = async () => {
+        if (!tonConnectUI.connected) return alert("⚠️ Please connect your wallet first.");
+        const cost = getGateCost(progress.current_level);
+        
+        if (!window.confirm(`🔓 PREMIUM GATE\n\nPay ${cost.ton} TON to unlock Level ${progress.current_level + 1} and your Premium Reward?`)) return;
+
+        setLoading(true);
+        try {
+            const amountInNano = (cost.ton * 1000000000).toFixed(0);
+            const transaction = { validUntil: Math.floor(Date.now() / 1000) + 600, messages: [{ address: ADMIN_WALLET_ADDRESS, amount: amountInNano }] };
+            await tonConnectUI.sendTransaction(transaction);
+            await advanceLevel();
+        } catch (err) {
+            console.error(err);
+            alert("Transaction cancelled or failed.");
+            setLoading(false);
+        }
+    };
+
     const advanceLevel = async () => {
         const isFinal = progress.current_level === 10;
         if (isFinal) {
             await supabase.from('user_million_path').update({ is_completed: true }).eq('user_id', user!.id);
-            if (!hasClaimedReward) {
-                await supabase.rpc('increment_score', { p_user_id: user!.id, p_amount: 2500000 });
-                setGlobalScore(prev => prev + 2500000);
-                setHasClaimedReward(true);
-            }
             setProgress(prev => ({ ...prev, is_completed: true }));
-            setShowEpicWin(true);
+            alert("🎉 FINAL NODE COMPLETED!\n\nScroll up to the Premium Track to claim your Ultimate 2.75M Reward!");
+            setLoading(false);
         } else {
-            await supabase.rpc('increment_score', { p_user_id: user!.id, p_amount: 5000 });
-            setGlobalScore(prev => prev + 5000);
-            
             const nextLevel = progress.current_level + 1;
-            const updates = { current_level: nextLevel, task_a_done: false, task_b_done: false, task_a_start_value: null, task_b_start_value: null };
+            const updates = { current_level: nextLevel, task_a_done: false, task_b_done: false, task_a_start_value: null, task_b_start_value: null, reward_5k_claimed: false };
             await supabase.from('user_million_path').update(updates).eq('user_id', user!.id);
             setProgress(prev => ({ ...prev, ...updates }));
             
             if (window.navigator.vibrate) window.navigator.vibrate(300);
-            alert(`✅ LEVEL ${progress.current_level} CLEARED!\n\n+5,000 PTS awarded. Proceed to Level ${nextLevel}.`);
+            alert(`🔓 GATE UNLOCKED!\n\nLevel ${nextLevel} reached. Scroll up to the Premium Track to claim your 250k PTS!`);
+            setLoading(false);
         }
     };
 
-    useEffect(() => {
-        if (progress.task_a_done && progress.task_b_done && !progress.is_completed) {
-            advanceLevel();
+    // 🔥 NUEVA LÓGICA DE COBRO PREMIUM (Las cajas de 250k/2.75M)
+    const handleClaimPremiumReward = async () => {
+        if (!user || loading) return;
+        setLoading(true);
+
+        const { data, error } = await supabase.rpc('claim_premium_path_reward', { user_id_in: user.id });
+
+        if (!error && data && data[0].success) {
+            const newClaimedLevel = data[0].new_claimed_level;
+            const rewardAmount = newClaimedLevel === 10 ? 2750000 : 250000;
+            
+            setGlobalScore(prev => prev + rewardAmount);
+            setProgress(prev => ({ ...prev, premium_rewards_claimed: newClaimedLevel }));
+            
+            if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
+            
+            if (newClaimedLevel === 10) {
+                setShowEpicWin(true);
+            } else {
+                alert(`🎁 PREMIUM REWARD CLAIMED!\n\n+${rewardAmount.toLocaleString()} PTS added to your balance.`);
+            }
+        } else {
+            alert(data?.[0]?.message || "Error claiming reward.");
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [progress.task_a_done, progress.task_b_done]);
+        setLoading(false);
+    };
 
     const handleShareVictory = () => {
         const mediaUrl = 'https://gem-nova-tma.vercel.app/epic-win.jpg'; 
@@ -278,20 +303,66 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
             // @ts-expect-error TypeScript
             if (window.Telegram?.WebApp?.shareToStory) {
                 // @ts-expect-error TypeScript
-                window.Telegram.WebApp.shareToStory(mediaUrl, { text: `🏆 I just beat the Ultimate Protocol and won 2.5M Pts on Gnova! Join my squad: ${inviteLink}` });
+                window.Telegram.WebApp.shareToStory(mediaUrl, { text: `🏆 I just unlocked the 5,000,000 Pts Premium Prize on Gnova! Join my squad: ${inviteLink}` });
             } else {
-                window.open(`https://t.me/share/url?url=${inviteLink}&text=🏆 I just won 2.5M Pts on Gnova! Play now!`, '_blank');
+                window.open(`https://t.me/share/url?url=${inviteLink}&text=🏆 I just won 5M Pts on Gnova! Play now!`, '_blank');
             }
         } catch (e) { console.error(e); }
     };
 
-    // 🔥 FUNCIÓN PARA EXPANDIR/CONTRAER HISTORIAL
     const toggleHistoryLevel = (level: number) => {
         if (expandedLevel === level) {
             setExpandedLevel(null);
         } else {
             setExpandedLevel(level);
         }
+    };
+
+    // 🔥 RENDER DE LA BARRA PREMIUM
+    const renderPremiumTrack = () => {
+        const boxes = [];
+        for (let i = 1; i <= 10; i++) {
+            const isClaimed = progress.premium_rewards_claimed >= i;
+            const isUnlocked = progress.is_completed ? true : progress.current_level > i;
+            const isNextToClaim = isUnlocked && progress.premium_rewards_claimed === i - 1;
+            
+            const rewardText = i === 10 ? '2.75M' : '250K';
+            
+            let bgColor = 'rgba(255,255,255,0.02)';
+            let borderColor = '#333';
+            let iconColor = '#555';
+            
+            if (isClaimed) {
+                bgColor = 'rgba(76, 175, 80, 0.1)';
+                borderColor = '#4CAF50';
+                iconColor = '#4CAF50';
+            } else if (isNextToClaim) {
+                bgColor = i === 10 ? 'rgba(255, 215, 0, 0.2)' : 'rgba(0, 242, 254, 0.2)';
+                borderColor = i === 10 ? '#FFD700' : '#00F2FE';
+                iconColor = i === 10 ? '#FFD700' : '#00F2FE';
+            }
+
+            boxes.push(
+                <div key={i} style={{ 
+                    minWidth: '80px', padding: '10px 5px', borderRadius: '10px', 
+                    background: bgColor, border: `1px solid ${borderColor}`,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px',
+                    boxShadow: isNextToClaim ? `0 0 10px ${borderColor}` : 'none',
+                    opacity: (!isUnlocked && !isClaimed) ? 0.5 : 1, transition: 'all 0.3s'
+                }}>
+                    <div style={{ fontSize: '10px', color: '#aaa', fontWeight: 'bold' }}>LVL {i}</div>
+                    {isClaimed ? (
+                        <CheckCircle2 size={20} color={iconColor} />
+                    ) : isUnlocked ? (
+                        <Gift size={20} color={iconColor} style={{ animation: isNextToClaim ? 'bounce 1s infinite' : 'none' }} />
+                    ) : (
+                        <Lock size={20} color={iconColor} />
+                    )}
+                    <div style={{ fontSize: '12px', fontWeight: '900', color: isNextToClaim ? '#fff' : iconColor }}>{rewardText}</div>
+                </div>
+            );
+        }
+        return boxes;
     };
 
     if (showEpicWin) {
@@ -304,10 +375,10 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 <div style={{ animation: 'bounce 2s infinite', zIndex: 2 }}><Trophy size={100} color="#FFD700" style={{ filter: 'drop-shadow(0 0 30px #FFD700)' }} /></div>
                 <h1 style={{ color: '#FFD700', fontSize: '42px', textAlign: 'center', margin: '20px 0 10px', textShadow: '0 0 20px #FFD700', fontFamily: 'monospace', zIndex: 2 }}>GOD MODE<br/>UNLOCKED</h1>
                 <div style={{ background: 'rgba(255,255,255,0.1)', border: '2px solid #FFD700', padding: '20px 40px', borderRadius: '20px', marginBottom: '30px', boxShadow: '0 0 40px rgba(255,215,0,0.3)', zIndex: 2 }}>
-                    <div style={{ color: '#fff', fontSize: '14px', textAlign: 'center', marginBottom: '5px', letterSpacing:'2px' }}>REWARD SECURED</div>
-                    <div style={{ color: '#4CAF50', fontSize: '38px', fontWeight: '900', textShadow: '0 0 15px rgba(76,175,80,0.5)' }}>+2,500,000 PTS</div>
+                    <div style={{ color: '#fff', fontSize: '14px', textAlign: 'center', marginBottom: '5px', letterSpacing:'2px' }}>ULTIMATE REWARD SECURED</div>
+                    <div style={{ color: '#4CAF50', fontSize: '38px', fontWeight: '900', textShadow: '0 0 15px rgba(76,175,80,0.5)' }}>+2,750,000 PTS</div>
                 </div>
-                <p style={{ color: '#aaa', textAlign: 'center', fontSize: '14px', marginBottom: '40px', maxWidth: '300px', lineHeight:'1.5', zIndex: 2 }}>You have conquered the Ultimate Protocol. Your legacy is now permanently inscribed in the blockchain.</p>
+                <p style={{ color: '#aaa', textAlign: 'center', fontSize: '14px', marginBottom: '40px', maxWidth: '300px', lineHeight:'1.5', zIndex: 2 }}>You conquered the Ultimate Protocol. You are now officially a Whale in the Gem Nova Ecosystem.</p>
                 <button onClick={handleShareVictory} className="btn-neon" style={{ background: 'linear-gradient(90deg, #FFD700, #FFA500)', color: '#000', border: 'none', padding: '18px 40px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 0 30px rgba(255,215,0,0.5)', cursor: 'pointer', zIndex: 2, borderRadius: '30px' }}>
                     <Share2 size={24} /> BRAG ON TG STORY
                 </button>
@@ -316,20 +387,38 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         );
     }
 
-    const currentStepConfig = PATH_STEPS[progress.current_level - 1];
-    const skipCost = getSkipCost(progress.current_level);
+    const currentStepConfig = PATH_STEPS[Math.min(progress.current_level - 1, 9)];
+    const gateCost = getGateCost(progress.current_level);
+    
+    // Validar si tiene algún premio pendiente de cobrar
+    const hasUnclaimedPremium = (progress.is_completed && progress.premium_rewards_claimed < 10) || (!progress.is_completed && progress.premium_rewards_claimed < progress.current_level - 1);
 
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
-            <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-                <h2 style={{ color: '#fff', fontSize: '28px', margin: 0, textShadow: '0 0 15px rgba(255,255,255,0.3)' }}>THE 2.5M PATH</h2>
-                <p style={{ color: '#00F2FE', fontSize: '12px', letterSpacing: '2px' }}>ULTIMATE PROTOCOL</p>
+            <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+                <h2 style={{ color: '#fff', fontSize: '28px', margin: 0, textShadow: '0 0 15px rgba(255,255,255,0.3)' }}>THE 5M PATH</h2>
+                <p style={{ color: '#FFD700', fontSize: '12px', letterSpacing: '2px' }}>PREMIUM BATTLE PASS</p>
                 <div style={{ display: 'flex', justifyContent: 'center', marginTop: '15px', transform: 'scale(0.8)' }}>
                     <TonConnectButton />
                 </div>
             </div>
 
-            {/* 🔥 HISTORIAL (Niveles Completados - Interactivo) */}
+            {/* 🔥 PREMIUM REWARD TRACK (SCROLL HORIZONTAL) */}
+            <div style={{ marginBottom: '30px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <h4 style={{ color: '#00F2FE', fontSize: '12px', margin: 0, letterSpacing: '1px' }}>PREMIUM REWARDS</h4>
+                    {hasUnclaimedPremium && (
+                        <button onClick={handleClaimPremiumReward} disabled={loading} className="btn-neon" style={{ background: '#00F2FE', color: '#000', border: 'none', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', borderRadius: '20px', cursor: 'pointer', boxShadow: '0 0 10px rgba(0, 242, 254, 0.4)' }}>
+                            CLAIM REWARD!
+                        </button>
+                    )}
+                </div>
+                <div className="no-scrollbar" style={{ display: 'flex', overflowX: 'auto', gap: '10px', paddingBottom: '10px', maskImage: 'linear-gradient(to right, black 90%, transparent)' }}>
+                    {renderPremiumTrack()}
+                </div>
+            </div>
+
+            {/* 🔥 HISTORIAL (Niveles Completados) */}
             {progress.current_level > 1 && (
                 <div style={{ marginBottom: '30px' }}>
                     <h4 style={{ color: '#4CAF50', fontSize: '12px', marginBottom: '10px', letterSpacing: '1px' }}>COMPLETED NODES</h4>
@@ -337,13 +426,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                         {PATH_STEPS.slice(0, progress.current_level - (progress.is_completed ? 0 : 1)).map(step => (
                             <div key={step.lvl} style={{ position: 'relative' }}>
                                 <div style={{ position: 'absolute', left: '-16px', top: '15px', background: '#4CAF50', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #000' }}></div>
-                                <div 
-                                    onClick={() => toggleHistoryLevel(step.lvl)}
-                                    style={{ 
-                                        padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid rgba(76, 175, 80, 0.3)', 
-                                        borderRadius: '8px', width: '100%', cursor: 'pointer', transition: 'all 0.3s'
-                                    }}
-                                >
+                                <div onClick={() => toggleHistoryLevel(step.lvl)} style={{ padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid rgba(76, 175, 80, 0.3)', borderRadius: '8px', width: '100%', cursor: 'pointer', transition: 'all 0.3s' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <div>
                                             <div style={{ color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div>
@@ -354,18 +437,10 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                                             {expandedLevel === step.lvl ? <ChevronUp size={16} color="#4CAF50" /> : <ChevronDown size={16} color="#4CAF50" />}
                                         </div>
                                     </div>
-
-                                    {/* 🔥 DETALLE DESPLEGABLE DE TAREAS COMPLETADAS */}
                                     {expandedLevel === step.lvl && (
                                         <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(76, 175, 80, 0.3)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>A</div>
-                                                <div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskA.desc}</div>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>B</div>
-                                                <div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskB.desc}</div>
-                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>A</div><div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskA.desc}</div></div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>B</div><div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskB.desc}</div></div>
                                         </div>
                                     )}
                                 </div>
@@ -376,10 +451,10 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
             )}
 
             {progress.is_completed ? (
-                <div onClick={() => setShowEpicWin(true)} className="glass-card" style={{ border: '2px solid #FFD700', background: 'rgba(255, 215, 0, 0.05)', boxShadow: '0 0 30px rgba(255, 215, 0, 0.2)', marginBottom: '30px', padding: '30px 20px', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s', transform: 'scale(1)' }} onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'} onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}>
+                <div className="glass-card" style={{ border: '2px solid #FFD700', background: 'rgba(255, 215, 0, 0.05)', boxShadow: '0 0 30px rgba(255, 215, 0, 0.2)', marginBottom: '30px', padding: '30px 20px', textAlign: 'center' }}>
                     <Medal size={40} color="#FFD700" style={{ margin: '0 auto 10px' }} />
                     <h3 style={{ color: '#FFD700', margin: '0 0 5px 0', fontSize: '20px' }}>PROTOCOL COMPLETED</h3>
-                    <p style={{ color: '#aaa', fontSize: '12px', margin: 0 }}>Tap to view your Golden Certificate</p>
+                    <p style={{ color: '#aaa', fontSize: '12px', margin: 0 }}>You are a legend in the Gem Nova Ecosystem.</p>
                 </div>
             ) : (
                 <div className="glass-card" style={{ border: '1px solid #00F2FE', background: 'rgba(0, 242, 254, 0.05)', boxShadow: '0 0 20px rgba(0, 242, 254, 0.1)', marginBottom: '30px', position: 'relative' }}>
@@ -401,38 +476,27 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                         />
                     </div>
 
-                    <div style={{ marginTop: '25px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '15px' }}>
-                        <div style={{ textAlign: 'center', fontSize: '10px', color: '#aaa', marginBottom: '10px' }}>OVERRIDE PROTOCOL (SKIP BOTH TASKS)</div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                            <button onClick={handleSkipWithTON} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#00F2FE', color: '#00F2FE', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}><Zap size={14} /> PAY {skipCost.ton} TON</button>
-                            <button onClick={() => alert(`Redirect to invite page... You need ${skipCost.refs} new invite(s).`)} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#E040FB', color: '#E040FB', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}><Users size={14} /> INVITE {skipCost.refs} AGENT</button>
+                    {/* PEAJE PREMIUM */}
+                    {progress.task_a_done && progress.task_b_done && (
+                        <div style={{ marginTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '15px' }}>
+                            {!progress.reward_5k_claimed ? (
+                                <button onClick={handleClaimBaseReward} disabled={loading} className="btn-neon" style={{ width: '100%', background: '#4CAF50', color: '#000', border: 'none', padding: '15px', fontSize: '14px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', boxShadow: '0 0 20px rgba(76, 175, 80, 0.4)' }}>
+                                    <Gift size={18} /> CLAIM 5,000 PTS
+                                </button>
+                            ) : (
+                                <div>
+                                    <div style={{ textAlign: 'center', fontSize: '10px', color: '#FFD700', marginBottom: '10px', fontWeight: 'bold' }}>🔓 PREMIUM GATE TO UNLOCK NEXT LEVEL</div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                        <button onClick={handlePayGateToAdvance} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#FFD700', color: '#FFD700', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}><Zap size={14} /> PAY {gateCost.ton} TON</button>
+                                        <button onClick={() => alert(`Redirecting...\n\nInvite ${gateCost.refs} new friend to bypass the TON fee.`)} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#E040FB', color: '#E040FB', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}><Users size={14} /> INVITE {gateCost.refs}</button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    </div>
+                    )}
                 </div>
             )}
-
-            {!progress.is_completed && (
-                <>
-                    <h4 style={{ color: '#666', fontSize: '12px', marginBottom: '15px', letterSpacing: '1px' }}>UPCOMING MILESTONES</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '10px', borderLeft: '2px solid #333', marginLeft: '10px' }}>
-                        {PATH_STEPS.slice(progress.current_level, 10).map(step => (
-                            <div key={step.lvl} style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative' }}>
-                                <div style={{ position: 'absolute', left: '-16px', background: '#111', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #444' }}></div>
-                                <div style={{ opacity: 0.5, padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div><div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div><div style={{ color: '#666', fontSize: '10px' }}>{step.title}</div></div>
-                                    <Lock size={14} color="#555" />
-                                </div>
-                            </div>
-                        ))}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative', marginTop: '10px' }}>
-                            <div style={{ position: 'absolute', left: '-20px', background: '#FFD700', width: '18px', height: '18px', borderRadius: '50%', border: '2px solid #fff', boxShadow: '0 0 10px #FFD700' }}></div>
-                            <div style={{ padding: '15px', background: 'linear-gradient(90deg, rgba(255,215,0,0.1) 0%, transparent 100%)', border: '1px solid #FFD700', borderRadius: '8px', width: '100%' }}>
-                                <div style={{ color: '#FFD700', fontSize: '16px', fontWeight: '900' }}>2,500,000 PTS</div><div style={{ color: '#aaa', fontSize: '10px' }}>ULTIMATE REWARD</div>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
+            <style>{`.no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
         </div>
     );
 };
@@ -442,43 +506,27 @@ const TaskRow: React.FC<TaskRowProps> = ({ letter, desc, isDone, isLoading, star
     let progressVisual = 0;
     
     if (isStarted && !isDone) {
-        if (type === 'level_static' || type === 'streak' || type === 'checkin' || type === 'buy') {
-            progressVisual = currentValue;
-        } else {
-            progressVisual = Math.max(0, currentValue - startValue);
-        }
+        if (STATIC_TYPES.includes(type)) progressVisual = currentValue;
+        else progressVisual = Math.max(0, currentValue - startValue);
     }
 
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: isDone ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: isDone ? '1px solid #4CAF50' : '1px solid #333' }}>
-            <div style={{ background: isDone ? '#4CAF50' : '#333', color: isDone ? '#000' : '#888', width: '24px', height: '24px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>
-                {letter}
-            </div>
+            <div style={{ background: isDone ? '#4CAF50' : '#333', color: isDone ? '#000' : '#888', width: '24px', height: '24px', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', fontSize: '12px' }}>{letter}</div>
             <div style={{ flex: 1 }}>
-                <div style={{ fontSize: '12px', color: isDone ? '#fff' : '#aaa', fontWeight: isDone ? 'bold' : 'normal' }}>
-                    {desc}
-                </div>
+                <div style={{ fontSize: '12px', color: isDone ? '#fff' : '#aaa', fontWeight: isDone ? 'bold' : 'normal' }}>{desc}</div>
                 {isStarted && !isDone && (
-                    <div style={{ fontSize: '9px', color: '#00F2FE', marginTop: '2px' }}>
-                        Progress: {Math.min(progressVisual, targetAmount).toLocaleString()} / {targetAmount.toLocaleString()}
-                    </div>
+                    <div style={{ fontSize: '9px', color: '#00F2FE', marginTop: '2px' }}>Progress: {Math.min(progressVisual, targetAmount).toLocaleString()} / {targetAmount.toLocaleString()}</div>
                 )}
             </div>
-            
             {isDone ? (
                 <CheckCircle2 size={24} color="#4CAF50" />
             ) : !isStarted ? (
-                <button 
-                    onClick={onStart} disabled={isLoading}
-                    style={{ background: '#FFD700', color: '#000', border: 'none', borderRadius: '4px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', display:'flex', alignItems:'center', gap:'4px' }}>
+                <button onClick={onStart} disabled={isLoading} style={{ background: '#FFD700', color: '#000', border: 'none', borderRadius: '4px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer', display:'flex', alignItems:'center', gap:'4px' }}>
                     <Play size={10} fill="#000"/> START
                 </button>
             ) : (
-                <button 
-                    onClick={onVerify} disabled={isLoading}
-                    style={{ background: '#00F2FE', color: '#000', border: 'none', borderRadius: '4px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}>
-                    VERIFY
-                </button>
+                <button onClick={onVerify} disabled={isLoading} style={{ background: '#00F2FE', color: '#000', border: 'none', borderRadius: '4px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: 'pointer' }}>VERIFY</button>
             )}
         </div>
     );
