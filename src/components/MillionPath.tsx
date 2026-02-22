@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
-// 🔥 ELIMINADO EL ICONO 'Star' QUE NO SE USABA
-import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X } from 'lucide-react';
+import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Medal } from 'lucide-react';
 
 const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
@@ -40,12 +39,15 @@ const PATH_STEPS = [
     { lvl: 10, title: "The Final Boss", taskA: "Buy Starter Node (0.15 TON)", taskB: "Get 3 Lucky Tickets Total" }
 ];
 
-export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClose }) => {
+export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const [tonConnectUI] = useTonConnectUI();
     const [progress, setProgress] = useState<PathProgress>({ current_level: 1, task_a_done: false, task_b_done: false, is_completed: false });
     const [loading, setLoading] = useState(false);
+    
+    // 🔥 Controladores del Modal Épico
     const [showEpicWin, setShowEpicWin] = useState(false); 
+    const [hasClaimedReward, setHasClaimedReward] = useState(false); // Para no dar los 2.5M dos veces
 
     useEffect(() => {
         if (!user) return;
@@ -53,7 +55,9 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
             const { data, error } = await supabase.from('user_million_path').select('*').eq('user_id', user.id).single();
             if (data) {
                 setProgress(data);
-                if (data.is_completed) setShowEpicWin(true);
+                // Si ya está completado en DB, no abrimos el modal automáticamente al cargar,
+                // solo si acaba de completarlo.
+                if (data.is_completed) setHasClaimedReward(true);
             } else if (error?.code === 'PGRST116') {
                 await supabase.from('user_million_path').insert([{ user_id: user.id }]);
             }
@@ -91,7 +95,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
         }
     };
 
-    // 🔥 VALIDADOR MAESTRO
+    // VALIDADOR MAESTRO
     const handleVerifyTask = async (taskLetter: 'A' | 'B') => {
         if (!user || loading) return;
         setLoading(true);
@@ -168,10 +172,16 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
         
         if (isFinal) {
             await supabase.from('user_million_path').update({ is_completed: true }).eq('user_id', user!.id);
-            await supabase.rpc('increment_score', { p_user_id: user!.id, p_amount: 2500000 });
-            setGlobalScore(prev => prev + 2500000);
+            
+            // Solo sumamos los puntos si no los había reclamado antes (seguridad extra)
+            if (!hasClaimedReward) {
+                await supabase.rpc('increment_score', { p_user_id: user!.id, p_amount: 2500000 });
+                setGlobalScore(prev => prev + 2500000);
+                setHasClaimedReward(true);
+            }
+            
             setProgress(prev => ({ ...prev, is_completed: true }));
-            setShowEpicWin(true);
+            setShowEpicWin(true); // Abrimos el modal de victoria
         } else {
             await supabase.rpc('increment_score', { p_user_id: user!.id, p_amount: 5000 });
             setGlobalScore(prev => prev + 5000);
@@ -197,8 +207,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
         const mediaUrl = 'https://gem-nova-tma.vercel.app/epic-win.jpg'; 
         const inviteLink = `https://t.me/Gnovatoken_bot/app?startapp=${user?.id}`;
         try {
-            // 🔥 SOLUCIÓN ESLINT: Explicación de por qué se ignora el error de tipos en window.Telegram
-            // @ts-expect-error TypeScript does not know about Telegram WebApp API injected in global window
+            // @ts-expect-error TypeScript does not know about Telegram WebApp API
             if (window.Telegram?.WebApp?.shareToStory) {
                 // @ts-expect-error TypeScript does not know about Telegram WebApp API
                 window.Telegram.WebApp.shareToStory(mediaUrl, {
@@ -210,38 +219,49 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
         } catch (e) { console.error(e); }
     };
 
-    // 🔥 PANTALLA ÉPICA DE VICTORIA
+    // 🔥 PANTALLA ÉPICA DE VICTORIA (MODAL)
     if (showEpicWin) {
         return (
-            <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px', background: 'radial-gradient(circle, rgba(255,215,0,0.2) 0%, rgba(0,0,0,1) 100%)' }}>
-                {onClose && (
-                    <button onClick={onClose} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>
-                        <X size={24} />
-                    </button>
-                )}
+            <div style={{ 
+                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+                background: 'radial-gradient(circle, rgba(255,215,0,0.3) 0%, rgba(0,0,0,0.95) 100%)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px'
+            }}>
+                {/* 🌟 CONFETI CSS BÁSICO */}
+                <div className="confetti" style={{ position:'absolute', top:0, left:'20%', width:'10px', height:'10px', background:'#00F2FE', animation:'fall 3s linear infinite' }}></div>
+                <div className="confetti" style={{ position:'absolute', top:0, left:'50%', width:'10px', height:'10px', background:'#FFD700', animation:'fall 2s linear infinite' }}></div>
+                <div className="confetti" style={{ position:'absolute', top:0, left:'80%', width:'10px', height:'10px', background:'#E040FB', animation:'fall 4s linear infinite' }}></div>
+
+                {/* BOTÓN CERRAR ACCESIBLE (Z-INDEX ALTO) */}
+                <button onClick={() => setShowEpicWin(false)} style={{ position: 'absolute', top: 30, right: 30, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}>
+                    <X size={24} />
+                </button>
                 
-                <div style={{ animation: 'bounce 2s infinite' }}>
-                    <Trophy size={80} color="#FFD700" style={{ filter: 'drop-shadow(0 0 20px #FFD700)' }} />
+                <div style={{ animation: 'bounce 2s infinite', zIndex: 2 }}>
+                    <Trophy size={100} color="#FFD700" style={{ filter: 'drop-shadow(0 0 30px #FFD700)' }} />
                 </div>
                 
-                <h1 style={{ color: '#FFD700', fontSize: '36px', textAlign: 'center', margin: '20px 0 10px', textShadow: '0 0 20px #FFD700', fontFamily: 'monospace' }}>
+                <h1 style={{ color: '#FFD700', fontSize: '42px', textAlign: 'center', margin: '20px 0 10px', textShadow: '0 0 20px #FFD700', fontFamily: 'monospace', zIndex: 2 }}>
                     GOD MODE<br/>UNLOCKED
                 </h1>
                 
-                <div style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid #FFD700', padding: '15px 30px', borderRadius: '15px', marginBottom: '30px' }}>
-                    <div style={{ color: '#fff', fontSize: '14px', textAlign: 'center', marginBottom: '5px' }}>REWARD CLAIMED</div>
-                    <div style={{ color: '#4CAF50', fontSize: '32px', fontWeight: '900' }}>+2,500,000 PTS</div>
+                <div style={{ background: 'rgba(255,255,255,0.1)', border: '2px solid #FFD700', padding: '20px 40px', borderRadius: '20px', marginBottom: '30px', boxShadow: '0 0 40px rgba(255,215,0,0.3)', zIndex: 2 }}>
+                    <div style={{ color: '#fff', fontSize: '14px', textAlign: 'center', marginBottom: '5px', letterSpacing:'2px' }}>REWARD SECURED</div>
+                    <div style={{ color: '#4CAF50', fontSize: '38px', fontWeight: '900', textShadow: '0 0 15px rgba(76,175,80,0.5)' }}>+2,500,000 PTS</div>
                 </div>
 
-                <p style={{ color: '#aaa', textAlign: 'center', fontSize: '12px', marginBottom: '30px', maxWidth: '300px' }}>
+                <p style={{ color: '#aaa', textAlign: 'center', fontSize: '14px', marginBottom: '40px', maxWidth: '300px', lineHeight:'1.5', zIndex: 2 }}>
                     You have conquered the Ultimate Protocol. Your legacy is now permanently inscribed in the blockchain.
                 </p>
 
-                <button onClick={handleShareVictory} className="btn-neon" style={{ background: '#FFD700', color: '#000', border: 'none', padding: '15px 30px', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 0 30px rgba(255,215,0,0.5)', cursor: 'pointer' }}>
-                    <Share2 size={20} /> BRAG ON TG STORY
+                <button onClick={handleShareVictory} className="btn-neon" style={{ background: 'linear-gradient(90deg, #FFD700, #FFA500)', color: '#000', border: 'none', padding: '18px 40px', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 0 30px rgba(255,215,0,0.5)', cursor: 'pointer', zIndex: 2, borderRadius: '30px' }}>
+                    <Share2 size={24} /> BRAG ON TG STORY
                 </button>
                 
-                <style>{`@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }`}</style>
+                <style>{`
+                    @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
+                    @keyframes fall { 0% { transform: translateY(-100px) rotate(0deg); opacity: 1; } 100% { transform: translateY(800px) rotate(360deg); opacity: 0; } }
+                `}</style>
             </div>
         );
     }
@@ -264,7 +284,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 <div style={{ marginBottom: '30px' }}>
                     <h4 style={{ color: '#4CAF50', fontSize: '12px', marginBottom: '10px', letterSpacing: '1px' }}>COMPLETED NODES</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '10px', borderLeft: '2px solid #4CAF50', marginLeft: '10px' }}>
-                        {PATH_STEPS.slice(0, progress.current_level - 1).map(step => (
+                        {PATH_STEPS.slice(0, progress.current_level - (progress.is_completed ? 0 : 1)).map(step => (
                             <div key={step.lvl} style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative' }}>
                                 <div style={{ position: 'absolute', left: '-16px', background: '#4CAF50', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #000' }}></div>
                                 <div style={{ padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid rgba(76, 175, 80, 0.3)', borderRadius: '8px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -280,58 +300,82 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 </div>
             )}
 
-            {/* NODO ACTUAL (ACTIVO) */}
-            <div className="glass-card" style={{ border: '1px solid #00F2FE', background: 'rgba(0, 242, 254, 0.05)', boxShadow: '0 0 20px rgba(0, 242, 254, 0.1)', marginBottom: '30px', position: 'relative' }}>
-                <div style={{ position: 'absolute', top: -12, left: 20, background: '#00F2FE', color: '#000', padding: '4px 12px', borderRadius: '12px', fontWeight: '900', fontSize: '12px' }}>
-                    LEVEL {progress.current_level} / 10
+            {/* 🔥 VISTA SI ESTÁ COMPLETADO TODO EL MAPA */}
+            {progress.is_completed ? (
+                <div 
+                    onClick={() => setShowEpicWin(true)}
+                    className="glass-card" 
+                    style={{ 
+                        border: '2px solid #FFD700', background: 'rgba(255, 215, 0, 0.05)', 
+                        boxShadow: '0 0 30px rgba(255, 215, 0, 0.2)', marginBottom: '30px', 
+                        padding: '30px 20px', textAlign: 'center', cursor: 'pointer',
+                        transition: 'transform 0.2s', transform: 'scale(1)'
+                    }}
+                    onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
+                    onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                    <Medal size={40} color="#FFD700" style={{ margin: '0 auto 10px' }} />
+                    <h3 style={{ color: '#FFD700', margin: '0 0 5px 0', fontSize: '20px' }}>PROTOCOL COMPLETED</h3>
+                    <p style={{ color: '#aaa', fontSize: '12px', margin: 0 }}>Tap to view your Golden Certificate</p>
                 </div>
-                
-                <h3 style={{ marginTop: '15px', color: '#fff', textAlign: 'center' }}>{currentStepConfig.title}</h3>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                    <TaskRow letter="A" desc={currentStepConfig.taskA} isDone={progress.task_a_done} isLoading={loading} onVerify={() => handleVerifyTask('A')} />
-                    <TaskRow letter="B" desc={currentStepConfig.taskB} isDone={progress.task_b_done} isLoading={loading} onVerify={() => handleVerifyTask('B')} />
-                </div>
-
-                {/* BOTONES DE SKIP */}
-                <div style={{ marginTop: '25px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '15px' }}>
-                    <div style={{ textAlign: 'center', fontSize: '10px', color: '#aaa', marginBottom: '10px' }}>OVERRIDE PROTOCOL (SKIP BOTH TASKS)</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <button onClick={handleSkipWithTON} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#00F2FE', color: '#00F2FE', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
-                            <Zap size={14} /> PAY {skipCost.ton} TON
-                        </button>
-                        <button onClick={() => alert(`Redirect to invite page... You need ${skipCost.refs} new invite(s).`)} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#E040FB', color: '#E040FB', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
-                            <Users size={14} /> INVITE {skipCost.refs} AGENT
-                        </button>
+            ) : (
+                /* NODO ACTUAL (ACTIVO) */
+                <div className="glass-card" style={{ border: '1px solid #00F2FE', background: 'rgba(0, 242, 254, 0.05)', boxShadow: '0 0 20px rgba(0, 242, 254, 0.1)', marginBottom: '30px', position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: -12, left: 20, background: '#00F2FE', color: '#000', padding: '4px 12px', borderRadius: '12px', fontWeight: '900', fontSize: '12px' }}>
+                        LEVEL {progress.current_level} / 10
                     </div>
-                </div>
-            </div>
+                    
+                    <h3 style={{ marginTop: '15px', color: '#fff', textAlign: 'center' }}>{currentStepConfig.title}</h3>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
+                        <TaskRow letter="A" desc={currentStepConfig.taskA} isDone={progress.task_a_done} isLoading={loading} onVerify={() => handleVerifyTask('A')} />
+                        <TaskRow letter="B" desc={currentStepConfig.taskB} isDone={progress.task_b_done} isLoading={loading} onVerify={() => handleVerifyTask('B')} />
+                    </div>
 
-            {/* MAPA VISUAL (Niveles siguientes) */}
-            <h4 style={{ color: '#666', fontSize: '12px', marginBottom: '15px', letterSpacing: '1px' }}>UPCOMING MILESTONES</h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '10px', borderLeft: '2px solid #333', marginLeft: '10px' }}>
-                {PATH_STEPS.slice(progress.current_level, 10).map(step => (
-                    <div key={step.lvl} style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative' }}>
-                        <div style={{ position: 'absolute', left: '-16px', background: '#111', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #444' }}></div>
-                        <div style={{ opacity: 0.5, padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                                <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div>
-                                <div style={{ color: '#666', fontSize: '10px' }}>{step.title}</div>
-                            </div>
-                            <Lock size={14} color="#555" />
+                    {/* BOTONES DE SKIP */}
+                    <div style={{ marginTop: '25px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '15px' }}>
+                        <div style={{ textAlign: 'center', fontSize: '10px', color: '#aaa', marginBottom: '10px' }}>OVERRIDE PROTOCOL (SKIP BOTH TASKS)</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                            <button onClick={handleSkipWithTON} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#00F2FE', color: '#00F2FE', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
+                                <Zap size={14} /> PAY {skipCost.ton} TON
+                            </button>
+                            <button onClick={() => alert(`Redirect to invite page... You need ${skipCost.refs} new invite(s).`)} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#E040FB', color: '#E040FB', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
+                                <Users size={14} /> INVITE {skipCost.refs} AGENT
+                            </button>
                         </div>
                     </div>
-                ))}
-                
-                {/* Meta Final */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative', marginTop: '10px' }}>
-                    <div style={{ position: 'absolute', left: '-20px', background: '#FFD700', width: '18px', height: '18px', borderRadius: '50%', border: '2px solid #fff', boxShadow: '0 0 10px #FFD700' }}></div>
-                    <div style={{ padding: '15px', background: 'linear-gradient(90deg, rgba(255,215,0,0.1) 0%, transparent 100%)', border: '1px solid #FFD700', borderRadius: '8px', width: '100%' }}>
-                        <div style={{ color: '#FFD700', fontSize: '16px', fontWeight: '900' }}>2,500,000 PTS</div>
-                        <div style={{ color: '#aaa', fontSize: '10px' }}>ULTIMATE REWARD</div>
-                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* MAPA VISUAL (Niveles siguientes - Solo visible si no ha completado) */}
+            {!progress.is_completed && (
+                <>
+                    <h4 style={{ color: '#666', fontSize: '12px', marginBottom: '15px', letterSpacing: '1px' }}>UPCOMING MILESTONES</h4>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '10px', borderLeft: '2px solid #333', marginLeft: '10px' }}>
+                        {PATH_STEPS.slice(progress.current_level, 10).map(step => (
+                            <div key={step.lvl} style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative' }}>
+                                <div style={{ position: 'absolute', left: '-16px', background: '#111', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #444' }}></div>
+                                <div style={{ opacity: 0.5, padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div>
+                                        <div style={{ color: '#666', fontSize: '10px' }}>{step.title}</div>
+                                    </div>
+                                    <Lock size={14} color="#555" />
+                                </div>
+                            </div>
+                        ))}
+                        
+                        {/* Meta Final */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative', marginTop: '10px' }}>
+                            <div style={{ position: 'absolute', left: '-20px', background: '#FFD700', width: '18px', height: '18px', borderRadius: '50%', border: '2px solid #fff', boxShadow: '0 0 10px #FFD700' }}></div>
+                            <div style={{ padding: '15px', background: 'linear-gradient(90deg, rgba(255,215,0,0.1) 0%, transparent 100%)', border: '1px solid #FFD700', borderRadius: '8px', width: '100%' }}>
+                                <div style={{ color: '#FFD700', fontSize: '16px', fontWeight: '900' }}>2,500,000 PTS</div>
+                                <div style={{ color: '#aaa', fontSize: '10px' }}>ULTIMATE REWARD</div>
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 };
