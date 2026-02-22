@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
-import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Medal, Play, ChevronDown, ChevronUp, Gift } from 'lucide-react';
+import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Medal, Play, ChevronDown, ChevronUp, Gift, Copy } from 'lucide-react';
 
 const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
@@ -15,7 +15,7 @@ interface PathProgress {
     task_b_start_value: number | null;
     reward_5k_claimed: boolean;
     premium_rewards_claimed: number;
-    gate_invite_start_value: number | null; // 🔥 NUEVO: Para contar los referidos desde 0 en el peaje
+    gate_invite_start_value: number | null; 
 }
 
 interface MillionPathProps {
@@ -117,7 +117,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         return () => clearInterval(interval);
     }, [loadProgress, loadLiveStats]);
 
-    // 🔥 PRECIOS DEL PEAJE (ACTUALIZADOS A 2 Y 3 REFERIDOS)
     const getGateCost = (level: number) => {
         if (level <= 8) return { ton: 0.35, refs: 2 };
         return { ton: 0.45, refs: 3 };
@@ -236,43 +235,42 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 NUEVA FUNCIÓN: INICIAR RETO DE INVITADOS (Guarda el estado y genera el link)
     const handleGateInviteClick = async () => {
         if (!user || loading) return;
         setLoading(true);
         try {
-            // 1. Obtener código de referido
             const { data: codeData } = await supabase.rpc('get_or_create_referral_code', { p_user_id: user.id });
-            // "@ts-expect-error Typescript window config"
+            // "@ts-expect-error Typescript config"
             const refCode = codeData?.code || user.id;
             const inviteLink = `https://t.me/Gnovatoken_bot/app?startapp=${refCode}`;
 
-            // 2. Obtener referidos actuales
-            const { data: countData } = await supabase.rpc('get_my_referrals', { my_id: user.id });
-            const currentRefs = Number(countData) || 0;
+            // Si es la PRIMERA VEZ que le da clic, guardamos el estado inicial en la BD
+            if (progress.gate_invite_start_value === null) {
+                const { data: countData } = await supabase.rpc('get_my_referrals', { my_id: user.id });
+                const currentRefs = Number(countData) || 0;
+                await supabase.from('user_million_path').update({ gate_invite_start_value: currentRefs }).eq('user_id', user.id);
+                setProgress(prev => ({ ...prev, gate_invite_start_value: currentRefs }));
+            }
 
-            // 3. Guardar el estado inicial en la BD para que empiece a contar desde cero
-            await supabase.from('user_million_path').update({ gate_invite_start_value: currentRefs }).eq('user_id', user.id);
-            setProgress(prev => ({ ...prev, gate_invite_start_value: currentRefs }));
-
-            // 4. Mandar a Telegram
-            const shareText = `🏆 I'm on my way to 5,000,000 Pts on Gnova! Join my squad and mine crypto!`;
-            // @ts-expect-error Typescript window config
+            // Textos de marketing que avisan sobre los bonos para el invitado
+            const shareText = `🏆 Join me on Gnova to win 5,000,000 Pts!\n\n🎁 Use my link to get:\n- 5,000 Pts Bonus\n- 1 Lucky Ticket\n- 1 Golden Ticket\n\nMine crypto before launch! 🚀`;
+            
+            // @ts-expect-error Typescript config
             if (window.Telegram?.WebApp?.openTelegramLink) {
-                // @ts-expect-error Typescript window config
+                // @ts-expect-error Typescript config
                 window.Telegram.WebApp.openTelegramLink(`https://t.me/share/url?url=${inviteLink}&text=${encodeURIComponent(shareText)}`);
             } else {
-                window.open(`https://t.me/share/url?url=${inviteLink}&text=${encodeURIComponent(shareText)}`, '_blank');
+                navigator.clipboard.writeText(inviteLink);
+                alert(`✅ Link Copied!\n\nSend this to your friends:\n${inviteLink}`);
             }
         } catch (err) {
             console.error(err);
-            alert("Error starting invite task.");
+            alert("Error generating invite link.");
         } finally {
             setLoading(false);
         }
     };
 
-    // 🔥 NUEVA FUNCIÓN: VERIFICAR INVITADOS (Comprueba si entraron los requeridos)
     const handleVerifyGateInvites = async () => {
         if (!user || loading || progress.gate_invite_start_value === null) return;
         setLoading(true);
@@ -304,7 +302,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
             setLoading(false);
         } else {
             const nextLevel = progress.current_level + 1;
-            // 🔥 Se resetea el gate_invite_start_value para el próximo nivel
             const updates = { 
                 current_level: nextLevel, task_a_done: false, task_b_done: false, 
                 task_a_start_value: null, task_b_start_value: null, reward_5k_claimed: false,
@@ -541,7 +538,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                         />
                     </div>
 
-                    {/* PEAJE PREMIUM ACTUALIZADO */}
+                    {/* PEAJE PREMIUM ACTUALIZADO Y DIVIDIDO */}
                     {progress.task_a_done && progress.task_b_done && (
                         <div style={{ marginTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '15px' }}>
                             {!progress.reward_5k_claimed ? (
@@ -556,17 +553,21 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                                             <Zap size={14} /> PAY {gateCost.ton} TON
                                         </button>
                                         
-                                        {/* 🔥 BOTÓN INTELIGENTE DE INVITACIÓN 🔥 */}
+                                        {/* 🔥 BOTÓN DIVIDIDO DE INVITACIÓN 🔥 */}
                                         {progress.gate_invite_start_value === null ? (
                                             <button onClick={handleGateInviteClick} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#E040FB', color: '#E040FB', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
                                                 <Users size={14} /> INVITE {gateCost.refs}
                                             </button>
                                         ) : (
-                                            <button onClick={handleVerifyGateInvites} disabled={loading} className="btn-cyber" style={{ background: '#E040FB', color: '#fff', border: 'none', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer', boxShadow: '0 0 10px rgba(224, 64, 251, 0.5)' }}>
-                                                VERIFY REFS
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '5px' }}>
+                                                <button onClick={handleGateInviteClick} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#444', color: '#aaa', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                                                    <Copy size={14} />
+                                                </button>
+                                                <button onClick={handleVerifyGateInvites} disabled={loading} className="btn-cyber" style={{ background: '#E040FB', color: '#fff', border: 'none', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer', boxShadow: '0 0 10px rgba(224, 64, 251, 0.5)', flex: 1 }}>
+                                                    VERIFY
+                                                </button>
+                                            </div>
                                         )}
-
                                     </div>
                                 </div>
                             )}
