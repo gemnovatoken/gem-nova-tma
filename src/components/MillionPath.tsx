@@ -28,24 +28,24 @@ interface TaskRowProps {
     startValue: number | null;
     currentValue: number;
     targetAmount: number;
+    type: string;
     onStart: () => void;
     onVerify: () => void;
 }
 
-// 🔥 NUEVA INTERFAZ: Soluciona el error "any" en liveStats
 interface LiveStats {
-    score?: number;
-    total_wealth?: number;
-    lucky_tickets?: number;
-    active_stakes?: number;
-    user_level?: number;
-    arcade_games_played?: number;
-    current_streak?: number;
-    lottery_played?: number;
-    bounties_done_today?: number;
-    checked_in_today?: boolean;
-    new_referrals_since_lvl9?: number;
-    starter_pack_bought?: boolean;
+    score: number;
+    total_wealth: number;
+    lucky_tickets: number;
+    active_stakes: number;
+    user_level: number;
+    arcade_games_played: number;
+    current_streak: number;
+    lottery_played: number;
+    bounties_done_today: number;
+    checked_in_today: boolean;
+    new_referrals_since_lvl9: number;
+    starter_pack_bought: boolean;
 }
 
 // Configuración de las tareas con sus METAS (targetAmount)
@@ -71,10 +71,13 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const [showEpicWin, setShowEpicWin] = useState(false); 
     const [hasClaimedReward, setHasClaimedReward] = useState(false); 
     
-    // 🔥 Reemplazamos <any> con <LiveStats>
-    const [liveStats, setLiveStats] = useState<LiveStats>({});
+    // Estadísticas inicializadas en 0
+    const [liveStats, setLiveStats] = useState<LiveStats>({
+        score: 0, total_wealth: 0, lucky_tickets: 0, active_stakes: 0, user_level: 1,
+        arcade_games_played: 0, current_streak: 0, lottery_played: 0, bounties_done_today: 0,
+        checked_in_today: false, new_referrals_since_lvl9: 0, starter_pack_bought: false
+    });
 
-    // Cargar progreso de la ruta
     const loadProgress = useCallback(async () => {
         if (!user) return;
         const { data, error } = await supabase.from('user_million_path').select('*').eq('user_id', user.id).single();
@@ -86,20 +89,48 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     }, [user]);
 
-    // Cargar estadísticas en vivo del usuario (para comparar con start_value)
+    // 🔥 NUEVO SISTEMA DE LECTURA DIRECTA (Frontend Computing)
     const loadLiveStats = useCallback(async () => {
         if (!user) return;
-        const { data: userData } = await supabase.rpc('get_user_full_stats_for_path', { p_user_id: user.id });
-        if (userData && userData[0]) {
-            setLiveStats(userData[0] as LiveStats); // Aseguramos el tipado
-        }
+        try {
+            // 1. Leemos el usuario directamente
+            const { data: u } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
+            // 2. Leemos sus stakings
+            const { data: s } = await supabase.from('stakes').select('amount').eq('user_id', user.id).eq('status', 'active');
+            
+            if (u) {
+                const today = new Date().toISOString().split('T')[0];
+                const activeStakesCount = s ? s.length : 0;
+                const stakesTotal = s ? s.reduce((acc, curr) => acc + (curr.amount || 0), 0) : 0;
+                const level = Math.min(u.multitap_level || 1, u.limit_level || 1, u.speed_level || 1);
+                
+                let bountiesDone = 0;
+                if (u.last_news_claim === today) bountiesDone++;
+                if (u.last_global_claim === today) bountiesDone++;
+
+                setLiveStats({
+                    score: u.score || 0,
+                    total_wealth: (u.score || 0) + stakesTotal,
+                    lucky_tickets: u.lucky_tickets || 0,
+                    active_stakes: activeStakesCount,
+                    user_level: level,
+                    arcade_games_played: u.arcade_games_played || 0, // Fallback si no existe columna
+                    current_streak: u.current_streak || 0,
+                    lottery_played: u.lottery_played || 0, // Fallback
+                    bounties_done_today: bountiesDone,
+                    checked_in_today: u.last_check_in_date === today,
+                    starter_pack_bought: u.starter_pack_bought || false, // Fallback
+                    new_referrals_since_lvl9: u.new_referrals_since_lvl9 || 0 // Fallback
+                });
+            }
+        } catch (e) { console.error("Error loading live stats", e); }
     }, [user]);
 
     useEffect(() => {
         loadProgress();
         loadLiveStats();
-        // Refrescar stats cada 10 seg
-        const interval = setInterval(loadLiveStats, 10000);
+        // 🔥 Polling rápido: Revisa cada 3 segundos para que la barra de progreso se sienta "en vivo"
+        const interval = setInterval(loadLiveStats, 3000);
         return () => clearInterval(interval);
     }, [loadProgress, loadLiveStats]);
 
@@ -129,32 +160,30 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // Helper para mapear el tipo de tarea con la variable en liveStats
-    const getStatValueByType = (type: string) => {
+    const getStatValueByType = (type: string): number => {
         switch(type) {
-            case 'score': return liveStats.score || 0;
-            case 'wealth': return liveStats.total_wealth || 0;
-            case 'ticket': return liveStats.lucky_tickets || 0;
-            case 'staking': return liveStats.active_stakes || 0;
-            case 'level': return liveStats.user_level || 1;
-            case 'level_static': return liveStats.user_level || 1; // Para niveles estáticos (Ej. Lvl 4)
-            case 'arcade': return liveStats.arcade_games_played || 0;
-            case 'streak': return liveStats.current_streak || 0;
-            case 'lottery': return liveStats.lottery_played || 0;
-            case 'bounty': return liveStats.bounties_done_today || 0;
+            case 'score': return liveStats.score;
+            case 'wealth': return liveStats.total_wealth;
+            case 'ticket': return liveStats.lucky_tickets;
+            case 'staking': return liveStats.active_stakes;
+            case 'level': return liveStats.user_level;
+            case 'level_static': return liveStats.user_level; 
+            case 'arcade': return liveStats.arcade_games_played;
+            case 'streak': return liveStats.current_streak;
+            case 'lottery': return liveStats.lottery_played;
+            case 'bounty': return liveStats.bounties_done_today;
             case 'checkin': return liveStats.checked_in_today ? 1 : 0;
-            case 'referral': return liveStats.new_referrals_since_lvl9 || 0;
+            case 'referral': return liveStats.new_referrals_since_lvl9;
             case 'buy': return liveStats.starter_pack_bought ? 1 : 0;
             default: return 0;
         }
     };
 
-    // 🔥 FUNCIÓN START: Guarda el punto de partida
     const handleStartTask = async (taskLetter: 'A' | 'B', type: string) => {
         if (!user || loading) return;
         setLoading(true);
         try {
-            await loadLiveStats(); // Traer el valor más fresco
+            await loadLiveStats(); // Traer el valor fresquito
             const currentValue = getStatValueByType(type);
             const columnToUpdate = taskLetter === 'A' ? 'task_a_start_value' : 'task_b_start_value';
             
@@ -168,25 +197,24 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 FUNCIÓN VERIFY: Compara el valor actual con el punto de partida
     const handleVerifyTask = async (taskLetter: 'A' | 'B', type: string, target: number) => {
         if (!user || loading) return;
         setLoading(true);
 
         try {
-            await loadLiveStats(); // Traer el valor más fresco
+            await loadLiveStats(); 
             const currentValue = getStatValueByType(type);
             const startValue = taskLetter === 'A' ? progress.task_a_start_value : progress.task_b_start_value;
             
             let passed = false;
             let progressAmount = 0;
 
-            // Excepciones: Tareas que no son relativas al inicio (Ej. "Llegar a Nivel 4" no importa dónde empezó)
+            // Tareas Estáticas (No importa cuándo empezaste, solo importa si lo tienes)
             if (type === 'level_static' || type === 'streak' || type === 'checkin' || type === 'buy') {
                 progressAmount = currentValue;
                 passed = currentValue >= target;
             } else {
-                // Tareas relativas: (Actual - Inicio) debe ser >= Meta
+                // Tareas Relativas (Debes conseguir NUEVOS puntos/tickets desde que diste START)
                 progressAmount = Math.max(0, currentValue - (startValue || 0));
                 passed = progressAmount >= target;
             }
@@ -243,9 +271,9 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         const mediaUrl = 'https://gem-nova-tma.vercel.app/epic-win.jpg'; 
         const inviteLink = `https://t.me/Gnovatoken_bot/app?startapp=${user?.id}`;
         try {
-            // @ts-expect-error Typescript window config
+            // @ts-expect-error TypeScript
             if (window.Telegram?.WebApp?.shareToStory) {
-                // @ts-expect-error Typescript window config
+                // @ts-expect-error TypeScript
                 window.Telegram.WebApp.shareToStory(mediaUrl, { text: `🏆 I just beat the Ultimate Protocol and won 2.5M Pts on Gnova! Join my squad: ${inviteLink}` });
             } else {
                 window.open(`https://t.me/share/url?url=${inviteLink}&text=🏆 I just won 2.5M Pts on Gnova! Play now!`, '_blank');
@@ -319,13 +347,13 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
                         <TaskRow 
                             letter="A" desc={currentStepConfig.taskA.desc} isDone={progress.task_a_done} isLoading={loading} 
-                            startValue={progress.task_a_start_value} currentValue={getStatValueByType(currentStepConfig.taskA.type)} targetAmount={currentStepConfig.taskA.target}
+                            startValue={progress.task_a_start_value} currentValue={getStatValueByType(currentStepConfig.taskA.type)} targetAmount={currentStepConfig.taskA.target} type={currentStepConfig.taskA.type}
                             onStart={() => handleStartTask('A', currentStepConfig.taskA.type)} 
                             onVerify={() => handleVerifyTask('A', currentStepConfig.taskA.type, currentStepConfig.taskA.target)} 
                         />
                         <TaskRow 
                             letter="B" desc={currentStepConfig.taskB.desc} isDone={progress.task_b_done} isLoading={loading} 
-                            startValue={progress.task_b_start_value} currentValue={getStatValueByType(currentStepConfig.taskB.type)} targetAmount={currentStepConfig.taskB.target}
+                            startValue={progress.task_b_start_value} currentValue={getStatValueByType(currentStepConfig.taskB.type)} targetAmount={currentStepConfig.taskB.target} type={currentStepConfig.taskB.type}
                             onStart={() => handleStartTask('B', currentStepConfig.taskB.type)} 
                             onVerify={() => handleVerifyTask('B', currentStepConfig.taskB.type, currentStepConfig.taskB.target)} 
                         />
@@ -367,13 +395,16 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     );
 };
 
-const TaskRow: React.FC<TaskRowProps> = ({ letter, desc, isDone, isLoading, startValue, currentValue, targetAmount, onStart, onVerify }) => {
+const TaskRow: React.FC<TaskRowProps> = ({ letter, desc, isDone, isLoading, startValue, currentValue, targetAmount, type, onStart, onVerify }) => {
     const isStarted = startValue !== null;
     let progressVisual = 0;
     
     if (isStarted && !isDone) {
-        progressVisual = Math.max(0, currentValue - startValue);
-        if (targetAmount <= 10 && startValue > 0) progressVisual = currentValue; 
+        if (type === 'level_static' || type === 'streak' || type === 'checkin' || type === 'buy') {
+            progressVisual = currentValue;
+        } else {
+            progressVisual = Math.max(0, currentValue - startValue);
+        }
     }
 
     return (
