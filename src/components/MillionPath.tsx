@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
-import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Medal, Play, ChevronDown, ChevronUp, Gift, Copy } from 'lucide-react';
+import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Play, ChevronDown, ChevronUp, Gift, Copy } from 'lucide-react';
 
 const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
@@ -235,7 +235,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 NUEVA FUNCIÓN: INICIAR RETO DE INVITADOS (Con Copywriting "Gnova System")
     const handleGateInviteClick = async () => {
         if (!user || loading) return;
         setLoading(true);
@@ -245,7 +244,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
             const refCode = codeData?.code || user.id;
             const inviteLink = `https://t.me/Gnovatoken_bot/app?startapp=${refCode}`;
 
-            // Si es la PRIMERA VEZ que le da clic, guardamos el estado inicial en la BD
             if (progress.gate_invite_start_value === null) {
                 const { data: countData } = await supabase.rpc('get_my_referrals', { my_id: user.id });
                 const currentRefs = Number(countData) || 0;
@@ -253,7 +251,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 setProgress(prev => ({ ...prev, gate_invite_start_value: currentRefs }));
             }
 
-            // 🔥 TEXTO DE MARKETING ACTUALIZADO ("GNOVA SYSTEM IS LIVE") 🔥
             const shareText = `🔥 GNOVA SYSTEM IS LIVE! 🔥\n\nI need backup to unlock the 5,000,000 PTS Premium Jackpot! 💎\n\n🎁 Use my VIP Link to instantly claim your 5,000 PTS Welcome Bonus!\n\nJoin my squad, mine crypto, and let's win together! 🚀👇`;
             
             // @ts-expect-error Typescript config
@@ -481,101 +478,130 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
 
-            {/* HISTORIAL (Niveles Completados) */}
-            {progress.current_level > 1 && (
-                <div style={{ marginBottom: '30px' }}>
-                    <h4 style={{ color: '#4CAF50', fontSize: '12px', marginBottom: '10px', letterSpacing: '1px' }}>COMPLETED NODES</h4>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '10px', borderLeft: '2px solid #4CAF50', marginLeft: '10px' }}>
-                        {PATH_STEPS.slice(0, progress.current_level - (progress.is_completed ? 0 : 1)).map(step => (
-                            <div key={step.lvl} style={{ position: 'relative' }}>
-                                <div style={{ position: 'absolute', left: '-16px', top: '15px', background: '#4CAF50', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #000' }}></div>
-                                <div onClick={() => toggleHistoryLevel(step.lvl)} style={{ padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid rgba(76, 175, 80, 0.3)', borderRadius: '8px', width: '100%', cursor: 'pointer', transition: 'all 0.3s' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div>
-                                            <div style={{ color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div>
-                                            <div style={{ color: '#aaa', fontSize: '10px', textDecoration: 'line-through' }}>{step.title}</div>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                            <CheckCircle2 size={16} color="#4CAF50" />
-                                            {expandedLevel === step.lvl ? <ChevronUp size={16} color="#4CAF50" /> : <ChevronDown size={16} color="#4CAF50" />}
-                                        </div>
-                                    </div>
-                                    {expandedLevel === step.lvl && (
-                                        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(76, 175, 80, 0.3)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>A</div><div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskA.desc}</div></div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>B</div><div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskB.desc}</div></div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {progress.is_completed ? (
-                <div className="glass-card" style={{ border: '2px solid #FFD700', background: 'rgba(255, 215, 0, 0.05)', boxShadow: '0 0 30px rgba(255, 215, 0, 0.2)', marginBottom: '30px', padding: '30px 20px', textAlign: 'center' }}>
-                    <Medal size={40} color="#FFD700" style={{ margin: '0 auto 10px' }} />
-                    <h3 style={{ color: '#FFD700', margin: '0 0 5px 0', fontSize: '20px' }}>PROTOCOL COMPLETED</h3>
-                    <p style={{ color: '#aaa', fontSize: '12px', margin: 0 }}>You are a legend in the Gem Nova Ecosystem.</p>
-                </div>
-            ) : (
-                <div className="glass-card" style={{ border: '1px solid #00F2FE', background: 'rgba(0, 242, 254, 0.05)', boxShadow: '0 0 20px rgba(0, 242, 254, 0.1)', marginBottom: '30px', position: 'relative' }}>
-                    <div style={{ position: 'absolute', top: -12, left: 20, background: '#00F2FE', color: '#000', padding: '4px 12px', borderRadius: '12px', fontWeight: '900', fontSize: '12px' }}>LEVEL {progress.current_level} / 10</div>
-                    <h3 style={{ marginTop: '15px', color: '#fff', textAlign: 'center' }}>{currentStepConfig.title}</h3>
+            {/* 🔥 EL NUEVO ROADMAP VERTICAL 🔥 */}
+            <div style={{ marginBottom: '30px' }}>
+                <h4 style={{ color: '#aaa', fontSize: '12px', marginBottom: '15px', letterSpacing: '1px', borderBottom: '1px solid #333', paddingBottom: '5px' }}>MISSION ROADMAP</h4>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '10px', borderLeft: '2px solid #333', marginLeft: '10px' }}>
                     
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '20px' }}>
-                        <TaskRow 
-                            letter="A" desc={currentStepConfig.taskA.desc} isDone={progress.task_a_done} isLoading={loading} 
-                            startValue={progress.task_a_start_value} currentValue={getStatValueByType(currentStepConfig.taskA.type)} targetAmount={currentStepConfig.taskA.target} type={currentStepConfig.taskA.type}
-                            onStart={() => handleStartTask('A', currentStepConfig.taskA.type)} 
-                            onVerify={() => handleVerifyTask('A', currentStepConfig.taskA.type, currentStepConfig.taskA.target)} 
-                        />
-                        <TaskRow 
-                            letter="B" desc={currentStepConfig.taskB.desc} isDone={progress.task_b_done} isLoading={loading} 
-                            startValue={progress.task_b_start_value} currentValue={getStatValueByType(currentStepConfig.taskB.type)} targetAmount={currentStepConfig.taskB.target} type={currentStepConfig.taskB.type}
-                            onStart={() => handleStartTask('B', currentStepConfig.taskB.type)} 
-                            onVerify={() => handleVerifyTask('B', currentStepConfig.taskB.type, currentStepConfig.taskB.target)} 
-                        />
-                    </div>
+                    {PATH_STEPS.map(step => {
+                        const isPast = step.lvl < progress.current_level;
+                        const isCurrent = step.lvl === progress.current_level && !progress.is_completed;
+                        const isFuture = step.lvl > progress.current_level;
+                        const isCompletedMode = progress.is_completed && step.lvl === 10;
 
-                    {/* PEAJE PREMIUM ACTUALIZADO Y DIVIDIDO */}
-                    {progress.task_a_done && progress.task_b_done && (
-                        <div style={{ marginTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '15px' }}>
-                            {!progress.reward_5k_claimed ? (
-                                <button onClick={handleClaimBaseReward} disabled={loading} className="btn-neon" style={{ width: '100%', background: '#4CAF50', color: '#000', border: 'none', padding: '15px', fontSize: '14px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', boxShadow: '0 0 20px rgba(76, 175, 80, 0.4)' }}>
-                                    <Gift size={18} /> CLAIM 5,000 PTS
-                                </button>
-                            ) : (
-                                <div>
-                                    <div style={{ textAlign: 'center', fontSize: '10px', color: '#FFD700', marginBottom: '10px', fontWeight: 'bold' }}>🔓 PREMIUM GATE TO UNLOCK NEXT LEVEL</div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                        <button onClick={handlePayGateToAdvance} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#FFD700', color: '#FFD700', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
-                                            <Zap size={14} /> PAY {gateCost.ton} TON
-                                        </button>
-                                        
-                                        {/* 🔥 BOTÓN DIVIDIDO DE INVITACIÓN 🔥 */}
-                                        {progress.gate_invite_start_value === null ? (
-                                            <button onClick={handleGateInviteClick} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#E040FB', color: '#E040FB', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
-                                                <Users size={14} /> INVITE {gateCost.refs}
-                                            </button>
-                                        ) : (
-                                            <div style={{ display: 'flex', gap: '5px' }}>
-                                                <button onClick={handleGateInviteClick} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#444', color: '#aaa', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
-                                                    <Copy size={14} />
-                                                </button>
-                                                <button onClick={handleVerifyGateInvites} disabled={loading} className="btn-cyber" style={{ background: '#E040FB', color: '#fff', border: 'none', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer', boxShadow: '0 0 10px rgba(224, 64, 251, 0.5)', flex: 1 }}>
-                                                    VERIFY
-                                                </button>
+                        // 1. RENDER DE NIVELES PASADOS (Verdes e interactivos)
+                        if (isPast || isCompletedMode) {
+                            return (
+                                <div key={step.lvl} style={{ position: 'relative' }}>
+                                    <div style={{ position: 'absolute', left: '-16px', top: '15px', background: '#4CAF50', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #000' }}></div>
+                                    <div onClick={() => toggleHistoryLevel(step.lvl)} style={{ padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid rgba(76, 175, 80, 0.3)', borderRadius: '8px', width: '100%', cursor: 'pointer', transition: 'all 0.3s' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <div style={{ color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div>
+                                                <div style={{ color: '#aaa', fontSize: '10px', textDecoration: 'line-through' }}>{step.title}</div>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <CheckCircle2 size={16} color="#4CAF50" />
+                                                {expandedLevel === step.lvl ? <ChevronUp size={16} color="#4CAF50" /> : <ChevronDown size={16} color="#4CAF50" />}
+                                            </div>
+                                        </div>
+                                        {expandedLevel === step.lvl && (
+                                            <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(76, 175, 80, 0.3)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>A</div><div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskA.desc}</div></div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>B</div><div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskB.desc}</div></div>
                                             </div>
                                         )}
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    )}
+                            );
+                        }
+
+                        // 2. RENDER DEL NIVEL ACTUAL (El bloque grande azul con los botones)
+                        if (isCurrent) {
+                            return (
+                                <div key={step.lvl} style={{ position: 'relative', margin: '15px 0' }}>
+                                    <div style={{ position: 'absolute', left: '-18px', top: '15px', background: '#00F2FE', width: '14px', height: '14px', borderRadius: '50%', border: '2px solid #000', boxShadow: '0 0 10px #00F2FE' }}></div>
+                                    <div className="glass-card" style={{ border: '1px solid #00F2FE', background: 'rgba(0, 242, 254, 0.05)', boxShadow: '0 0 20px rgba(0, 242, 254, 0.1)', position: 'relative', padding: '15px' }}>
+                                        <div style={{ position: 'absolute', top: -12, left: 20, background: '#00F2FE', color: '#000', padding: '4px 12px', borderRadius: '12px', fontWeight: '900', fontSize: '12px' }}>CURRENT NODE</div>
+                                        <h3 style={{ marginTop: '10px', color: '#fff', textAlign: 'center' }}>{currentStepConfig.title}</h3>
+                                        
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '15px' }}>
+                                            <TaskRow 
+                                                letter="A" desc={currentStepConfig.taskA.desc} isDone={progress.task_a_done} isLoading={loading} 
+                                                startValue={progress.task_a_start_value} currentValue={getStatValueByType(currentStepConfig.taskA.type)} targetAmount={currentStepConfig.taskA.target} type={currentStepConfig.taskA.type}
+                                                onStart={() => handleStartTask('A', currentStepConfig.taskA.type)} 
+                                                onVerify={() => handleVerifyTask('A', currentStepConfig.taskA.type, currentStepConfig.taskA.target)} 
+                                            />
+                                            <TaskRow 
+                                                letter="B" desc={currentStepConfig.taskB.desc} isDone={progress.task_b_done} isLoading={loading} 
+                                                startValue={progress.task_b_start_value} currentValue={getStatValueByType(currentStepConfig.taskB.type)} targetAmount={currentStepConfig.taskB.target} type={currentStepConfig.taskB.type}
+                                                onStart={() => handleStartTask('B', currentStepConfig.taskB.type)} 
+                                                onVerify={() => handleVerifyTask('B', currentStepConfig.taskB.type, currentStepConfig.taskB.target)} 
+                                            />
+                                        </div>
+
+                                        {/* PEAJE PREMIUM */}
+                                        {progress.task_a_done && progress.task_b_done && (
+                                            <div style={{ marginTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '15px' }}>
+                                                {!progress.reward_5k_claimed ? (
+                                                    <button onClick={handleClaimBaseReward} disabled={loading} className="btn-neon" style={{ width: '100%', background: '#4CAF50', color: '#000', border: 'none', padding: '15px', fontSize: '14px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', boxShadow: '0 0 20px rgba(76, 175, 80, 0.4)' }}>
+                                                        <Gift size={18} /> CLAIM 5,000 PTS
+                                                    </button>
+                                                ) : (
+                                                    <div>
+                                                        <div style={{ textAlign: 'center', fontSize: '10px', color: '#FFD700', marginBottom: '10px', fontWeight: 'bold' }}>🔓 PREMIUM GATE TO UNLOCK NEXT LEVEL</div>
+                                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                                                            <button onClick={handlePayGateToAdvance} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#FFD700', color: '#FFD700', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
+                                                                <Zap size={14} /> PAY {gateCost.ton} TON
+                                                            </button>
+                                                            
+                                                            {/* BOTÓN DIVIDIDO DE INVITACIÓN */}
+                                                            {progress.gate_invite_start_value === null ? (
+                                                                <button onClick={handleGateInviteClick} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#E040FB', color: '#E040FB', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer' }}>
+                                                                    <Users size={14} /> INVITE {gateCost.refs}
+                                                                </button>
+                                                            ) : (
+                                                                <div style={{ display: 'flex', gap: '5px' }}>
+                                                                    <button onClick={handleGateInviteClick} disabled={loading} className="btn-cyber" style={{ background: 'transparent', borderColor: '#444', color: '#aaa', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+                                                                        <Copy size={14} />
+                                                                    </button>
+                                                                    <button onClick={handleVerifyGateInvites} disabled={loading} className="btn-cyber" style={{ background: '#E040FB', color: '#fff', border: 'none', fontSize: '12px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', cursor: 'pointer', boxShadow: '0 0 10px rgba(224, 64, 251, 0.5)', flex: 1 }}>
+                                                                        VERIFY
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        // 3. RENDER DE NIVELES FUTUROS (Gris, opacos, con candado)
+                        if (isFuture) {
+                            return (
+                                <div key={step.lvl} style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative' }}>
+                                    <div style={{ position: 'absolute', left: '-16px', background: '#111', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #444' }}></div>
+                                    <div style={{ opacity: 0.4, padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #222' }}>
+                                        <div>
+                                            <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div>
+                                            <div style={{ color: '#666', fontSize: '10px' }}>{step.title}</div>
+                                        </div>
+                                        <Lock size={14} color="#555" />
+                                    </div>
+                                </div>
+                            );
+                        }
+
+                        return null;
+                    })}
                 </div>
-            )}
+            </div>
+
             <style>{`.no-scrollbar::-webkit-scrollbar { display: none; } .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }`}</style>
         </div>
     );
