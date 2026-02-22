@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
-import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Medal, Play } from 'lucide-react';
+import { CheckCircle2, Lock, Zap, Users, Trophy, Share2, X, Medal, Play, ChevronDown, ChevronUp } from 'lucide-react';
 
 const ADMIN_WALLET_ADDRESS = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
@@ -51,7 +51,7 @@ interface LiveStats {
 // Configuración de las tareas con sus METAS (targetAmount)
 const PATH_STEPS = [
     { lvl: 1, title: "Onboarding", taskA: { desc: "Get 5,000 New Pts", target: 5000, type: 'score' }, taskB: { desc: "Do Daily Check-in Today", target: 1, type: 'checkin' } },
-    { lvl: 2, title: "Financial Literacy", taskA: { desc: "Gain 15,000 Total Wealth", target: 15000, type: 'wealth' }, taskB: { desc: "Complete 1 Daily Bounty", target: 1, type: 'bounty' } },
+    { lvl: 2, title: "Financial Literacy", taskA: { desc: "Gain 20,000 Total Wealth", target: 20000, type: 'wealth' }, taskB: { desc: "Complete 1 Daily Bounty", target: 1, type: 'bounty' } }, // 🔥 CAMBIO: 20k Total Wealth
     { lvl: 3, title: "Effort Filter", taskA: { desc: "Get 1 New Lucky Ticket", target: 1, type: 'ticket' }, taskB: { desc: "Start 1 Active Staking", target: 1, type: 'staking' } },
     { lvl: 4, title: "In-App Engagement", taskA: { desc: "Upgrade Account Level", target: 1, type: 'level' }, taskB: { desc: "Play 10 Arcade Games", target: 10, type: 'arcade' } },
     { lvl: 5, title: "Medium Commitment", taskA: { desc: "Reach 3-Day Streak", target: 3, type: 'streak' }, taskB: { desc: "Play Lottery Event", target: 1, type: 'lottery' } },
@@ -71,6 +71,9 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const [showEpicWin, setShowEpicWin] = useState(false); 
     const [hasClaimedReward, setHasClaimedReward] = useState(false); 
     
+    // 🔥 NUEVO ESTADO: Para controlar qué nivel completado está desplegado
+    const [expandedLevel, setExpandedLevel] = useState<number | null>(null);
+    
     // Estadísticas inicializadas en 0
     const [liveStats, setLiveStats] = useState<LiveStats>({
         score: 0, total_wealth: 0, lucky_tickets: 0, active_stakes: 0, user_level: 1,
@@ -89,7 +92,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     }, [user]);
 
-    // 🔥 NUEVO SISTEMA DE LECTURA DIRECTA (Frontend Computing)
+    // NUEVO SISTEMA DE LECTURA DIRECTA (Frontend Computing)
     const loadLiveStats = useCallback(async () => {
         if (!user) return;
         try {
@@ -114,13 +117,13 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                     lucky_tickets: u.lucky_tickets || 0,
                     active_stakes: activeStakesCount,
                     user_level: level,
-                    arcade_games_played: u.arcade_games_played || 0, // Fallback si no existe columna
+                    arcade_games_played: u.arcade_games_played || 0, 
                     current_streak: u.current_streak || 0,
-                    lottery_played: u.lottery_played || 0, // Fallback
+                    lottery_played: u.lottery_played || 0, 
                     bounties_done_today: bountiesDone,
                     checked_in_today: u.last_check_in_date === today,
-                    starter_pack_bought: u.starter_pack_bought || false, // Fallback
-                    new_referrals_since_lvl9: u.new_referrals_since_lvl9 || 0 // Fallback
+                    starter_pack_bought: u.starter_pack_bought || false, 
+                    new_referrals_since_lvl9: u.new_referrals_since_lvl9 || 0 
                 });
             }
         } catch (e) { console.error("Error loading live stats", e); }
@@ -129,7 +132,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     useEffect(() => {
         loadProgress();
         loadLiveStats();
-        // 🔥 Polling rápido: Revisa cada 3 segundos para que la barra de progreso se sienta "en vivo"
+        // Polling rápido: Revisa cada 3 segundos
         const interval = setInterval(loadLiveStats, 3000);
         return () => clearInterval(interval);
     }, [loadProgress, loadLiveStats]);
@@ -160,6 +163,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
+    // Helper para mapear el tipo de tarea
     const getStatValueByType = (type: string): number => {
         switch(type) {
             case 'score': return liveStats.score;
@@ -179,11 +183,12 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
+    // FUNCIÓN START
     const handleStartTask = async (taskLetter: 'A' | 'B', type: string) => {
         if (!user || loading) return;
         setLoading(true);
         try {
-            await loadLiveStats(); // Traer el valor fresquito
+            await loadLiveStats(); 
             const currentValue = getStatValueByType(type);
             const columnToUpdate = taskLetter === 'A' ? 'task_a_start_value' : 'task_b_start_value';
             
@@ -197,6 +202,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
+    // FUNCIÓN VERIFY
     const handleVerifyTask = async (taskLetter: 'A' | 'B', type: string, target: number) => {
         if (!user || loading) return;
         setLoading(true);
@@ -209,12 +215,10 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
             let passed = false;
             let progressAmount = 0;
 
-            // Tareas Estáticas (No importa cuándo empezaste, solo importa si lo tienes)
             if (type === 'level_static' || type === 'streak' || type === 'checkin' || type === 'buy') {
                 progressAmount = currentValue;
                 passed = currentValue >= target;
             } else {
-                // Tareas Relativas (Debes conseguir NUEVOS puntos/tickets desde que diste START)
                 progressAmount = Math.max(0, currentValue - (startValue || 0));
                 passed = progressAmount >= target;
             }
@@ -281,6 +285,15 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         } catch (e) { console.error(e); }
     };
 
+    // 🔥 FUNCIÓN PARA EXPANDIR/CONTRAER HISTORIAL
+    const toggleHistoryLevel = (level: number) => {
+        if (expandedLevel === level) {
+            setExpandedLevel(null);
+        } else {
+            setExpandedLevel(level);
+        }
+    };
+
     if (showEpicWin) {
         return (
             <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: 'radial-gradient(circle, rgba(255,215,0,0.3) 0%, rgba(0,0,0,0.95) 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -316,16 +329,45 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
 
+            {/* 🔥 HISTORIAL (Niveles Completados - Interactivo) */}
             {progress.current_level > 1 && (
                 <div style={{ marginBottom: '30px' }}>
                     <h4 style={{ color: '#4CAF50', fontSize: '12px', marginBottom: '10px', letterSpacing: '1px' }}>COMPLETED NODES</h4>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', paddingLeft: '10px', borderLeft: '2px solid #4CAF50', marginLeft: '10px' }}>
                         {PATH_STEPS.slice(0, progress.current_level - (progress.is_completed ? 0 : 1)).map(step => (
-                            <div key={step.lvl} style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative' }}>
-                                <div style={{ position: 'absolute', left: '-16px', background: '#4CAF50', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #000' }}></div>
-                                <div style={{ padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid rgba(76, 175, 80, 0.3)', borderRadius: '8px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <div><div style={{ color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div><div style={{ color: '#aaa', fontSize: '10px', textDecoration: 'line-through' }}>{step.title}</div></div>
-                                    <CheckCircle2 size={16} color="#4CAF50" />
+                            <div key={step.lvl} style={{ position: 'relative' }}>
+                                <div style={{ position: 'absolute', left: '-16px', top: '15px', background: '#4CAF50', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #000' }}></div>
+                                <div 
+                                    onClick={() => toggleHistoryLevel(step.lvl)}
+                                    style={{ 
+                                        padding: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid rgba(76, 175, 80, 0.3)', 
+                                        borderRadius: '8px', width: '100%', cursor: 'pointer', transition: 'all 0.3s'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <div>
+                                            <div style={{ color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div>
+                                            <div style={{ color: '#aaa', fontSize: '10px', textDecoration: 'line-through' }}>{step.title}</div>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <CheckCircle2 size={16} color="#4CAF50" />
+                                            {expandedLevel === step.lvl ? <ChevronUp size={16} color="#4CAF50" /> : <ChevronDown size={16} color="#4CAF50" />}
+                                        </div>
+                                    </div>
+
+                                    {/* 🔥 DETALLE DESPLEGABLE DE TAREAS COMPLETADAS */}
+                                    {expandedLevel === step.lvl && (
+                                        <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px dashed rgba(76, 175, 80, 0.3)', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>A</div>
+                                                <div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskA.desc}</div>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <div style={{ width: '16px', height: '16px', background: 'rgba(76, 175, 80, 0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#4CAF50', fontWeight: 'bold' }}>B</div>
+                                                <div style={{ fontSize: '10px', color: '#888', textDecoration: 'line-through' }}>{step.taskB.desc}</div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
