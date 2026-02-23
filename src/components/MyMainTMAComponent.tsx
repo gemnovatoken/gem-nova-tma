@@ -58,6 +58,34 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const isEliteMode = globalLevel >= 6 && globalLevel < 8; 
     const isBasicMode = globalLevel < 6; 
 
+    // 🔥 NUEVA FUNCIÓN: Sincronización Silenciosa al Reanudar 🔥
+    const syncMiningData = useCallback(async () => {
+        if (!user || claiming) return;
+        const { data, error } = await supabase.rpc('claim_mining', { user_id_in: user.id });
+        if (!error && data && data[0] && data[0].success) {
+            setScore(data[0].new_score);
+            // Actualizamos la energía si el backend la devuelve
+            if (data[0].new_energy !== undefined) setEnergy(data[0].new_energy);
+        }
+    }, [user, claiming, setScore, setEnergy]);
+
+    // 🔥 NUEVO EFFECT: Detecta entrada a la app y cambio de visibilidad 🔥
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && user) {
+                syncMiningData();
+            }
+        };
+
+        // Ejecutar al montar (cuando entra a la app)
+        if (user) {
+            syncMiningData();
+        }
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, [user, syncMiningData]);
+
     // --- FUNCIÓN DE COBRO (CLAIM) ORIGINAL ---
     const handleClaim = useCallback(async () => {
         if (!user || energy < 1 || claiming) return;
@@ -134,7 +162,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     }, [user, loading, setScore, setLevels]);
 
     // 🔥 CONFIGURACIÓN DEL PAGO REAL EN TON 🔥
-    const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q'; // <--- CAMBIA ESTO
+    const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
     const handleBuyPremiumBot = async (tonAmount: number, days: number) => {
         if (!user) return;
@@ -271,7 +299,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                             <p style={{color: '#aaa', fontSize: '12px', margin: '5px 0 0 0'}}>Let the system work while you sleep.</p>
                         </div>
 
-                        {/* SECCIONES CONDICIONALES IGUAL QUE TU TABLA MAESTRA */}
                         {isBasicMode && (
                             <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
                                 <div style={{background:'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'12px', border:'1px solid #333'}}>
