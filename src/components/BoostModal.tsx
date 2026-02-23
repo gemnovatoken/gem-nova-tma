@@ -10,15 +10,16 @@ interface BoostModalProps {
 
 // 🔥 PRECIOS Y BENEFICIOS ACTUALIZADOS 🔥
 // 🔥 PRECIOS, BENEFICIOS Y ESTADÍSTICAS SINCRONIZADAS 🔥
+// 🔥 PRECIOS, BENEFICIOS Y ESTADÍSTICAS EXACTAS 🔥
 const RIG_LEVELS = [
-    { lvl: 1, name: "Laptop", speed: "3.6k/h", cap: "1k Pts", staking: "Locked", cost: "FREE", benefit: "" },
-    { lvl: 2, name: "GPU Home", speed: "7.2k/h", cap: "5k Pts", staking: "Locked", cost: "20k", benefit: "" },
-    { lvl: 3, name: "Garage Rig", speed: "15k/h", cap: "15k Pts", staking: "10k Limit", cost: "250k", benefit: "🔓 UNLOCK STAKING" },
-    { lvl: 4, name: "Server Room", speed: "36k/h", cap: "50k Pts", staking: "10% Cap", cost: "1M", benefit: "" },
-    { lvl: 5, name: "Industrial", speed: "72k/h", cap: "150k Pts", staking: "20% Cap", cost: "5M", benefit: "✅ NO MIN WITHDRAW" },
-    { lvl: 6, name: "Geothermal", speed: "180k/h", cap: "500k Pts", staking: "35% Cap", cost: "15M", benefit: "🤖 24H AUTO-MINING" },
-    { lvl: 7, name: "Fusion", speed: "360k/h", cap: "1.5M Pts", staking: "50% Cap", cost: "25M", benefit: "" },
-    { lvl: 8, name: "Quantum", speed: "1M/h", cap: "5M Pts", staking: "75% Cap", cost: "30M", benefit: "🏝️ 3-DAY OFFLINE MODE" },
+    { lvl: 1, name: "Laptop", speed: "3.6k/h", cap: "5k Pts", staking: "Locked", cost: "FREE", benefit: "" },
+    { lvl: 2, name: "GPU Home", speed: "7.2k/h", cap: "10k Pts", staking: "Locked", cost: "20k", benefit: "" },
+    { lvl: 3, name: "Garage Rig", speed: "10.8k/h", cap: "20k Pts", staking: "10k Limit", cost: "250k", benefit: "🔓 UNLOCK STAKING" },
+    { lvl: 4, name: "Server Room", speed: "14.4k/h", cap: "25k Pts", staking: "10% Cap", cost: "1M", benefit: "" },
+    { lvl: 5, name: "Industrial", speed: "18k/h", cap: "35k Pts", staking: "20% Cap", cost: "5M", benefit: "✅ NO MIN WITHDRAW" },
+    { lvl: 6, name: "Geothermal", speed: "21.6k/h", cap: "40k Pts", staking: "35% Cap", cost: "15M", benefit: "🤖 24H AUTO-MINING" },
+    { lvl: 7, name: "Fusion", speed: "28.8k/h", cap: "50k Pts", staking: "50% Cap", cost: "25M", benefit: "" },
+    { lvl: 8, name: "Quantum", speed: "36k/h", cap: "60k Pts", staking: "75% Cap", cost: "30M", benefit: "🏝️ 3-DAY OFFLINE MODE" },
 ];
 
 export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, onBuy }) => {
