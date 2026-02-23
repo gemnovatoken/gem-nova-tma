@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
-import { useTonConnectUI } from '@tonconnect/ui-react'; // Hook ya importado correctamente
+import { useTonConnectUI } from '@tonconnect/ui-react'; 
 import { Zap, Gamepad2, Rocket, Bot, Video, Server, X, BatteryCharging, ShieldCheck } from 'lucide-react';
 import type { SetStateAction, Dispatch } from 'react';
 
@@ -34,7 +34,7 @@ const LEVEL_NAMES = ["Laptop", "GPU Rig", "Garage Farm", "Server Room", "Industr
 
 export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const { user } = useAuth();
-    const [tonConnectUI] = useTonConnectUI(); // 🔥 INICIALIZACIÓN DEL SDK DE PAGOS
+    const [tonConnectUI] = useTonConnectUI(); 
     
     const [showRanking, setShowRanking] = useState(false);
     const [showLucky, setShowLucky] = useState(false);
@@ -58,33 +58,33 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const isEliteMode = globalLevel >= 6 && globalLevel < 8; 
     const isBasicMode = globalLevel < 6; 
 
-    // 🔥 NUEVA FUNCIÓN: Sincronización Silenciosa y Alerta (The Welcome Back Bonus) 🔥
+    // 🔥 SOLUCIÓN 2DA COSA: Sincronización Segura y Transferencia al Balance 🔥
     const syncMiningData = useCallback(async () => {
         if (!user || claiming) return;
         
-        // 1. Guardamos el score actual antes de hacer la consulta al backend
-        const oldScore = score;
-        
-        const { data, error } = await supabase.rpc('claim_mining', { user_id_in: user.id });
+        // Llamamos a la NUEVA función exclusiva para el modo offline
+        const { data, error } = await supabase.rpc('sync_offline', { user_id_in: user.id });
         
         if (!error && data && data[0] && data[0].success) {
             const newScoreFromServer = data[0].new_score;
-            // 2. Calculamos cuántos puntos mágicos se ganaron mientras estaba offline
-            const offlineProfit = newScoreFromServer - oldScore;
+            // Le pedimos al servidor exactamente cuánto minó (Evita el bug del Millón)
+            const offlineGained = data[0].mined_amount || 0; 
 
-            // 3. Momento CMO: Si ganó una cantidad decente, lo felicitamos primero
-            if (offlineProfit > 10) {
-                // Al darle OK, se ejecuta la línea de abajo y el número en pantalla sube
-                alert(`💰 YOUR RIG WAS WORKING!\n\nOffline profit generated:\n+${offlineProfit.toLocaleString()} PTS\n\nClick OK to transfer to balance.`);
+            // Si ganó puntos (porque el bot estaba activo), mostramos la alerta ANTES de actualizar
+            if (offlineGained > 10) {
+                alert(`💰 OFFLINE PROFITS!\n\nWhile you were away, your bots mined:\n+${offlineGained.toLocaleString()} POINTS\n\nClick OK to transfer to your balance! 🚀`);
             }
-
-            // 4. Actualizamos estados (sea que hubo alerta o no)
+            
+            // Transferimos el score visualmente (con o sin alerta)
             setScore(newScoreFromServer);
-            if (data[0].new_energy !== undefined) setEnergy(data[0].new_energy);
+            // Llenamos la batería con lo que calculó el servidor sin empezar de 0
+            if (data[0].new_energy !== undefined) {
+                setEnergy(data[0].new_energy);
+            }
         }
-    }, [user, claiming, score, setScore, setEnergy]);
+    }, [user, claiming, setScore, setEnergy]); // Ya no dependemos del 'score' roto inicial
 
-    // 🔥 NUEVO EFFECT: Detecta entrada a la app y cambio de visibilidad 🔥
+    // Detecta entrada a la app y cambio de visibilidad 
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && user) {
@@ -92,7 +92,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             }
         };
 
-        // Ejecutar al montar (cuando entra a la app)
         if (user) {
             syncMiningData();
         }
@@ -176,52 +175,32 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         setLoading(false);
     }, [user, loading, setScore, setLevels]);
 
-    // 🔥 CONFIGURACIÓN DEL PAGO REAL EN TON 🔥
     const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
     const handleBuyPremiumBot = async (tonAmount: number, days: number) => {
         if (!user) return;
-        
-        // 1. Validar que la billetera esté conectada
         if (!tonConnectUI.account) {
             alert("❌ Please connect your TON wallet first using the button at the top!");
             return;
         }
-
         const confirmBuy = window.confirm(`💎 PREMIUM CONTRACT\n\nPay ${tonAmount} TON to activate the Bot for ${days} days?`);
         if(!confirmBuy) return;
-        
         setLoading(true);
-
         try {
-            // 2. Preparar la transacción real (Nanotons = TON * 10^9)
             const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 360, // 6 minutos de validez
-                messages: [
-                    {
-                        address: ADMIN_WALLET,
-                        amount: (tonAmount * 1000000000).toString(), // Convertimos a Nanotons
-                    },
-                ],
+                validUntil: Math.floor(Date.now() / 1000) + 360,
+                messages: [{ address: ADMIN_WALLET, amount: (tonAmount * 1000000000).toString() }],
             };
-
-            // 3. Solicitar firma del usuario en su App (Tonkeeper, etc)
             const result = await tonConnectUI.sendTransaction(transaction);
-
             if (result) {
-                // 4. Si el pago se procesó, actualizamos la base de datos
                 const durationSeconds = days * 24 * 3600;
-                const { error } = await supabase.rpc('activate_bot', { 
-                    user_id_in: user.id, 
-                    duration_seconds: durationSeconds 
-                });
-
+                const { error } = await supabase.rpc('activate_bot', { user_id_in: user.id, duration_seconds: durationSeconds });
                 if (!error) {
                     setBotTime(prev => prev + durationSeconds);
                     alert(`🎉 PAYMENT SUCCESSFUL!\n\nBot Premium activated for ${days} days.`);
                     setShowManager(false);
                 } else {
-                    alert("Payment received but failed to sync. Please contact support with your transaction hash.");
+                    alert("Payment received but failed to sync.");
                 }
             }
         } catch (e) {
@@ -232,7 +211,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     };
 
-    // Funciones visuales (Rings & Labels)
     const radius = 100; 
     const circumference = 2 * Math.PI * radius;
     const fillPercent = Math.min(100, (energy / maxEnergy) * 100);
@@ -318,7 +296,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                             <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
                                 <div style={{background:'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'12px', border:'1px solid #333'}}>
                                     <div style={{fontSize:'14px', fontWeight:'bold', color:'#fff', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}><span>Basic Contract</span><span style={{color:'#00F2FE'}}>4 Hours</span></div>
-                                    <div style={{fontSize:'11px', color:'#aaa', marginBottom:'15px'}}>Watch an ad to activate. Max 2 per day.</div>
                                     <button onClick={() => handleWatchBotAd(4)} disabled={adsWatched >= 2 || loading} className="btn-neon" style={{width:'100%', background:'transparent', border:'1px solid #00F2FE', color:'#00F2FE'}}>
                                         {adsWatched >= 2 ? 'LIMIT REACHED (2/2)' : `WATCH AD (${adsWatched}/2)`} <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/>
                                     </button>
