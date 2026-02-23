@@ -134,7 +134,7 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
             setCheckedInToday(true);
             setGlobalScore((prev: number) => prev + reward);
 
-            // 🔥 NUEVA LÓGICA: 3 Lucky Tickets en el Día 7 🔥
+            // 🔥 NUEVA LÓGICA: 2 Lucky Tickets en el Día 7 (Actualizado para balance económico) 🔥
             if ((streak + 1) % 7 === 0) {
                  // Leemos el valor más reciente de la BD para evitar sobrescribir con datos viejos
                  const { data: currentData } = await supabase
@@ -144,13 +144,13 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                      .single();
                  
                  const currentTickets = currentData?.lucky_tickets || luckyTickets;
-                 const newTotalTickets = currentTickets + 3;
+                 const newTotalTickets = currentTickets + 2; // 🔥 Cambio a 2 tickets
 
                  // Actualizamos la base de datos y el estado local
                  await supabase.from('user_score').update({ lucky_tickets: newTotalTickets }).eq('user_id', user.id);
                  setLuckyTickets(newTotalTickets);
 
-                 alert(`🏆 7-DAY STREAK COMPLETED!\n\nBIG REWARD: +${reward} PTS & +3 LUCKY TICKETS! 🎟️`);
+                 alert(`🏆 7-DAY STREAK COMPLETED!\n\nBIG REWARD: +${reward} PTS & +2 LUCKY TICKETS! 🎟️`);
             } else {
                  alert(`✅ DAILY CHECK-IN SUCCESS!\n\nStreak: ${streak + 1} Days\nReceived: +${reward} PTS`);
             }
