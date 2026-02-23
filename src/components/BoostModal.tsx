@@ -8,15 +8,16 @@ interface BoostModalProps {
     onBuy: (type: 'multitap' | 'limit' | 'speed') => void;
 }
 
+// 🔥 CONFIGURACIÓN SINCRONIZADA CON STAKING BANK 🔥
 const RIG_LEVELS = [
-    { lvl: 1, name: "Laptop", speed: "3.6k/h", cap: "5k Pts", staking: "Locked", cost: "FREE", benefit: "" },
-    { lvl: 2, name: "GPU Home", speed: "7.2k/h", cap: "10k Pts", staking: "Locked", cost: "20k", benefit: "" },
-    { lvl: 3, name: "Garage Rig", speed: "10.8k/h", cap: "20k Pts", staking: "10k Limit", cost: "250k", benefit: "🔓 UNLOCK STAKING" },
-    { lvl: 4, name: "Server Room", speed: "14.4k/h", cap: "25k Pts", staking: "10% Cap", cost: "1M", benefit: "" },
-    { lvl: 5, name: "Industrial", speed: "18k/h", cap: "35k Pts", staking: "20% Cap", cost: "5M", benefit: "✅ NO MIN WITHDRAW" },
-    { lvl: 6, name: "Geothermal", speed: "21.6k/h", cap: "40k Pts", staking: "35% Cap", cost: "15M", benefit: "🤖 24H AUTO-MINING" },
-    { lvl: 7, name: "Fusion", speed: "28.8k/h", cap: "50k Pts", staking: "50% Cap", cost: "25M", benefit: "" },
-    { lvl: 8, name: "Quantum", speed: "36k/h", cap: "60k Pts", staking: "75% Cap", cost: "30M", benefit: "🏝️ 3-DAY OFFLINE MODE" },
+    { lvl: 1, name: "Laptop", speed: "3.6k/h", cap: "5k Pts", staking: "Flash Only (24h)", cost: "FREE", benefit: "2 Deposit Slots" },
+    { lvl: 2, name: "GPU Home", speed: "7.2k/h", cap: "10k Pts", staking: "Flash Only (24h)", cost: "20k", benefit: "Basic Staking Capacity" },
+    { lvl: 3, name: "Garage Rig", speed: "10.8k/h", cap: "20k Pts", staking: "10% Bank Quota", cost: "250k", benefit: "🔓 UNLOCK DEEP STORAGE" },
+    { lvl: 4, name: "Server Room", speed: "14.4k/h", cap: "25k Pts", staking: "25% Bank Quota", cost: "1M", benefit: "Higher Quota" },
+    { lvl: 5, name: "Industrial", speed: "18k/h", cap: "35k Pts", staking: "40% Bank Quota", cost: "5M", benefit: "Advanced Portfolio (4 Slots)" },
+    { lvl: 6, name: "Geothermal", speed: "21.6k/h", cap: "40k Pts", staking: "55% Bank Quota", cost: "15M", benefit: "🤖 24H AUTO-MINING" },
+    { lvl: 7, name: "Fusion", speed: "28.8k/h", cap: "50k Pts", staking: "70% Bank Quota", cost: "25M", benefit: "Master Banker (10 Slots)" },
+    { lvl: 8, name: "Quantum", speed: "36k/h", cap: "60k Pts", staking: "70% Bank Quota", cost: "30M", benefit: "🏝️ MAX BANK QUOTA" },
 ];
 
 export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, onBuy }) => {
@@ -100,7 +101,7 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <Battery size={10} color={isCurrent ? "#4CAF50" : "#555"} />
-                                                <span style={{ fontSize: '10px', color: '#888' }}>{rig.cap}</span>
+                                                <span style={{ fontSize: '10px', color: '#888' }}>{rig.staking}</span>
                                             </div>
                                         </div>
 
