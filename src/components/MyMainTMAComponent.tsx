@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
-import { useTonConnectUI } from '@tonconnect/ui-react'; // Hook ya importado correctamente
+import { useTonConnectUI } from '@tonconnect/ui-react'; 
 import { Zap, Gamepad2, Rocket, Bot, Video, Server, X, BatteryCharging, ShieldCheck, Clock } from 'lucide-react';
 import type { SetStateAction, Dispatch } from 'react';
 
@@ -34,7 +34,7 @@ const LEVEL_NAMES = ["Laptop", "GPU Rig", "Garage Farm", "Server Room", "Industr
 
 export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const { user } = useAuth();
-    const [tonConnectUI] = useTonConnectUI(); // 🔥 INICIALIZACIÓN DEL SDK DE PAGOS
+    const [tonConnectUI] = useTonConnectUI(); 
     
     const [showRanking, setShowRanking] = useState(false);
     const [showLucky, setShowLucky] = useState(false);
@@ -58,33 +58,27 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const isEliteMode = globalLevel >= 6 && globalLevel < 8; 
     const isBasicMode = globalLevel < 6; 
 
-    // 🔥 2da COSA: Sincronización con Alerta de Impacto (Transferencia al Balance) 🔥
+    // 🔥 Sincronización Segura y Transferencia al Balance 🔥
     const syncMiningData = useCallback(async () => {
         if (!user || claiming) return;
         
-        // Llamamos a la NUEVA función exclusiva para el modo offline
         const { data, error } = await supabase.rpc('sync_offline', { user_id_in: user.id });
         
         if (!error && data && data[0] && data[0].success) {
             const newScoreFromServer = data[0].new_score;
-            // Le pedimos al servidor exactamente cuánto minó (Evita el bug del Millón)
             const offlineGained = data[0].mined_amount || 0; 
 
-            // Si ganó puntos (porque el bot estaba activo), mostramos la alerta ANTES de actualizar
             if (offlineGained > 10) {
                 alert(`💰 OFFLINE PROFITS!\n\nWhile you were away, your bots mined:\n+${offlineGained.toLocaleString()} POINTS\n\nClick OK to transfer to your balance! 🚀`);
             }
             
-            // Transferimos el score visualmente (con o sin alerta)
             setScore(newScoreFromServer);
-            // Llenamos la batería con lo que calculó el servidor sin empezar de 0
             if (data[0].new_energy !== undefined) {
                 setEnergy(data[0].new_energy);
             }
         }
-    }, [user, claiming, setScore, setEnergy]); // Ya no dependemos del 'score' roto inicial
+    }, [user, claiming, setScore, setEnergy]);
 
-    // Detecta entrada a la app y cambio de visibilidad 
     useEffect(() => {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && user) {
@@ -100,7 +94,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
     }, [user, syncMiningData]);
 
-    // 🔥 NUEVO: Reducir el timer del bot visualmente cada segundo
+    // Reducir el timer del bot visualmente cada segundo
     useEffect(() => {
         if (botTime > 0) {
             const timer = setInterval(() => {
@@ -110,7 +104,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     }, [botTime, setBotTime]);
 
-    // Helper para formatear el tiempo del bot
     const formatBotTime = (seconds: number) => {
         if (seconds <= 0) return null;
         const d = Math.floor(seconds / (3600 * 24));
@@ -164,7 +157,8 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     }, [botTime, energy, maxEnergy, handleClaim]);
 
-    const watchVideo = useCallback(async (type: 'turbo' | 'refill') => {
+    // 🔥 LIMPIAMOS WATCH VIDEO: Solo queda el Overclock 🔥
+    const watchVideo = useCallback(async (type: 'turbo') => {
         if (!user) return; 
         if (type === 'turbo') {
             if(!window.confirm("📺 Watch Ad to DOUBLE mining speed (60s)?")) return;
@@ -175,19 +169,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 60 seconds.\nUses today: ${data[0].new_count}/3`);
             } else alert(data?.[0]?.message || "Limit reached");
         } 
-        else if (type === 'refill') {
-            if(!window.confirm("📺 Watch Ad to FILL tank?")) return;
-            if (energy > 0) {
-                const collected = Math.floor(energy);
-                setScore(prev => prev + collected);
-                supabase.rpc('claim_mining', { user_id_in: user.id });
-            }
-            const { error } = await supabase.rpc('apply_refill', { user_id_in: user.id });
-            if (error) console.error(error);
-            setEnergy(maxEnergy);
-            alert("🔋 Smart Refill!\nCollected pending points & Filled Tank 100%");
-        }
-    }, [maxEnergy, setEnergy, user, setOverclockTime, energy, setScore]);
+    }, [user, setOverclockTime]);
 
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
         if (loading || !user) return; setLoading(true);
@@ -202,7 +184,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
     const handleBuyPremiumBot = async (tonAmount: number, days: number) => {
         if (!user) return;
-        // Prevenir compra si ya hay un bot activo
         if (botTime > 0) {
             alert("⚠️ You already have an active Bot!\nPlease wait for it to expire before buying a new one.");
             return;
@@ -243,7 +224,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
     const handleWatchBotAd = async (hours: number) => {
         if (!user) return;
-        // Prevenir visualización si ya hay un bot activo
         if (botTime > 0) {
             alert("⚠️ You already have an active Bot!\nPlease wait for it to expire before getting a new one.");
             return;
@@ -305,11 +285,11 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             <div style={{ width: '100%', padding: '0 15px', zIndex: 10 }}>
                 <div style={{ marginBottom:'2px', display:'flex', justifyContent:'center', fontSize:'9px', color: ringColor, fontWeight:'bold' }}><span>PRODUCTION: {(overclockTime && overclockTime > 0) ? (regenRate * 3600 * 2) : (regenRate * 3600)} PTS/HOUR</span></div>
                 <div className="glass-card" style={{ padding: '6px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap:'5px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '5px' }}>
+                    {/* 🔥 EL GRID AHORA TIENE 3 COLUMNAS SIMÉTRICAS 🔥 */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px' }}>
                         <DockButton icon={<Rocket/>} label="UPGRADE" color="#00F2FE" onClick={() => setShowBoosts(true)} />
                         <DockButton icon={<Bot/>} label="MANAGER" sub={getBotLabel()} color={getBotColor()} onClick={() => setShowManager(true)} />
                         <DockButton icon={<Zap/>} label="OVERCLOCK" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
-                        <DockButton icon={<Video/>} label="INSTA-FILL" sub="AD" color="#4CAF50" onClick={() => watchVideo('refill')} />
                     </div>
                     <button onClick={() => setShowLucky(true)} style={{ width:'100%', padding:'6px', borderRadius:'10px', border:'1px solid #E040FB', background:'rgba(224, 64, 251, 0.15)', color:'#fff', cursor:'pointer', display:'flex', justifyContent:'center', alignItems:'center', gap:'6px' }}>
                         <Gamepad2 size={14} color="#E040FB"/> <span style={{fontSize:'10px', fontWeight:'bold'}}>CASINO SPIN</span>
@@ -327,7 +307,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                             <Bot size={40} color="#00F2FE" style={{marginBottom: '10px'}}/>
                             <h2 style={{margin: 0, color: '#fff', fontSize: '20px', letterSpacing: '1px'}}>AUTO-MINER BOT</h2>
                             
-                            {/* 🔥 NUEVO TIMER VISUAL 🔥 */}
                             {botTime > 0 ? (
                                 <div style={{marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', color: '#4CAF50', fontSize: '14px', fontWeight: 'bold'}}>
                                     <Clock size={14} /> ACTIVE: {formatBotTime(botTime)}
