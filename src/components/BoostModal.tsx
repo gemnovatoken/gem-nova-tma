@@ -47,7 +47,7 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                     <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', borderRadius: '50%', padding: '8px' }}><X size={18} /></button>
                 </div>
 
-                {/* Scroll de Rigs (Cuadros más largos/altos) */}
+                {/* Scroll de Rigs */}
                 <div style={{ overflowY: 'auto', padding: '0 20px 40px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     {RIG_LEVELS.map((rig) => {
                         const isCurrent = rig.lvl === currentLvl;
@@ -63,8 +63,8 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                                 position: 'relative',
                                 background: isCurrent ? 'linear-gradient(135deg, #0f1718 0%, #000 100%)' : (isNext ? 'rgba(255,215,0,0.02)' : 'rgba(255,255,255,0.01)'),
                                 borderRadius: '18px',
-                                padding: '20px 16px', // Aumentado el padding vertical para cuadros más largos
-                                minHeight: '110px',   // Altura mínima asegurada
+                                padding: '20px 16px',
+                                minHeight: '110px',
                                 border: isCurrent ? '1.5px solid #00F2FE' : (isNext ? '1.5px solid #FFD700' : '1px solid #1a1a1a'),
                                 transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                                 opacity: isLocked ? 0.4 : 1,
@@ -100,7 +100,6 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                                             {rig.name} <span style={{fontSize:'10px', color: '#444', marginLeft:'5px'}}>LVL {rig.lvl}</span>
                                         </div>
                                         
-                                        {/* Stats Row */}
                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '6px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <Zap size={10} color={isCurrent ? "#00F2FE" : "#555"} />
@@ -112,13 +111,11 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                                             </div>
                                         </div>
 
-                                        {/* Staking Row */}
                                         <div style={{ fontSize: '10px', color: '#aaa', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                                             <Server size={10} color="#E040FB" />
                                             {rig.staking}
                                         </div>
 
-                                        {/* Benefit Row */}
                                         <div style={{ 
                                             fontSize: '9px', color: isNext ? '#FFD700' : (isCurrent ? '#00F2FE' : '#666'), 
                                             display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' 
@@ -128,26 +125,46 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                                         </div>
                                     </div>
 
-                                    {/* Botón */}
+                                    {/* 🔥 BOTÓN DE UPGRADE CORREGIDO Y BRILLANTE 🔥 */}
                                     {isNext && (
                                         <button 
                                             onClick={() => onBuy('limit')}
                                             disabled={!canAfford}
                                             style={{
-                                                padding: '12px 14px',
-                                                borderRadius: '12px',
-                                                border: 'none',
-                                                background: canAfford ? 'linear-gradient(to bottom, #FFD700, #b8860b)' : '#1a1a1a',
+                                                padding: '10px 12px',
+                                                borderRadius: '10px',
+                                                border: canAfford ? '1px solid #FFF' : '1px solid #333',
+                                                // Gradiente mucho más brillante (Dorado Real)
+                                                background: canAfford 
+                                                    ? 'linear-gradient(180deg, #FFE873 0%, #FFD700 50%, #B8860B 100%)' 
+                                                    : '#1a1a1a',
                                                 color: '#000',
                                                 fontWeight: '900',
                                                 fontSize: '11px',
-                                                boxShadow: canAfford ? '0 4px 15px rgba(218, 165, 32, 0.4)' : 'none',
+                                                // Glow exterior para que resalte en el fondo oscuro
+                                                boxShadow: canAfford 
+                                                    ? '0 0 20px rgba(255, 215, 0, 0.5), inset 0 0 5px rgba(255,255,255,0.8)' 
+                                                    : 'none',
                                                 cursor: canAfford ? 'pointer' : 'not-allowed',
-                                                flexShrink: 0
+                                                flexShrink: 0,
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                minWidth: '85px'
                                             }}
                                         >
-                                            <div style={{fontSize: '10px'}}>UPGRADE</div>
-                                            <div style={{ fontSize: '8px', opacity: 0.8 }}>{rig.cost}</div>
+                                            <span style={{fontSize: '10px', lineHeight: '1'}}>UPGRADE</span>
+                                            <span style={{ 
+                                                fontSize: '9px', 
+                                                marginTop: '2px', 
+                                                background: 'rgba(0,0,0,0.15)', 
+                                                padding: '1px 4px', 
+                                                borderRadius: '4px',
+                                                fontWeight: '800'
+                                            }}>
+                                                {rig.cost}
+                                            </span>
                                         </button>
                                     )}
                                     
