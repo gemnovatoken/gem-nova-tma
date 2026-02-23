@@ -134,7 +134,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     }, [user, loading, setScore, setLevels]);
 
     // 🔥 CONFIGURACIÓN DEL PAGO REAL EN TON 🔥
-    const ADMIN_WALLET = "PON_AQUI_TU_DIRECCION_DE_BILLETERA_REAL"; // <--- CAMBIA ESTO
+    const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q'; // <--- CAMBIA ESTO
 
     const handleBuyPremiumBot = async (tonAmount: number, days: number) => {
         if (!user) return;
