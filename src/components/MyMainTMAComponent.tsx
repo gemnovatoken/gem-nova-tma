@@ -4,8 +4,8 @@ import { useAuth } from '../hooks/useAuth';
 import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
-import { useTonConnectUI } from '@tonconnect/ui-react'; 
-import { Zap, Gamepad2, Rocket, Bot, Video, Server, X, BatteryCharging, ShieldCheck } from 'lucide-react';
+import { useTonConnectUI } from '@tonconnect/ui-react'; // Hook ya importado correctamente
+import { Zap, Gamepad2, Rocket, Bot, Video, Server, X, BatteryCharging, ShieldCheck, Clock } from 'lucide-react';
 import type { SetStateAction, Dispatch } from 'react';
 
 interface GameProps {
@@ -34,7 +34,7 @@ const LEVEL_NAMES = ["Laptop", "GPU Rig", "Garage Farm", "Server Room", "Industr
 
 export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const { user } = useAuth();
-    const [tonConnectUI] = useTonConnectUI(); 
+    const [tonConnectUI] = useTonConnectUI(); // 🔥 INICIALIZACIÓN DEL SDK DE PAGOS
     
     const [showRanking, setShowRanking] = useState(false);
     const [showLucky, setShowLucky] = useState(false);
@@ -58,7 +58,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const isEliteMode = globalLevel >= 6 && globalLevel < 8; 
     const isBasicMode = globalLevel < 6; 
 
-    // 🔥 SOLUCIÓN 2DA COSA: Sincronización Segura y Transferencia al Balance 🔥
+    // 🔥 2da COSA: Sincronización con Alerta de Impacto (Transferencia al Balance) 🔥
     const syncMiningData = useCallback(async () => {
         if (!user || claiming) return;
         
@@ -99,6 +99,29 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         document.addEventListener("visibilitychange", handleVisibilityChange);
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
     }, [user, syncMiningData]);
+
+    // 🔥 NUEVO: Reducir el timer del bot visualmente cada segundo
+    useEffect(() => {
+        if (botTime > 0) {
+            const timer = setInterval(() => {
+                setBotTime(prev => Math.max(0, prev - 1));
+            }, 1000);
+            return () => clearInterval(timer);
+        }
+    }, [botTime, setBotTime]);
+
+    // Helper para formatear el tiempo del bot
+    const formatBotTime = (seconds: number) => {
+        if (seconds <= 0) return null;
+        const d = Math.floor(seconds / (3600 * 24));
+        const h = Math.floor((seconds % (3600 * 24)) / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = Math.floor(seconds % 60);
+        
+        if (d > 0) return `${d}d ${h}h`;
+        if (h > 0) return `${h}h ${m}m`;
+        return `${m}m ${s}s`;
+    };
 
     // --- FUNCIÓN DE COBRO (CLAIM) ORIGINAL ---
     const handleClaim = useCallback(async () => {
@@ -179,10 +202,17 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
     const handleBuyPremiumBot = async (tonAmount: number, days: number) => {
         if (!user) return;
+        // Prevenir compra si ya hay un bot activo
+        if (botTime > 0) {
+            alert("⚠️ You already have an active Bot!\nPlease wait for it to expire before buying a new one.");
+            return;
+        }
+
         if (!tonConnectUI.account) {
             alert("❌ Please connect your TON wallet first using the button at the top!");
             return;
         }
+
         const confirmBuy = window.confirm(`💎 PREMIUM CONTRACT\n\nPay ${tonAmount} TON to activate the Bot for ${days} days?`);
         if(!confirmBuy) return;
         setLoading(true);
@@ -211,16 +241,14 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     };
 
-    const radius = 100; 
-    const circumference = 2 * Math.PI * radius;
-    const fillPercent = Math.min(100, (energy / maxEnergy) * 100);
-    const strokeDashoffset = circumference - (fillPercent / 100) * circumference;
-    const ringColor = (overclockTime && overclockTime > 0) ? '#FF0055' : (fillPercent < 50 ? '#00F2FE' : (fillPercent < 90 ? '#FFD700' : '#FF512F'));
-    const getBotLabel = () => botTime > 0 ? "ACTIVE" : "OFFLINE";
-    const getBotColor = () => botTime > 0 ? "#4CAF50" : "#FF512F";
-
     const handleWatchBotAd = async (hours: number) => {
         if (!user) return;
+        // Prevenir visualización si ya hay un bot activo
+        if (botTime > 0) {
+            alert("⚠️ You already have an active Bot!\nPlease wait for it to expire before getting a new one.");
+            return;
+        }
+
         setLoading(true);
         const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
         if (!error && data && data[0].success) {
@@ -233,6 +261,14 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         } else alert(error?.message || data?.[0]?.message || "Error watching ad.");
         setLoading(false);
     };
+
+    const radius = 100; 
+    const circumference = 2 * Math.PI * radius;
+    const fillPercent = Math.min(100, (energy / maxEnergy) * 100);
+    const strokeDashoffset = circumference - (fillPercent / 100) * circumference;
+    const ringColor = (overclockTime && overclockTime > 0) ? '#FF0055' : (fillPercent < 50 ? '#00F2FE' : (fillPercent < 90 ? '#FFD700' : '#FF512F'));
+    const getBotLabel = () => botTime > 0 ? "ACTIVE" : "OFFLINE";
+    const getBotColor = () => botTime > 0 ? "#4CAF50" : "#FF512F";
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '15px', height: 'calc(100dvh - 135px)', padding: '0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
@@ -286,23 +322,34 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 5000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                     <div className="glass-card" style={{ width: '100%', maxWidth: '400px', border: '1px solid #00F2FE', position: 'relative', padding: '20px' }}>
                         <button onClick={() => setShowManager(false)} style={{ position: 'absolute', top: 15, right: 15, background: 'none', border: 'none', color: '#fff' }}><X /></button>
+                        
                         <div style={{textAlign: 'center', marginBottom: '20px'}}>
                             <Bot size={40} color="#00F2FE" style={{marginBottom: '10px'}}/>
                             <h2 style={{margin: 0, color: '#fff', fontSize: '20px', letterSpacing: '1px'}}>AUTO-MINER BOT</h2>
-                            <p style={{color: '#aaa', fontSize: '12px', margin: '5px 0 0 0'}}>Let the system work while you sleep.</p>
+                            
+                            {/* 🔥 NUEVO TIMER VISUAL 🔥 */}
+                            {botTime > 0 ? (
+                                <div style={{marginTop: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', color: '#4CAF50', fontSize: '14px', fontWeight: 'bold'}}>
+                                    <Clock size={14} /> ACTIVE: {formatBotTime(botTime)}
+                                </div>
+                            ) : (
+                                <p style={{color: '#aaa', fontSize: '12px', margin: '5px 0 0 0'}}>Let the system work while you sleep.</p>
+                            )}
                         </div>
 
                         {isBasicMode && (
                             <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
                                 <div style={{background:'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'12px', border:'1px solid #333'}}>
                                     <div style={{fontSize:'14px', fontWeight:'bold', color:'#fff', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}><span>Basic Contract</span><span style={{color:'#00F2FE'}}>4 Hours</span></div>
-                                    <button onClick={() => handleWatchBotAd(4)} disabled={adsWatched >= 2 || loading} className="btn-neon" style={{width:'100%', background:'transparent', border:'1px solid #00F2FE', color:'#00F2FE'}}>
-                                        {adsWatched >= 2 ? 'LIMIT REACHED (2/2)' : `WATCH AD (${adsWatched}/2)`} <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/>
+                                    <button onClick={() => handleWatchBotAd(4)} disabled={botTime > 0 || adsWatched >= 2 || loading} className="btn-neon" style={{width:'100%', background:'transparent', border: botTime > 0 ? '1px solid #555' : '1px solid #00F2FE', color: botTime > 0 ? '#555' : '#00F2FE'}}>
+                                        {botTime > 0 ? 'BOT ALREADY ACTIVE' : (adsWatched >= 2 ? 'LIMIT REACHED (2/2)' : `WATCH AD (${adsWatched}/2)`)} {!botTime && <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/>}
                                     </button>
                                 </div>
                                 <div style={{background:'rgba(255,215,0,0.1)', padding:'15px', borderRadius:'12px', border:'1px solid #FFD700'}}>
                                     <div style={{fontSize:'14px', fontWeight:'bold', color:'#FFD700', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}><span>Premium Bypass</span><span>48 Hours</span></div>
-                                    <button onClick={() => handleBuyPremiumBot(0.15, 2)} disabled={loading} className="btn-neon" style={{width:'100%', background:'#FFD700', color:'#000', border:'none'}}>PAY 0.15 TON</button>
+                                    <button onClick={() => handleBuyPremiumBot(0.15, 2)} disabled={botTime > 0 || loading} className="btn-neon" style={{width:'100%', background: botTime > 0 ? '#555' : '#FFD700', color: botTime > 0 ? '#aaa' : '#000', border:'none'}}>
+                                        {botTime > 0 ? 'BOT ALREADY ACTIVE' : 'PAY 0.15 TON'}
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -311,12 +358,16 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                             <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
                                 <div style={{background:'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'12px', border:'1px solid #333'}}>
                                     <div style={{fontSize:'14px', fontWeight:'bold', color:'#fff', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}><span>Elite Contract</span><span style={{color:'#00F2FE'}}>24 Hours</span></div>
-                                    <button onClick={() => handleWatchBotAd(24)} disabled={loading} className="btn-neon" style={{width:'100%', background:'transparent', border:'1px solid #00F2FE', color:'#00F2FE'}}>WATCH 1 AD <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/></button>
+                                    <button onClick={() => handleWatchBotAd(24)} disabled={botTime > 0 || loading} className="btn-neon" style={{width:'100%', background:'transparent', border: botTime > 0 ? '1px solid #555' : '1px solid #00F2FE', color: botTime > 0 ? '#555' : '#00F2FE'}}>
+                                        {botTime > 0 ? 'BOT ALREADY ACTIVE' : 'WATCH 1 AD'} {!botTime && <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/>}
+                                    </button>
                                 </div>
                                 <div style={{background:'rgba(255,215,0,0.1)', padding:'15px', borderRadius:'12px', border:'1px solid #FFD700'}}>
                                     <div style={{fontSize:'14px', fontWeight:'bold', color:'#FFD700', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}><span>Elite Weekly Pass</span><span>6 Days</span></div>
                                     <div style={{fontSize:'11px', color:'#ccc', marginBottom:'15px'}}><BatteryCharging size={12} style={{verticalAlign:'middle'}}/> Reload battery every 3 days.</div>
-                                    <button onClick={() => handleBuyPremiumBot(0.20, 6)} disabled={loading} className="btn-neon" style={{width:'100%', background:'#FFD700', color:'#000', border:'none'}}>PAY 0.20 TON</button>
+                                    <button onClick={() => handleBuyPremiumBot(0.20, 6)} disabled={botTime > 0 || loading} className="btn-neon" style={{width:'100%', background: botTime > 0 ? '#555' : '#FFD700', color: botTime > 0 ? '#aaa' : '#000', border:'none'}}>
+                                        {botTime > 0 ? 'BOT ALREADY ACTIVE' : 'PAY 0.20 TON'}
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -325,12 +376,16 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                             <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
                                 <div style={{background:'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'12px', border:'1px solid #333'}}>
                                     <div style={{fontSize:'14px', fontWeight:'bold', color:'#fff', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}><span>Quantum Contract</span><span style={{color:'#00F2FE'}}>3 Days</span></div>
-                                    <button onClick={() => handleWatchBotAd(72)} disabled={loading} className="btn-neon" style={{width:'100%', background:'transparent', border:'1px solid #00F2FE', color:'#00F2FE'}}>WATCH 1 AD <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/></button>
+                                    <button onClick={() => handleWatchBotAd(72)} disabled={botTime > 0 || loading} className="btn-neon" style={{width:'100%', background:'transparent', border: botTime > 0 ? '1px solid #555' : '1px solid #00F2FE', color: botTime > 0 ? '#555' : '#00F2FE'}}>
+                                        {botTime > 0 ? 'BOT ALREADY ACTIVE' : 'WATCH 1 AD'} {!botTime && <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/>}
+                                    </button>
                                 </div>
                                 <div style={{background:'rgba(224, 64, 251, 0.15)', padding:'15px', borderRadius:'12px', border:'1px solid #E040FB'}}>
                                     <div style={{fontSize:'14px', fontWeight:'bold', color:'#E040FB', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}><span>God Mode Pass</span><span>15 Days</span></div>
                                     <div style={{fontSize:'11px', color:'#ccc', marginBottom:'15px'}}><ShieldCheck size={12} style={{verticalAlign:'middle'}}/> Reload every 5 days.</div>
-                                    <button onClick={() => handleBuyPremiumBot(0.30, 15)} disabled={loading} className="btn-neon" style={{width:'100%', background:'#E040FB', color:'#fff', border:'none'}}>PAY 0.30 TON</button>
+                                    <button onClick={() => handleBuyPremiumBot(0.30, 15)} disabled={botTime > 0 || loading} className="btn-neon" style={{width:'100%', background: botTime > 0 ? '#555' : '#E040FB', color: botTime > 0 ? '#aaa' : '#fff', border:'none'}}>
+                                        {botTime > 0 ? 'BOT ALREADY ACTIVE' : 'PAY 0.30 TON'}
+                                    </button>
                                 </div>
                             </div>
                         )}
