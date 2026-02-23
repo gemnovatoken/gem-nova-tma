@@ -344,7 +344,7 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                 )}
             </div>
 
-            {/* 🔥 NUEVO: BANNER DORADO PARA ABRIR LA RUTA DEL MILLÓN */}
+            {/* 🔥 BANNER DORADO PARA ABRIR LA RUTA DEL MILLÓN (ACTUALIZADO A 5M) */}
             <div 
                 onClick={() => setShowPathModal(true)}
                 className="glass-card"
@@ -360,7 +360,7 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                             <Map size={24} />
                         </div>
                         <div>
-                            <div style={{ color: '#FFD700', fontWeight: '900', fontSize: '16px', letterSpacing: '1px' }}>THE 2.5M PATH</div>
+                            <div style={{ color: '#FFD700', fontWeight: '900', fontSize: '16px', letterSpacing: '1px' }}>THE 5M PATH</div>
                             <div style={{ color: '#aaa', fontSize: '10px' }}>ULTIMATE PROTOCOL ACTIVATED</div>
                         </div>
                     </div>
