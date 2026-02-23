@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Server, Lock, ChevronRight, Zap, Battery, Crown, Target } from 'lucide-react';
+import { X, Server, Lock, Zap, Battery, Crown, Target, Check } from 'lucide-react';
 
 interface BoostModalProps {
     onClose: () => void;
@@ -8,7 +8,6 @@ interface BoostModalProps {
     onBuy: (type: 'multitap' | 'limit' | 'speed') => void;
 }
 
-// 🔥 CONFIGURACIÓN SINCRONIZADA CON STAKING BANK Y CAPACIDAD 🔥
 const RIG_LEVELS = [
     { lvl: 1, name: "Laptop", speed: "3.6k/h", cap: "5k Pts", staking: "24h Flash + 0% Deep", cost: "FREE", benefit: "2 Deposit Slots" },
     { lvl: 2, name: "GPU Home", speed: "7.2k/h", cap: "10k Pts", staking: "24h Flash + 0% Deep", cost: "20k", benefit: "2 Deposit Slots" },
@@ -38,7 +37,6 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                 borderRadius: '30px 30px 0 0', padding: '20px 0', maxHeight: '92vh', 
                 display: 'flex', flexDirection: 'column', boxShadow: '0 -15px 50px rgba(0,0,0,0.8)'
             }}>
-                {/* Header */}
                 <div style={{ padding: '0 25px 20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <h2 style={{ margin: 0, color: '#fff', fontSize: '20px', fontWeight: '900', letterSpacing: '1px' }}>HARDWARE UPGRADES</h2>
@@ -47,7 +45,6 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                     <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', borderRadius: '50%', padding: '8px' }}><X size={18} /></button>
                 </div>
 
-                {/* Scroll de Rigs */}
                 <div style={{ overflowY: 'auto', padding: '0 20px 40px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     {RIG_LEVELS.map((rig) => {
                         const isCurrent = rig.lvl === currentLvl;
@@ -66,25 +63,21 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                                 padding: '20px 16px',
                                 minHeight: '110px',
                                 border: isCurrent ? '1.5px solid #00F2FE' : (isNext ? '1.5px solid #FFD700' : '1px solid #1a1a1a'),
-                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                                opacity: isLocked ? 0.4 : 1,
-                                filter: isLocked ? 'grayscale(0.8)' : 'none',
-                                boxShadow: isNext ? '0 0 15px rgba(255, 215, 0, 0.1)' : 'none',
+                                transition: 'all 0.4s ease',
+                                opacity: isLocked ? 0.6 : 1,
                                 display: 'flex',
                                 alignItems: 'center'
                             }}>
-                                {/* Badge de Estado */}
                                 <div style={{ 
                                     position: 'absolute', top: -10, right: 15, 
                                     background: isCurrent ? '#00F2FE' : (isPast ? '#4CAF50' : (isNext ? '#FFD700' : '#222')),
                                     color: '#000', fontSize: '8px', fontWeight: '900', padding: '3px 12px', borderRadius: '20px',
                                     letterSpacing: '0.5px', boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
                                 }}>
-                                    {isCurrent ? 'CURRENT RIG' : (isPast ? 'MASTERED' : (isNext ? 'NEXT TARGET' : 'LOCKED'))}
+                                    {isCurrent ? 'CURRENT GEAR' : (isPast ? 'MASTERED' : (isNext ? 'NEXT TARGET' : 'LOCKED'))}
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center', width: '100%' }}>
-                                    {/* Icono Principal */}
                                     <div style={{
                                         width: '48px', height: '48px', borderRadius: '12px',
                                         background: isCurrent ? 'rgba(0, 242, 254, 0.1)' : (isNext ? 'rgba(255, 215, 0, 0.1)' : 'rgba(255,255,255,0.03)'),
@@ -107,7 +100,7 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                 <Battery size={10} color={isCurrent ? "#4CAF50" : "#555"} />
-                                                <span style={{ fontSize: '10px', color: '#ccc' }}>Limit: {rig.cap}</span>
+                                                <span style={{ fontSize: '10px', color: '#ccc' }}>Cap: {rig.cap}</span>
                                             </div>
                                         </div>
 
@@ -125,51 +118,40 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                                         </div>
                                     </div>
 
-                                    {/* 🔥 BOTÓN DE UPGRADE CORREGIDO Y BRILLANTE 🔥 */}
-                                    {isNext && (
-                                        <button 
-                                            onClick={() => onBuy('limit')}
-                                            disabled={!canAfford}
-                                            style={{
-                                                padding: '10px 12px',
-                                                borderRadius: '10px',
-                                                border: canAfford ? '1px solid #FFF' : '1px solid #333',
-                                                // Gradiente mucho más brillante (Dorado Real)
-                                                background: canAfford 
-                                                    ? 'linear-gradient(180deg, #FFE873 0%, #FFD700 50%, #B8860B 100%)' 
-                                                    : '#1a1a1a',
-                                                color: '#000',
-                                                fontWeight: '900',
-                                                fontSize: '11px',
-                                                // Glow exterior para que resalte en el fondo oscuro
-                                                boxShadow: canAfford 
-                                                    ? '0 0 20px rgba(255, 215, 0, 0.5), inset 0 0 5px rgba(255,255,255,0.8)' 
-                                                    : 'none',
-                                                cursor: canAfford ? 'pointer' : 'not-allowed',
-                                                flexShrink: 0,
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                minWidth: '85px'
-                                            }}
-                                        >
-                                            <span style={{fontSize: '10px', lineHeight: '1'}}>UPGRADE</span>
-                                            <span style={{ 
-                                                fontSize: '9px', 
-                                                marginTop: '2px', 
-                                                background: 'rgba(0,0,0,0.15)', 
-                                                padding: '1px 4px', 
-                                                borderRadius: '4px',
-                                                fontWeight: '800'
-                                            }}>
-                                                {rig.cost}
-                                            </span>
-                                        </button>
-                                    )}
-                                    
-                                    {isLocked && <Lock size={16} color="#222" style={{flexShrink:0}} />}
-                                    {isPast && <ChevronRight size={16} color="#222" style={{flexShrink:0}} />}
+                                    {/* 🔥 SECCIÓN DE BOTÓN DINÁMICO (COSTOS SIEMPRE VISIBLES) 🔥 */}
+                                    <div style={{ flexShrink: 0, minWidth: '90px', display: 'flex', justifyContent: 'center' }}>
+                                        {isPast ? (
+                                            <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(76, 175, 80, 0.1)', border: '1px solid #4CAF50', color: '#4CAF50', fontSize: '10px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Check size={12} /> OWNED
+                                            </div>
+                                        ) : isCurrent ? (
+                                            <div style={{ padding: '8px 12px', borderRadius: '10px', background: 'rgba(0, 242, 254, 0.1)', border: '1px solid #00F2FE', color: '#00F2FE', fontSize: '10px', fontWeight: '900' }}>
+                                                ACTIVE
+                                            </div>
+                                        ) : isNext ? (
+                                            <button 
+                                                onClick={() => onBuy('limit')}
+                                                disabled={!canAfford}
+                                                style={{
+                                                    padding: '10px 12px', borderRadius: '10px',
+                                                    border: canAfford ? '1px solid #FFF' : '1px solid #333',
+                                                    background: canAfford ? 'linear-gradient(180deg, #FFE873 0%, #FFD700 50%, #B8860B 100%)' : '#1a1a1a',
+                                                    color: '#000', fontWeight: '900', fontSize: '10px',
+                                                    boxShadow: canAfford ? '0 0 20px rgba(255, 215, 0, 0.4)' : 'none',
+                                                    cursor: canAfford ? 'pointer' : 'not-allowed',
+                                                    display: 'flex', flexDirection: 'column', alignItems: 'center'
+                                                }}
+                                            >
+                                                <span>UPGRADE</span>
+                                                <span style={{ fontSize: '9px', marginTop: '2px', background: 'rgba(0,0,0,0.1)', padding: '1px 4px', borderRadius: '4px' }}>{rig.cost}</span>
+                                            </button>
+                                        ) : (
+                                            <div style={{ padding: '10px 12px', borderRadius: '10px', background: '#111', border: '1px solid #222', color: '#444', fontSize: '10px', fontWeight: '900', display: 'flex', flexDirection: 'column', alignItems: 'center', opacity: 0.8 }}>
+                                                <Lock size={12} style={{marginBottom: '2px'}} />
+                                                <span>{rig.cost}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
