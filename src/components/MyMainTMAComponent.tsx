@@ -58,16 +58,31 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const isEliteMode = globalLevel >= 6 && globalLevel < 8; 
     const isBasicMode = globalLevel < 6; 
 
-    // 🔥 NUEVA FUNCIÓN: Sincronización Silenciosa al Reanudar 🔥
+    // 🔥 NUEVA FUNCIÓN: Sincronización Silenciosa y Alerta (The Welcome Back Bonus) 🔥
     const syncMiningData = useCallback(async () => {
         if (!user || claiming) return;
+        
+        // 1. Guardamos el score actual antes de hacer la consulta al backend
+        const oldScore = score;
+        
         const { data, error } = await supabase.rpc('claim_mining', { user_id_in: user.id });
+        
         if (!error && data && data[0] && data[0].success) {
-            setScore(data[0].new_score);
-            // Actualizamos la energía si el backend la devuelve
+            const newScoreFromServer = data[0].new_score;
+            // 2. Calculamos cuántos puntos mágicos se ganaron mientras estaba offline
+            const offlineProfit = newScoreFromServer - oldScore;
+
+            // 3. Momento CMO: Si ganó una cantidad decente, lo felicitamos primero
+            if (offlineProfit > 10) {
+                // Al darle OK, se ejecuta la línea de abajo y el número en pantalla sube
+                alert(`💰 YOUR RIG WAS WORKING!\n\nOffline profit generated:\n+${offlineProfit.toLocaleString()} PTS\n\nClick OK to transfer to balance.`);
+            }
+
+            // 4. Actualizamos estados (sea que hubo alerta o no)
+            setScore(newScoreFromServer);
             if (data[0].new_energy !== undefined) setEnergy(data[0].new_energy);
         }
-    }, [user, claiming, setScore, setEnergy]);
+    }, [user, claiming, score, setScore, setEnergy]);
 
     // 🔥 NUEVO EFFECT: Detecta entrada a la app y cambio de visibilidad 🔥
     useEffect(() => {
@@ -288,7 +303,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 </div>
             </div>
 
-            {/* --- 🔥 MODAL DEL MANAGER (BOT) 🔥 --- */}
+            {/* Modal Manager */}
             {showManager && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 5000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                     <div className="glass-card" style={{ width: '100%', maxWidth: '400px', border: '1px solid #00F2FE', position: 'relative', padding: '20px' }}>
