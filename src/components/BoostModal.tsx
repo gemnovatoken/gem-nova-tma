@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Server, Lock, TrendingUp, ChevronRight, Zap, Battery, Crown } from 'lucide-react';
+import { X, Server, Lock, ChevronRight, Zap, Battery, Crown, Target } from 'lucide-react';
 
 interface BoostModalProps {
     onClose: () => void;
@@ -26,34 +26,28 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
     return (
         <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(0,0,0,0.92)', zIndex: 5000,
+            background: 'rgba(0,0,0,0.94)', zIndex: 5000,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end',
-            backdropFilter: 'blur(10px)'
+            backdropFilter: 'blur(12px)'
         }}>
             <div style={{ flex: 1, width: '100%' }} onClick={onClose}></div>
 
             <div style={{
-                width: '100%', 
-                background: '#0a0a0c', 
-                borderTop: '2px solid #333',
-                borderRadius: '30px 30px 0 0', 
-                padding: '20px 0', 
-                maxHeight: '90vh', 
-                display: 'flex', 
-                flexDirection: 'column',
-                boxShadow: '0 -10px 40px rgba(0,0,0,0.5)'
+                width: '100%', background: '#08080a', borderTop: '1px solid #333',
+                borderRadius: '30px 30px 0 0', padding: '20px 0', maxHeight: '92vh', 
+                display: 'flex', flexDirection: 'column', boxShadow: '0 -15px 50px rgba(0,0,0,0.8)'
             }}>
-                {/* Header Fijo */}
+                {/* Header Estrecho */}
                 <div style={{ padding: '0 25px 20px 25px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h2 style={{ margin: 0, color: '#fff', fontSize: '22px', fontWeight: '900', letterSpacing: '1px' }}>MINING ARSENAL</h2>
-                        <div style={{ fontSize: '10px', color: '#00F2FE', fontWeight: 'bold' }}>UPGRADE YOUR RIG TO INCREASE PROFITS</div>
+                        <h2 style={{ margin: 0, color: '#fff', fontSize: '20px', fontWeight: '900', letterSpacing: '1px' }}>HARDWARE UPGRADES</h2>
+                        <div style={{ fontSize: '10px', color: '#aaa', fontWeight: 'bold' }}>EVOLVE YOUR MINING INFRASTRUCTURE</div>
                     </div>
-                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', borderRadius: '50%', padding: '8px' }}><X size={20} /></button>
+                    <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: '#fff', borderRadius: '50%', padding: '8px' }}><X size={18} /></button>
                 </div>
 
-                {/* Scroll de Progresión */}
-                <div style={{ overflowY: 'auto', padding: '0 20px 40px 20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                {/* Scroll con Diseño de Misión */}
+                <div style={{ overflowY: 'auto', padding: '0 20px 40px 20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {RIG_LEVELS.map((rig) => {
                         const isCurrent = rig.lvl === currentLvl;
                         const isPast = rig.lvl < currentLvl;
@@ -66,92 +60,85 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                         return (
                             <div key={rig.lvl} style={{
                                 position: 'relative',
-                                background: isCurrent ? 'linear-gradient(135deg, #1a1a1a 0%, #001a1d 100%)' : 'rgba(255,255,255,0.02)',
-                                borderRadius: '20px',
-                                padding: '15px',
-                                border: isCurrent ? '2px solid #00F2FE' : (isNext ? '1px solid #FFD700' : '1px solid #222'),
-                                opacity: isLocked ? 0.6 : 1,
-                                transition: 'all 0.3s ease',
-                                boxShadow: isCurrent ? '0 0 20px rgba(0, 242, 254, 0.2)' : 'none'
+                                background: isCurrent ? 'linear-gradient(135deg, #0f1718 0%, #000 100%)' : (isNext ? 'rgba(255,215,0,0.02)' : 'rgba(255,255,255,0.01)'),
+                                borderRadius: '18px',
+                                padding: '16px',
+                                border: isCurrent ? '1.5px solid #00F2FE' : (isNext ? '1.5px solid #FFD700' : '1px solid #1a1a1a'),
+                                transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                                opacity: isLocked ? 0.4 : 1,
+                                filter: isLocked ? 'grayscale(0.8)' : 'none',
+                                boxShadow: isNext ? '0 0 15px rgba(255, 215, 0, 0.1)' : 'none'
                             }}>
-                                {/* Badge de Estado */}
+                                {/* Badge de Estado Dinámico */}
                                 <div style={{ 
-                                    position: 'absolute', top: -8, right: 20, 
-                                    background: isCurrent ? '#00F2FE' : (isPast ? '#4CAF50' : (isNext ? '#FFD700' : '#333')),
-                                    color: '#000', fontSize: '9px', fontWeight: '900', padding: '2px 10px', borderRadius: '10px'
+                                    position: 'absolute', top: -10, right: 15, 
+                                    background: isCurrent ? '#00F2FE' : (isPast ? '#4CAF50' : (isNext ? '#FFD700' : '#222')),
+                                    color: '#000', fontSize: '8px', fontWeight: '900', padding: '3px 12px', borderRadius: '20px',
+                                    letterSpacing: '0.5px', boxShadow: '0 2px 5px rgba(0,0,0,0.5)'
                                 }}>
-                                    {isCurrent ? 'ACTIVE RIG' : (isPast ? 'SUPERSEDED' : (isNext ? 'AVAILABLE' : 'LOCKED'))}
+                                    {isCurrent ? 'CURRENT RIG' : (isPast ? 'MASTERED' : (isNext ? 'NEXT TARGET' : 'LOCKED'))}
                                 </div>
 
                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                                    {/* Icono de Nivel con Línea de Progresión */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                        <div style={{
-                                            width: '45px', height: '45px', borderRadius: '12px',
-                                            background: isCurrent ? 'rgba(0, 242, 254, 0.1)' : 'rgba(255,255,255,0.05)',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            border: isCurrent ? '1px solid #00F2FE' : '1px solid #333'
-                                        }}>
-                                            {isPast ? <Crown size={20} color="#4CAF50" /> : <Server size={20} color={isCurrent ? "#00F2FE" : "#666"} />}
-                                        </div>
-                                        <div style={{ fontSize: '12px', fontWeight: '900', color: isCurrent ? '#00F2FE' : '#444', marginTop: '5px' }}>L{rig.lvl}</div>
+                                    {/* Icono Principal */}
+                                    <div style={{
+                                        width: '42px', height: '42px', borderRadius: '10px',
+                                        background: isCurrent ? 'rgba(0, 242, 254, 0.1)' : (isNext ? 'rgba(255, 215, 0, 0.1)' : 'rgba(255,255,255,0.03)'),
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        border: '1px solid rgba(255,255,255,0.05)'
+                                    }}>
+                                        {isPast ? <Crown size={18} color="#4CAF50" /> : (isNext ? <Target size={18} color="#FFD700" /> : <Server size={18} color={isCurrent ? "#00F2FE" : "#444"} />)}
                                     </div>
 
-                                    {/* Información del Rig */}
                                     <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '18px', fontWeight: 'bold', color: isPast ? '#666' : '#fff' }}>{rig.name}</div>
+                                        <div style={{ fontSize: '16px', fontWeight: '800', color: isPast ? '#666' : '#fff' }}>{rig.name} <span style={{fontSize:'10px', color: '#444', marginLeft:'5px'}}>LVL {rig.lvl}</span></div>
                                         
-                                        <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+                                        <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <Zap size={10} color="#00F2FE" />
-                                                <span style={{ fontSize: '11px', color: '#aaa' }}>{rig.speed}</span>
+                                                <Zap size={10} color={isCurrent ? "#00F2FE" : "#555"} />
+                                                <span style={{ fontSize: '10px', color: '#888' }}>{rig.speed}</span>
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <Battery size={10} color="#4CAF50" />
-                                                <span style={{ fontSize: '11px', color: '#aaa' }}>{rig.cap}</span>
-                                            </div>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                <TrendingUp size={10} color="#E040FB" />
-                                                <span style={{ fontSize: '11px', color: '#aaa' }}>{rig.staking}</span>
+                                                <Battery size={10} color={isCurrent ? "#4CAF50" : "#555"} />
+                                                <span style={{ fontSize: '10px', color: '#888' }}>{rig.cap}</span>
                                             </div>
                                         </div>
 
                                         {rig.benefit && (
                                             <div style={{ 
-                                                marginTop: '10px', fontSize: '10px', color: isCurrent || isNext ? '#FFD700' : '#444', 
-                                                display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 'bold' 
+                                                marginTop: '8px', fontSize: '9px', color: isNext ? '#FFD700' : (isCurrent ? '#00F2FE' : '#444'), 
+                                                display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 'bold' 
                                             }}>
-                                                <Zap size={12} fill="currentColor" /> {rig.benefit}
+                                                <div style={{width: '4px', height: '4px', borderRadius: '50%', background: 'currentColor'}}></div>
+                                                {rig.benefit}
                                             </div>
                                         )}
                                     </div>
 
-                                    {/* Acciones */}
+                                    {/* Botón de Acción Especializado */}
                                     {isNext && (
                                         <button 
                                             onClick={() => onBuy('limit')}
                                             disabled={!canAfford}
                                             style={{
-                                                padding: '10px 15px',
+                                                padding: '10px 14px',
                                                 borderRadius: '12px',
                                                 border: 'none',
-                                                background: canAfford ? '#FFD700' : '#222',
+                                                background: canAfford ? 'linear-gradient(to bottom, #FFD700, #b8860b)' : '#1a1a1a',
                                                 color: '#000',
                                                 fontWeight: '900',
                                                 fontSize: '11px',
-                                                cursor: canAfford ? 'pointer' : 'not-allowed',
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                alignItems: 'center'
+                                                boxShadow: canAfford ? '0 4px 15px rgba(218, 165, 32, 0.4)' : 'none',
+                                                cursor: canAfford ? 'pointer' : 'not-allowed'
                                             }}
                                         >
-                                            <span>UPGRADE</span>
-                                            <span style={{ fontSize: '8px', opacity: 0.7 }}>{rig.cost}</span>
+                                            <div style={{fontSize: '10px'}}>UPGRADE</div>
+                                            <div style={{ fontSize: '8px', opacity: 0.8 }}>{rig.cost}</div>
                                         </button>
                                     )}
                                     
-                                    {isLocked && <Lock size={20} color="#333" />}
-                                    {isPast && <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#4CAF50', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ChevronRight size={14} color="#000" /></div>}
+                                    {isLocked && <Lock size={16} color="#222" />}
+                                    {isPast && <ChevronRight size={16} color="#222" />}
                                 </div>
                             </div>
                         );
