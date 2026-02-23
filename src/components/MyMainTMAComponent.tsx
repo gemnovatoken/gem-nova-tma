@@ -5,7 +5,7 @@ import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
 // CORRECCIÓN: Se eliminó 'Flame' de los imports porque no se usaba
-import { Zap, Gamepad2, Rocket, Bot, Video, Server } from 'lucide-react';
+import { Zap, Gamepad2, Rocket, Bot, Video, Server, X, BatteryCharging, ShieldCheck } from 'lucide-react';
 import type { SetStateAction, Dispatch } from 'react';
 
 interface GameProps {
@@ -42,6 +42,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const [showRanking, setShowRanking] = useState(false);
     const [showLucky, setShowLucky] = useState(false);
     const [showBoosts, setShowBoosts] = useState(false);
+    const [showManager, setShowManager] = useState(false); // 🔥 NUEVO ESTADO PARA EL MODAL DEL MANAGER
     const [loading, setLoading] = useState(false);
     const [claiming, setClaiming] = useState(false);
     
@@ -53,8 +54,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         score, setScore, energy, setEnergy, levels, setLevels, 
         maxEnergy, regenRate, botTime, setBotTime, 
         adsWatched, setAdsWatched, 
-        setOverclockTime, 
-        overclockTime     
+        setOverclockTime, overclockTime     
     } = props;
 
     const globalLevel = levels.limit; 
@@ -94,7 +94,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         setTimeout(() => setIsPressed(false), 100);
 
         // 3. Números Flotantes
-        // Obtenemos coordenadas del toque o click
         let clientX, clientY;
         if ('changedTouches' in e) {
             clientX = e.changedTouches[0].clientX;
@@ -131,71 +130,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             return () => clearTimeout(t);
         }
     }, [botTime, energy, maxEnergy, handleClaim]);
-
-    // --- FUNCIÓN PARA ACTIVAR BOT ---
-    const activateBot = async (duration: number) => {
-        if (!user) return;
-        setBotTime(prev => prev + duration); 
-        await supabase.rpc('activate_bot', { user_id_in: user.id, duration_seconds: duration });
-    };
-
-    const handleBotClick = async () => {
-        if (botTime > 0) { 
-            const hrs = Math.floor(botTime / 3600);
-            const mins = Math.floor((botTime % 3600) / 60);
-            alert(`🤖 Supervisor Active: ${hrs}h ${mins}m remaining.`); 
-            return; 
-        }
-
-        if (isGodMode) {
-            if(window.confirm("🌌 QUANTUM SUPERVISOR\n\nActivate for 5 DAYS (120 Hours)?")) {
-                await activateBot(432000); 
-                alert("✅ Bot deployed for 5 days.");
-            }
-            return;
-        }
-
-        if (isEliteMode) {
-            if(window.confirm("🌋 ELITE SUPERVISOR\n\nActivate for 2 DAYS (48 Hours)?")) {
-                await activateBot(172800); 
-                alert("✅ Bot deployed for 48 hours.");
-            }
-            return;
-        }
-
-        if (isBasicMode) {
-            if (adsWatched >= 2) {
-                alert("🛑 Daily Limit Reached (2/2)\n\nUpgrade to Level 6 to remove limits and ads!");
-                return;
-            }
-
-            if(window.confirm(`📺 Hire Supervisor for 30m?\n\nWatch Ad (${2 - adsWatched} left today)`)) {
-                console.log("Watching Ad...");
-                if (!user) return;
-                
-                const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
-                
-                if (error) {
-                    console.error("Supabase Error:", error);
-                    alert("SYSTEM ERROR:\n" + error.message); 
-                } 
-                else if (data && data[0] && data[0].success) {
-                    await supabase.from('game_logs').insert({
-                        user_id: user.id,
-                        event_type: 'video_bot',
-                        metadata: { source: 'bot_supervisor' } 
-                    });
-
-                    setAdsWatched(data[0].new_count); 
-                    activateBot(1800); 
-                    alert("✅ Bot Activated for 30m!");
-                } 
-                else {
-                    alert(data?.[0]?.message || "Unknown error occurred.");
-                }
-            }
-        }
-    };
 
     // --- 🔥 WATCH VIDEO (AHORA CON SMART FILL 🧠💰) ---
     const watchVideo = useCallback(async (type: 'turbo' | 'refill') => {
@@ -261,16 +195,45 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
     const getBotLabel = () => {
         if (botTime > 0) return "ACTIVE";
-        if (isGodMode) return "5 DAYS";
-        if (isEliteMode) return "48 HRS";
-        return adsWatched >= 2 ? "LIMIT" : "30 MIN";
+        return "OFFLINE";
     };
 
     const getBotColor = () => {
         if (botTime > 0) return "#4CAF50"; 
-        if (isGodMode || isEliteMode) return "#FFD700"; 
-        if (adsWatched >= 2) return "#333"; 
-        return "#fff"; 
+        return "#FF512F"; 
+    };
+
+    // 🔥 NUEVAS FUNCIONES PARA EL MANAGER 🔥
+    const handleWatchBotAd = async (hours: number) => {
+        if (!user) return;
+        setLoading(true);
+        // Simulamos la llamada a ver el anuncio
+        const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
+        if (!error && data && data[0].success) {
+            setAdsWatched(data[0].new_count); 
+            const durationSeconds = hours * 3600;
+            setBotTime(prev => prev + durationSeconds);
+            await supabase.rpc('activate_bot', { user_id_in: user.id, duration_seconds: durationSeconds });
+            alert(`✅ Ad Verified! Bot active for ${hours} Hours.`);
+            setShowManager(false);
+        } else {
+            alert(error?.message || data?.[0]?.message || "Error watching ad.");
+        }
+        setLoading(false);
+    };
+
+    const handleBuyPremiumBot = async (tonAmount: number, days: number) => {
+        if (!user) return;
+        const confirmBuy = window.confirm(`💎 PREMIUM CONTRACT\n\nPay ${tonAmount} TON for ${days} Days of Bot Service?`);
+        if(!confirmBuy) return;
+        
+        setLoading(true);
+        // AQUÍ IRÁ LA LÓGICA DE TON CONNECT CUANDO LA TENGAMOS. POR AHORA SIMULAMOS:
+        setTimeout(() => {
+            alert(`🎉 PAYMENT SUCCESSFUL!\n\nBot Premium activated for ${days} days.`);
+            setShowManager(false);
+            setLoading(false);
+        }, 1500);
     };
 
     return (
@@ -326,19 +289,13 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
                 {/* 3. BOTÓN CENTRAL CON INTERACCIÓN */}
                 <button 
-                    // Cambiamos el onClick por onTouchStart/MouseDown para mejor respuesta
-                    onTouchStart={handleTapWithJuice}
-                    onMouseDown={handleTapWithJuice} 
-                    disabled={energy < 1}
+                    onTouchStart={handleTapWithJuice} onMouseDown={handleTapWithJuice} disabled={energy < 1}
                     style={{
                         width: '170px', height: '170px', borderRadius: '50%', zIndex: 2, border: 'none',
-                        // Gradiente más vivo
                         background: claiming ? '#fff' : `radial-gradient(circle at 30% 30%, ${ringColor}, #050505)`,
-                        boxShadow: `0 0 ${fillPercent/2}px ${ringColor}`, 
-                        cursor: 'pointer', 
-                        // 🔥 APLICA LA ANIMACIÓN DE REBOTE AQUÍ
+                        boxShadow: `0 0 ${fillPercent/2}px ${ringColor}`, cursor: 'pointer', 
                         transform: isPressed ? 'scale(0.92)' : (claiming ? 'scale(0.95)' : 'scale(1)'), 
-                        transition: 'transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)', // Efecto resorte
+                        transition: 'transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
                         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
                     }}
                 >
@@ -349,22 +306,11 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                             <div style={{fontSize:'24px', filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))'}}>
                                 {(overclockTime && overclockTime > 0) ? '🔥' : (fillPercent >= 100 ? '⚠️' : '⚡')}
                             </div>
-                            
-                            <div style={{fontSize:'18px', fontWeight:'900', color:'#fff', textShadow:'0 0 5px #000'}}>
-                                +{Math.floor(energy)}
-                            </div>
-
+                            <div style={{fontSize:'18px', fontWeight:'900', color:'#fff', textShadow:'0 0 5px #000'}}>+{Math.floor(energy)}</div>
                             {(overclockTime && overclockTime > 0) ? (
-                                <div style={{
-                                    color: '#FF0055', fontWeight: '900', fontSize: '14px', marginTop: '2px',
-                                    animation: 'pulse 0.8s infinite alternate' 
-                                }}>
-                                    TURBO {overclockTime}s
-                                </div>
+                                <div style={{ color: '#FF0055', fontWeight: '900', fontSize: '14px', marginTop: '2px', animation: 'pulse 0.8s infinite alternate' }}>TURBO {overclockTime}s</div>
                             ) : (
-                                <div style={{fontSize:'8px', color:'rgba(255,255,255,0.8)', marginTop:'2px'}}>
-                                    {fillPercent.toFixed(0)}% FULL
-                                </div>
+                                <div style={{fontSize:'8px', color:'rgba(255,255,255,0.8)', marginTop:'2px'}}>{fillPercent.toFixed(0)}% FULL</div>
                             )}
                         </>
                     )}
@@ -372,19 +318,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
                 {/* 4. VISUALIZADOR DE CLICKS (Floating Numbers) */}
                 {clickEffects.map((effect) => (
-                    <div key={effect.id} style={{
-                        position: 'fixed', // Fixed para evitar problemas con transformaciones padres
-                        left: effect.x,
-                        top: effect.y,
-                        pointerEvents: 'none',
-                        zIndex: 100,
-                        color: ringColor, // Del color de la energía
-                        fontWeight: '900',
-                        fontSize: '24px',
-                        textShadow: '0 0 10px rgba(0,0,0,0.8)',
-                        animation: 'floatUp 0.8s ease-out forwards', // Animación CSS
-                        transform: 'translate(-50%, -50%)'
-                    }}>
+                    <div key={effect.id} style={{ position: 'fixed', left: effect.x, top: effect.y, pointerEvents: 'none', zIndex: 100, color: ringColor, fontWeight: '900', fontSize: '24px', textShadow: '0 0 10px rgba(0,0,0,0.8)', animation: 'floatUp 0.8s ease-out forwards', transform: 'translate(-50%, -50%)' }}>
                         +{effect.value}
                     </div>
                 ))}
@@ -393,70 +327,144 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             {/* STATUS BAR & DOCK */}
             <div style={{ width: '100%', padding: '0 15px', zIndex: 10 }}>
                 <div style={{ marginBottom:'2px', display:'flex', justifyContent:'center', fontSize:'9px', color: ringColor, fontWeight:'bold' }}>
-                    <span>
-                        PRODUCTION: {(overclockTime && overclockTime > 0) ? (regenRate * 3600 * 2) : (regenRate * 3600)} PTS/HOUR
-                    </span>
+                    <span>PRODUCTION: {(overclockTime && overclockTime > 0) ? (regenRate * 3600 * 2) : (regenRate * 3600)} PTS/HOUR</span>
                 </div>
 
-                <div className="glass-card" style={{ 
-                    padding: '6px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', 
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    display: 'flex', flexDirection: 'column', gap:'5px'
-                }}>
+                <div className="glass-card" style={{ padding: '6px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap:'5px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '5px' }}>
                         <DockButton icon={<Rocket/>} label="UPGRADE" color="#00F2FE" onClick={() => setShowBoosts(true)} />
                         <DockButton 
                             icon={<Bot/>} label="MANAGER" sub={getBotLabel()} color={getBotColor()} 
-                            onClick={handleBotClick} 
+                            onClick={() => setShowManager(true)} 
                         />
                         <DockButton icon={<Zap/>} label="OVERCLOCK" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
                         <DockButton icon={<Video/>} label="INSTA-FILL" sub="AD" color="#4CAF50" onClick={() => watchVideo('refill')} />
                     </div>
 
-                    <button onClick={() => setShowLucky(true)} style={{
-                        width:'100%', padding:'6px', borderRadius:'10px', border:'1px solid #E040FB', 
-                        background:'rgba(224, 64, 251, 0.15)', color:'#fff', cursor:'pointer',
-                        display:'flex', justifyContent:'center', alignItems:'center', gap:'6px'
-                    }}>
+                    <button onClick={() => setShowLucky(true)} style={{ width:'100%', padding:'6px', borderRadius:'10px', border:'1px solid #E040FB', background:'rgba(224, 64, 251, 0.15)', color:'#fff', cursor:'pointer', display:'flex', justifyContent:'center', alignItems:'center', gap:'6px' }}>
                         <Gamepad2 size={14} color="#E040FB"/> 
                         <span style={{fontSize:'10px', fontWeight:'bold'}}>CASINO SPIN</span>
                     </button>
                 </div>
             </div>
 
+            {/* --- 🔥 NUEVO MODAL DEL MANAGER (BOT) 🔥 --- */}
+            {showManager && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 5000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <div className="glass-card" style={{ width: '100%', maxWidth: '400px', border: '1px solid #00F2FE', position: 'relative', padding: '20px' }}>
+                        <button onClick={() => setShowManager(false)} style={{ position: 'absolute', top: 15, right: 15, background: 'none', border: 'none', color: '#fff' }}><X /></button>
+                        
+                        <div style={{textAlign: 'center', marginBottom: '20px'}}>
+                            <Bot size={40} color="#00F2FE" style={{marginBottom: '10px'}}/>
+                            <h2 style={{margin: 0, color: '#fff', fontSize: '20px', letterSpacing: '1px'}}>AUTO-MINER BOT</h2>
+                            <p style={{color: '#aaa', fontSize: '12px', margin: '5px 0 0 0'}}>Let the system work while you sleep.</p>
+                        </div>
+
+                        {/* RENDERIZADO CONDICIONAL POR NIVELES */}
+                        {isBasicMode && (
+                            <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
+                                <div style={{background:'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'12px', border:'1px solid #333'}}>
+                                    <div style={{fontSize:'14px', fontWeight:'bold', color:'#fff', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}>
+                                        <span>Basic Contract</span>
+                                        <span style={{color:'#00F2FE'}}>4 Hours</span>
+                                    </div>
+                                    <div style={{fontSize:'11px', color:'#aaa', marginBottom:'15px'}}>Watch an ad to activate. Max 2 per day.</div>
+                                    <button onClick={() => handleWatchBotAd(4)} disabled={adsWatched >= 2 || loading} className="btn-neon" style={{width:'100%', background:'transparent', border:'1px solid #00F2FE', color:'#00F2FE'}}>
+                                        {adsWatched >= 2 ? 'LIMIT REACHED (2/2)' : `WATCH AD (${adsWatched}/2)`} <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/>
+                                    </button>
+                                </div>
+
+                                <div style={{background:'rgba(255,215,0,0.1)', padding:'15px', borderRadius:'12px', border:'1px solid #FFD700'}}>
+                                    <div style={{fontSize:'14px', fontWeight:'bold', color:'#FFD700', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}>
+                                        <span>Premium Bypass</span>
+                                        <span>48 Hours</span>
+                                    </div>
+                                    <div style={{fontSize:'11px', color:'#ccc', marginBottom:'15px'}}>No ads. Non-stop mining for 2 full days.</div>
+                                    <button onClick={() => handleBuyPremiumBot(0.15, 2)} disabled={loading} className="btn-neon" style={{width:'100%', background:'#FFD700', color:'#000', border:'none'}}>
+                                        PAY 0.15 TON
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {isEliteMode && (
+                            <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
+                                <div style={{background:'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'12px', border:'1px solid #333'}}>
+                                    <div style={{fontSize:'14px', fontWeight:'bold', color:'#fff', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}>
+                                        <span>Elite Contract</span>
+                                        <span style={{color:'#00F2FE'}}>24 Hours</span>
+                                    </div>
+                                    <div style={{fontSize:'11px', color:'#aaa', marginBottom:'15px'}}>Watch a quick sponsor ad to activate your free daily bot.</div>
+                                    <button onClick={() => handleWatchBotAd(24)} disabled={loading} className="btn-neon" style={{width:'100%', background:'transparent', border:'1px solid #00F2FE', color:'#00F2FE'}}>
+                                        WATCH 1 AD <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/>
+                                    </button>
+                                </div>
+
+                                <div style={{background:'rgba(255,215,0,0.1)', padding:'15px', borderRadius:'12px', border:'1px solid #FFD700'}}>
+                                    <div style={{fontSize:'14px', fontWeight:'bold', color:'#FFD700', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}>
+                                        <span>Elite Weekly Pass</span>
+                                        <span>6 Days</span>
+                                    </div>
+                                    <div style={{fontSize:'11px', color:'#ccc', marginBottom:'15px'}}><BatteryCharging size={12} style={{verticalAlign:'middle'}}/> Requires tap to reload every 3 days.</div>
+                                    <button onClick={() => handleBuyPremiumBot(0.20, 6)} disabled={loading} className="btn-neon" style={{width:'100%', background:'#FFD700', color:'#000', border:'none'}}>
+                                        PAY 0.20 TON
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {isGodMode && (
+                            <div style={{display:'flex', flexDirection:'column', gap:'15px'}}>
+                                <div style={{background:'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'12px', border:'1px solid #333'}}>
+                                    <div style={{fontSize:'14px', fontWeight:'bold', color:'#fff', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}>
+                                        <span>Quantum Contract</span>
+                                        <span style={{color:'#00F2FE'}}>3 Days (72h)</span>
+                                    </div>
+                                    <div style={{fontSize:'11px', color:'#aaa', marginBottom:'15px'}}>Whale perk: 1 ad gives you 3 full days of mining.</div>
+                                    <button onClick={() => handleWatchBotAd(72)} disabled={loading} className="btn-neon" style={{width:'100%', background:'transparent', border:'1px solid #00F2FE', color:'#00F2FE'}}>
+                                        WATCH 1 AD <Video size={14} style={{marginLeft:'5px', verticalAlign:'middle'}}/>
+                                    </button>
+                                </div>
+
+                                <div style={{background:'rgba(224, 64, 251, 0.15)', padding:'15px', borderRadius:'12px', border:'1px solid #E040FB'}}>
+                                    <div style={{fontSize:'14px', fontWeight:'bold', color:'#E040FB', marginBottom:'5px', display:'flex', justifyContent:'space-between'}}>
+                                        <span>God Mode Pass</span>
+                                        <span>15 Days</span>
+                                    </div>
+                                    <div style={{fontSize:'11px', color:'#ccc', marginBottom:'15px'}}><ShieldCheck size={12} style={{verticalAlign:'middle'}}/> Requires tap to reload every 5 days.</div>
+                                    <button onClick={() => handleBuyPremiumBot(0.30, 15)} disabled={loading} className="btn-neon" style={{width:'100%', background:'#E040FB', color:'#fff', border:'none'}}>
+                                        PAY 0.30 TON
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {botTime > 0 && (
+                            <div style={{marginTop:'20px', textAlign:'center', color:'#4CAF50', fontSize:'12px', fontWeight:'bold', background:'rgba(76, 175, 80, 0.1)', padding:'10px', borderRadius:'8px'}}>
+                                ✅ SUPERVISOR IS CURRENTLY ACTIVE
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+            
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
             {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} onUpdateScore={setScore} />}
             {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} />}
             
             <style>{`
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                @keyframes pulse { 
-                    0% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px #FF0055; } 
-                    100% { transform: scale(1.1); opacity: 0.8; text-shadow: 0 0 20px #FF0055; } 
-                }
-                @keyframes pulse-glow {
-                    0% { transform: scale(1); opacity: 0.5; border-color: rgba(0, 242, 254, 0.1); }
-                    50% { transform: scale(1.05); opacity: 0.8; border-color: rgba(0, 242, 254, 0.3); }
-                    100% { transform: scale(1); opacity: 0.5; border-color: rgba(0, 242, 254, 0.1); }
-                }
-                @keyframes floatUp {
-                    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-                    100% { transform: translate(-50%, -150px) scale(1.5); opacity: 0; }
-                }
+                @keyframes pulse { 0% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px #FF0055; } 100% { transform: scale(1.1); opacity: 0.8; text-shadow: 0 0 20px #FF0055; } }
+                @keyframes pulse-glow { 0% { transform: scale(1); opacity: 0.5; border-color: rgba(0, 242, 254, 0.1); } 50% { transform: scale(1.05); opacity: 0.8; border-color: rgba(0, 242, 254, 0.3); } 100% { transform: scale(1); opacity: 0.5; border-color: rgba(0, 242, 254, 0.1); } }
+                @keyframes floatUp { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -150px) scale(1.5); opacity: 0; } }
             `}</style>
         </div>
     );
 };
 
 const DockButton: React.FC<DockButtonProps> = ({ icon, label, sub, color, onClick }) => (
-    <button onClick={onClick} style={{ 
-        background: 'transparent', border: 'none', flex: 1, display: 'flex', flexDirection: 'column', 
-        alignItems: 'center', justifyContent: 'center', gap: '0px', cursor: 'pointer', color: color || '#fff',
-        padding: '4px 0'
-    }}>
-        {React.isValidElement(icon) 
-            ? React.cloneElement(icon as React.ReactElement<{ size: number }>, { size: 18 }) 
-            : icon}
+    <button onClick={onClick} style={{ background: 'transparent', border: 'none', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0px', cursor: 'pointer', color: color || '#fff', padding: '4px 0' }}>
+        {React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement<{ size: number }>, { size: 18 }) : icon}
         <span style={{ fontSize: '8px', fontWeight: 'bold', marginTop:'1px' }}>{label}</span>
         {sub && <span style={{ fontSize: '6px', background: '#333', padding: '0px 3px', borderRadius: '2px', color: '#aaa', marginTop:'1px' }}>{sub}</span>}
     </button>
