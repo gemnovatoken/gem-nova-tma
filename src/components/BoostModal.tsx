@@ -8,15 +8,16 @@ interface BoostModalProps {
     onBuy: (type: 'multitap' | 'limit' | 'speed') => void;
 }
 
+// 🔥 PRECIOS Y BENEFICIOS ACTUALIZADOS 🔥
 const RIG_LEVELS = [
-    { lvl: 1, name: "Laptop", speed: "100/h", cap: "2h", staking: "10k Limit", cost: "FREE", benefit: "" },
-    { lvl: 2, name: "GPU Home", speed: "500/h", cap: "3h", staking: "10k Limit", cost: "25k", benefit: "" },
-    { lvl: 3, name: "Garage Rig", speed: "1,000/h", cap: "4h", staking: "10k Limit", cost: "100k", benefit: "" },
-    { lvl: 4, name: "Server Room", speed: "2,500/h", cap: "6h", staking: "10% Cap", cost: "500k", benefit: "" },
-    { lvl: 5, name: "Industrial", speed: "3,500/h", cap: "8h", staking: "20% Cap", cost: "1.5M", benefit: "✅ NO MIN WITHDRAW" },
-    { lvl: 6, name: "Geothermal", speed: "5,000/h", cap: "24h", staking: "35% Cap", cost: "4M", benefit: "🤖 24H AUTO-MINING" },
-    { lvl: 7, name: "Fusion", speed: "10,000/h", cap: "24h", staking: "50% Cap", cost: "10M", benefit: "" },
-    { lvl: 8, name: "Quantum", speed: "20,000/h", cap: "72h", staking: "75% Cap", cost: "20M", benefit: "🏝️ 3-DAY OFFLINE MODE" },
+    { lvl: 1, name: "Laptop", speed: "100/h", cap: "2h", staking: "Locked", cost: "FREE", benefit: "" },
+    { lvl: 2, name: "GPU Home", speed: "500/h", cap: "3h", staking: "Locked", cost: "20k", benefit: "" },
+    { lvl: 3, name: "Garage Rig", speed: "1,000/h", cap: "4h", staking: "10k Limit", cost: "250k", benefit: "🔓 UNLOCK STAKING" },
+    { lvl: 4, name: "Server Room", speed: "2,500/h", cap: "6h", staking: "10% Cap", cost: "1M", benefit: "" },
+    { lvl: 5, name: "Industrial", speed: "3,500/h", cap: "8h", staking: "20% Cap", cost: "5M", benefit: "✅ NO MIN WITHDRAW" },
+    { lvl: 6, name: "Geothermal", speed: "5,000/h", cap: "24h", staking: "35% Cap", cost: "15M", benefit: "🤖 24H AUTO-MINING" },
+    { lvl: 7, name: "Fusion", speed: "10,000/h", cap: "24h", staking: "50% Cap", cost: "25M", benefit: "" },
+    { lvl: 8, name: "Quantum", speed: "20,000/h", cap: "72h", staking: "75% Cap", cost: "30M", benefit: "🏝️ 3-DAY OFFLINE MODE" },
 ];
 
 export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, onBuy }) => {
@@ -26,7 +27,8 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
     const currentRig = RIG_LEVELS[currentLvl - 1];
     const isMax = currentLvl >= 8;
 
-    const costs = [0, 25000, 100000, 500000, 1500000, 4000000, 10000000, 20000000];
+    // 🔥 MATRIZ DE COSTOS EXACTA SINCRONIZADA CON BACKEND 🔥
+    const costs = [0, 20000, 250000, 1000000, 5000000, 15000000, 25000000, 30000000];
     const upgradeCost = costs[currentLvl]; 
     const canAfford = score >= upgradeCost;
 
@@ -103,7 +105,7 @@ export const BoostModal: React.FC<BoostModalProps> = ({ onClose, levels, score, 
                             <TrendingUp size={16} color="#E040FB"/>
                             <div>
                                 <div style={{fontSize:'10px', color:'#E040FB'}}>STAKING UPGRADE</div>
-                                <div style={{color:'#fff', fontWeight:'bold', fontSize:'12px'}}>{nextRig.staking} of earnings</div>
+                                <div style={{color:'#fff', fontWeight:'bold', fontSize:'12px'}}>{nextRig.staking}</div>
                             </div>
                         </div>
 
