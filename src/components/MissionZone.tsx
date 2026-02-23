@@ -37,9 +37,8 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
 
     // Modales
     const [showPathModal, setShowPathModal] = useState(false);
-    const [showBountiesModal, setShowBountiesModal] = useState(false); // 🔥 NUEVO MODAL
+    const [showBountiesModal, setShowBountiesModal] = useState(false); 
 
-    // Mucho más limpio, solo carga lo del check-in y las monedas
     const loadData = useCallback(async () => {
         if(!user) return;
         const { data, error } = await supabase
@@ -199,7 +198,7 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
             
-            {/* MODAL DEL MILLION PATH */}
+            {/* MODALES */}
             {showPathModal && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9000, background: '#0a0a0a', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end' }}>
@@ -213,7 +212,6 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                 </div>
             )}
 
-            {/* 🔥 NUEVO MODAL DE DAILY BOUNTIES */}
             {showBountiesModal && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9000, background: '#0a0a0a', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end' }}>
@@ -263,37 +261,51 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                 )}
             </div>
 
-            {/* BANNERS DE MISIONES (Limpio y elegante) */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '35px' }}>
+            {/* 🔥 MENU DE CARTAS PRINCIPALES (GRID 2x1) 🔥 */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '35px' }}>
                 
-                {/* 1. BANNER 5M PATH */}
-                <div onClick={() => setShowPathModal(true)} className="glass-card" style={{ padding: '0', overflow: 'hidden', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)', border: '1px solid #FFD700', boxShadow: '0 0 15px rgba(255, 215, 0, 0.2)' }}>
-                    <div style={{ padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                            <div style={{ background: '#FFD700', padding: '10px', borderRadius: '12px', color: '#000' }}><Map size={24} /></div>
-                            <div>
-                                <div style={{ color: '#FFD700', fontWeight: '900', fontSize: '16px', letterSpacing: '1px' }}>THE 5M PATH</div>
-                                <div style={{ color: '#aaa', fontSize: '10px' }}>ULTIMATE PROTOCOL ACTIVATED</div>
-                            </div>
-                        </div>
-                        <Play size={20} color="#FFD700" fill="#FFD700" />
+                {/* 1. CARTA 5M PATH */}
+                <div 
+                    onClick={() => setShowPathModal(true)} 
+                    className="glass-card" 
+                    style={{ 
+                        padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                        cursor: 'pointer', background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)', 
+                        border: '1px solid #FFD700', boxShadow: '0 0 15px rgba(255, 215, 0, 0.2)', textAlign: 'center'
+                    }}
+                >
+                    <div style={{ background: '#FFD700', padding: '12px', borderRadius: '50%', color: '#000', marginBottom: '5px' }}>
+                        <Map size={28} />
                     </div>
-                    <div style={{ background: 'rgba(255, 215, 0, 0.2)', padding: '5px', textAlign: 'center', fontSize: '10px', color: '#FFD700', fontWeight: 'bold' }}>TAP TO OPEN MISSION MAP</div>
+                    <div>
+                        <div style={{ color: '#FFD700', fontWeight: '900', fontSize: '15px', letterSpacing: '1px' }}>THE 5M PATH</div>
+                        <div style={{ color: '#aaa', fontSize: '9px', marginTop: '2px' }}>ULTIMATE PROTOCOL</div>
+                    </div>
+                    <button style={{ background: 'rgba(255,215,0,0.2)', border: 'none', borderRadius: '20px', padding: '5px 15px', color: '#FFD700', fontSize: '10px', fontWeight: 'bold', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        OPEN <Play size={10} fill="#FFD700" />
+                    </button>
                 </div>
 
-                {/* 2. NUEVO BANNER DAILY BOUNTIES */}
-                <div onClick={() => setShowBountiesModal(true)} className="glass-card" style={{ padding: '0', overflow: 'hidden', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)', border: '1px solid #00F2FE', boxShadow: '0 0 15px rgba(0, 242, 254, 0.2)' }}>
-                    <div style={{ padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                            <div style={{ background: '#00F2FE', padding: '10px', borderRadius: '12px', color: '#000' }}><Tv size={24} /></div>
-                            <div>
-                                <div style={{ color: '#00F2FE', fontWeight: '900', fontSize: '16px', letterSpacing: '1px' }}>DAILY BOUNTIES</div>
-                                <div style={{ color: '#aaa', fontSize: '10px' }}>EARN POINTS EVERY 24H</div>
-                            </div>
-                        </div>
-                        <Play size={20} color="#00F2FE" fill="#00F2FE" />
+                {/* 2. CARTA DAILY BOUNTIES */}
+                <div 
+                    onClick={() => setShowBountiesModal(true)} 
+                    className="glass-card" 
+                    style={{ 
+                        padding: '15px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                        cursor: 'pointer', background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)', 
+                        border: '1px solid #00F2FE', boxShadow: '0 0 15px rgba(0, 242, 254, 0.2)', textAlign: 'center'
+                    }}
+                >
+                    <div style={{ background: '#00F2FE', padding: '12px', borderRadius: '50%', color: '#000', marginBottom: '5px' }}>
+                        <Tv size={28} />
                     </div>
-                    <div style={{ background: 'rgba(0, 242, 254, 0.2)', padding: '5px', textAlign: 'center', fontSize: '10px', color: '#00F2FE', fontWeight: 'bold' }}>TAP TO OPEN TASKS</div>
+                    <div>
+                        <div style={{ color: '#00F2FE', fontWeight: '900', fontSize: '15px', letterSpacing: '1px' }}>DAILY TASKS</div>
+                        <div style={{ color: '#aaa', fontSize: '9px', marginTop: '2px' }}>EARN POINTS EVERY 24H</div>
+                    </div>
+                    <button style={{ background: 'rgba(0, 242, 254, 0.2)', border: 'none', borderRadius: '20px', padding: '5px 15px', color: '#00F2FE', fontSize: '10px', fontWeight: 'bold', marginTop: '5px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        EARN <Play size={10} fill="#00F2FE" />
+                    </button>
                 </div>
 
             </div>
