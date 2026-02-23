@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-// 🔥 Añadimos Twitter y Youtube a las importaciones
-import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Coins, Gift, Zap, Tv, MessageCircle, Map, X, Twitter, Youtube } from 'lucide-react';
+import { Calendar, CheckCircle2, Play, Brain, Rocket, Shield, Coins, Gift, Zap, Tv, Map, X } from 'lucide-react';
 import { MemoryGame, AsteroidGame, HackerGame } from './ArcadeGames';
 import { MillionPath } from './MillionPath';
+// 🔥 IMPORTAMOS EL NUEVO COMPONENTE
+import { DailyBounties } from './DailyBounties'; 
 
 interface TransactionResponse {
     success: boolean;
@@ -25,18 +26,6 @@ interface MissionZoneProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
 
-interface CommunityTaskCardProps {
-    title: string;
-    desc: string;
-    reward: number;
-    status: 'idle' | 'pending' | 'claimed';
-    isLoading: boolean;
-    onGo: () => void;
-    onVerify: () => void;
-    icon: React.ReactNode;
-    color: string;
-}
-
 export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const [streak, setStreak] = useState(0);
@@ -46,39 +35,23 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [activeGame, setActiveGame] = useState<string | null>(null);
 
+    // Modales
     const [showPathModal, setShowPathModal] = useState(false);
+    const [showBountiesModal, setShowBountiesModal] = useState(false); // 🔥 NUEVO MODAL
 
-    // 🔥 ESTADOS ACTUALIZADOS (News, Global, Twitter, YouTube)
-    const [newsStatus, setNewsStatus] = useState<'idle' | 'pending' | 'claimed'>('idle');
-    const [globalStatus, setGlobalStatus] = useState<'idle' | 'pending' | 'claimed'>('idle');
-    const [twitterStatus, setTwitterStatus] = useState<'idle' | 'pending' | 'claimed'>('idle');
-    const [youtubeStatus, setYoutubeStatus] = useState<'idle' | 'pending' | 'claimed'>('idle');
-    const [claimingTask, setClaimingTask] = useState<string | null>(null);
-    
-    // Ref para guardar el momento exacto
-    const clickTimestamps = useRef({ news: 0, global: 0, twitter: 0, youtube: 0 });
-
+    // Mucho más limpio, solo carga lo del check-in y las monedas
     const loadData = useCallback(async () => {
         if(!user) return;
         const { data, error } = await supabase
             .from('user_score')
-            // 🔥 LEEMOS LAS NUEVAS COLUMNAS
-            .select('current_streak, last_check_in_date, arcade_coins, last_news_claim, last_global_claim, last_twitter_claim, last_youtube_claim')
+            .select('current_streak, last_check_in_date, arcade_coins')
             .eq('user_id', user.id)
             .single();
             
         if (!error && data) {
             setStreak(data.current_streak || 0);
             const today = new Date().toISOString().split('T')[0];
-            
             if (data.last_check_in_date === today) setCheckedInToday(true);
-            
-            // Si ya cobró hoy, bloqueamos el botón permanentemente hasta mañana
-            if (data.last_news_claim === today) setNewsStatus('claimed');
-            if (data.last_global_claim === today) setGlobalStatus('claimed');
-            if (data.last_twitter_claim === today) setTwitterStatus('claimed');
-            if (data.last_youtube_claim === today) setYoutubeStatus('claimed');
-            
             setCoins(data.arcade_coins ?? 0);
         }
     }, [user]);
@@ -113,65 +86,6 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
         }
     };
 
-    const handleTaskGo = (taskType: 'news' | 'global' | 'twitter' | 'youtube', url: string) => {
-        clickTimestamps.current[taskType] = Date.now();
-        
-        if (taskType === 'news') setNewsStatus('pending');
-        else if (taskType === 'global') setGlobalStatus('pending');
-        else if (taskType === 'twitter') setTwitterStatus('pending');
-        else if (taskType === 'youtube') setYoutubeStatus('pending');
-
-        // @ts-expect-error Explicacion: TypeScript no conoce WebApp
-        if (window.Telegram?.WebApp?.openTelegramLink && !url.includes('youtube.com') && !url.includes('x.com')) {
-             // @ts-expect-error Explicacion: Telegram API
-             window.Telegram.WebApp.openTelegramLink(url);
-        } else {
-             window.open(url, '_blank');
-        }
-    };
-
-    const handleTaskVerify = async (taskType: 'news' | 'global' | 'twitter' | 'youtube') => {
-        if (!user || claimingTask) return;
-
-        const timeSpentAway = Date.now() - clickTimestamps.current[taskType];
-
-        // 3 segundos anti-trampas
-        if (timeSpentAway < 3000) {
-            alert("⚠️ VERIFICATION FAILED!\n\nYou must engage with the content for at least 3 seconds to verify.");
-            return;
-        }
-
-        setClaimingTask(taskType);
-        
-        try {
-            const today = new Date().toISOString().split('T')[0];
-            let columnToUpdate = '';
-            let taskName = '';
-
-            if (taskType === 'news') { columnToUpdate = 'last_news_claim'; taskName = 'Gnova News'; }
-            else if (taskType === 'global') { columnToUpdate = 'last_global_claim'; taskName = 'Gnova Global'; }
-            else if (taskType === 'twitter') { columnToUpdate = 'last_twitter_claim'; taskName = 'X (Twitter)'; }
-            else if (taskType === 'youtube') { columnToUpdate = 'last_youtube_claim'; taskName = 'YouTube'; }
-            
-            await supabase.rpc('increment_score', { p_user_id: user.id, p_amount: 500 });
-            await supabase.from('user_score').update({ [columnToUpdate]: today }).eq('user_id', user.id);
-            
-            if (taskType === 'news') setNewsStatus('claimed');
-            else if (taskType === 'global') setGlobalStatus('claimed');
-            else if (taskType === 'twitter') setTwitterStatus('claimed');
-            else if (taskType === 'youtube') setYoutubeStatus('claimed');
-            
-            setGlobalScore(prev => prev + 500);
-            
-            if (window.navigator.vibrate) window.navigator.vibrate(200);
-            alert(`✅ VERIFIED! +500 PTS added from ${taskName}.`);
-        } catch {
-            alert("Error verifying task.");
-        } finally {
-            setClaimingTask(null);
-        }
-    };
-
     const handleWatchAdForCoins = async () => {
         if (!user || loadingAd) return;
 
@@ -194,15 +108,12 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
 
     const handlePlayGame = async (gameId: string) => {
         if (!user) return;
-        
         if (coins <= 0) {
             handleWatchAdForCoins();
             return;
         }
-
         const { data } = await supabase.rpc('spend_arcade_coin', { p_user_id: user.id });
         const result = data as TransactionResponse;
-
         if (!result || result.success === false) {
              handleWatchAdForCoins();
         } else {
@@ -288,11 +199,9 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     return (
         <div style={{ padding: '20px', paddingBottom: '100px' }}>
             
+            {/* MODAL DEL MILLION PATH */}
             {showPathModal && (
-                <div style={{
-                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9000,
-                    background: '#0a0a0a', overflowY: 'auto', display: 'flex', flexDirection: 'column'
-                }}>
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9000, background: '#0a0a0a', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
                     <div style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end' }}>
                         <button onClick={() => setShowPathModal(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer' }}>
                             <X size={24} />
@@ -304,17 +213,30 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                 </div>
             )}
 
+            {/* 🔥 NUEVO MODAL DE DAILY BOUNTIES */}
+            {showBountiesModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9000, background: '#0a0a0a', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button onClick={() => setShowBountiesModal(false)} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer' }}>
+                            <X size={24} />
+                        </button>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <DailyBounties setGlobalScore={setGlobalScore} />
+                    </div>
+                </div>
+            )}
+
             {activeGame === 'memory' && <MemoryGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
             {activeGame === 'asteroid' && <AsteroidGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
             {activeGame === 'hacker' && <HackerGame onClose={() => setActiveGame(null)} onFinish={(w, s) => handleGameFinish(w, s)} />}
 
+            {/* EXPEDITION */}
             <div style={{textAlign:'center', marginBottom:'25px'}}>
                 <h2 style={{marginTop: 0, fontSize:'28px', marginBottom:'5px', color:'#fff'}}>🗺️ Expedition</h2>
                 <div style={{display:'inline-flex', alignItems:'center', gap:'8px', background:'rgba(255,255,255,0.1)', padding:'5px 12px', borderRadius:'20px'}}>
                     <div style={{width:8, height:8, background: checkedInToday ? '#4CAF50' : '#FFD700', borderRadius:'50%', boxShadow: checkedInToday ? '0 0 5px #4CAF50' : '0 0 5px #FFD700'}}></div>
-                    <span style={{fontSize: '12px', color: '#fff', fontWeight:'bold'}}>
-                        Streak: {streak} Days
-                    </span>
+                    <span style={{fontSize: '12px', color: '#fff', fontWeight:'bold'}}>Streak: {streak} Days</span>
                 </div>
             </div>
 
@@ -330,110 +252,53 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                 
                 {!checkedInToday ? (
                     <button className="btn-neon" onClick={handleCheckIn} style={{
-                        width:'100%', marginTop:'15px', padding:'15px', fontSize:'16px',
-                        background: 'linear-gradient(90deg, #00F2FE, #0072FF)', border:'none',
-                        boxShadow: '0 0 20px rgba(0, 242, 254, 0.3)'
+                        width:'100%', marginTop:'15px', padding:'15px', fontSize:'16px', background: 'linear-gradient(90deg, #00F2FE, #0072FF)', border:'none', boxShadow: '0 0 20px rgba(0, 242, 254, 0.3)'
                     }}>
                         CLAIM DAY {streak + 1} REWARD
                     </button>
                 ) : (
-                    <div style={{
-                        textAlign:'center', fontSize:'12px', color:'#888', marginTop:'15px', 
-                        background:'rgba(255,255,255,0.05)', padding:'10px', borderRadius:'10px', border:'1px dashed #444'
-                    }}>
+                    <div style={{ textAlign:'center', fontSize:'12px', color:'#888', marginTop:'15px', background:'rgba(255,255,255,0.05)', padding:'10px', borderRadius:'10px', border:'1px dashed #444' }}>
                         ✅ Rewards claimed. Come back tomorrow.
                     </div>
                 )}
             </div>
 
-            {/* 🔥 BANNER DORADO ACTUALIZADO A 5M */}
-            <div 
-                onClick={() => setShowPathModal(true)}
-                className="glass-card"
-                style={{
-                    marginBottom: '35px', padding: '0', overflow: 'hidden', cursor: 'pointer',
-                    background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)',
-                    border: '1px solid #FFD700', boxShadow: '0 0 15px rgba(255, 215, 0, 0.2)'
-                }}
-            >
-                <div style={{ padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div style={{ background: '#FFD700', padding: '10px', borderRadius: '12px', color: '#000' }}>
-                            <Map size={24} />
-                        </div>
-                        <div>
-                            <div style={{ color: '#FFD700', fontWeight: '900', fontSize: '16px', letterSpacing: '1px' }}>THE 5M PATH</div>
-                            <div style={{ color: '#aaa', fontSize: '10px' }}>ULTIMATE PROTOCOL ACTIVATED</div>
-                        </div>
-                    </div>
-                    <Play size={20} color="#FFD700" fill="#FFD700" />
-                </div>
-                <div style={{ background: 'rgba(255, 215, 0, 0.2)', padding: '5px', textAlign: 'center', fontSize: '10px', color: '#FFD700', fontWeight: 'bold' }}>
-                    TAP TO OPEN MISSION MAP
-                </div>
-            </div>
-
-            {/* 🔥 DAILY BOUNTIES EN GRID (2x2) */}
-            <div style={{ marginBottom: '35px' }}>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'12px', borderBottom:'1px solid #333', paddingBottom:'8px' }}>
-                    <h3 style={{ fontSize:'16px', margin:0, color: '#fff' }}>📢 Daily Bounties</h3>
-                    <span style={{ fontSize:'10px', color:'#FFD700', background:'rgba(255, 215, 0, 0.1)', padding:'2px 6px', borderRadius:'4px' }}>Resets in 24h</span>
-                </div>
+            {/* BANNERS DE MISIONES (Limpio y elegante) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '35px' }}>
                 
-                {/* Contenedor Grid (2 Columnas) */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                    
-                    <CommunityTaskCard 
-                        title="TG News" 
-                        desc="@gnovaofiicialnews"
-                        reward={500} 
-                        status={newsStatus}
-                        isLoading={claimingTask === 'news'}
-                        onGo={() => handleTaskGo('news', 'https://t.me/gnovaofiicialnews')}
-                        onVerify={() => handleTaskVerify('news')}
-                        icon={<Tv size={16} color="#00F2FE"/>}
-                        color="#00F2FE"
-                    />
-                    
-                    <CommunityTaskCard 
-                        title="TG Global" 
-                        desc="@gnovaglobal"
-                        reward={500} 
-                        status={globalStatus}
-                        isLoading={claimingTask === 'global'}
-                        onGo={() => handleTaskGo('global', 'https://t.me/gnovaglobal')}
-                        onVerify={() => handleTaskVerify('global')}
-                        icon={<MessageCircle size={16} color="#E040FB"/>}
-                        color="#E040FB"
-                    />
-
-                    <CommunityTaskCard 
-                        title="X (Twitter)" 
-                        desc="@gnovatoken"
-                        reward={500} 
-                        status={twitterStatus}
-                        isLoading={claimingTask === 'twitter'}
-                        onGo={() => handleTaskGo('twitter', 'https://x.com/gnovatoken')}
-                        onVerify={() => handleTaskVerify('twitter')}
-                        icon={<Twitter size={16} color="#1DA1F2"/>}
-                        color="#1DA1F2"
-                    />
-
-                    <CommunityTaskCard 
-                        title="YouTube" 
-                        desc="Anonymous"
-                        reward={500} 
-                        status={youtubeStatus}
-                        isLoading={claimingTask === 'youtube'}
-                        onGo={() => handleTaskGo('youtube', 'https://youtube.com/')}
-                        onVerify={() => handleTaskVerify('youtube')}
-                        icon={<Youtube size={16} color="#FF0000"/>}
-                        color="#FF0000"
-                    />
-
+                {/* 1. BANNER 5M PATH */}
+                <div onClick={() => setShowPathModal(true)} className="glass-card" style={{ padding: '0', overflow: 'hidden', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(255, 215, 0, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)', border: '1px solid #FFD700', boxShadow: '0 0 15px rgba(255, 215, 0, 0.2)' }}>
+                    <div style={{ padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div style={{ background: '#FFD700', padding: '10px', borderRadius: '12px', color: '#000' }}><Map size={24} /></div>
+                            <div>
+                                <div style={{ color: '#FFD700', fontWeight: '900', fontSize: '16px', letterSpacing: '1px' }}>THE 5M PATH</div>
+                                <div style={{ color: '#aaa', fontSize: '10px' }}>ULTIMATE PROTOCOL ACTIVATED</div>
+                            </div>
+                        </div>
+                        <Play size={20} color="#FFD700" fill="#FFD700" />
+                    </div>
+                    <div style={{ background: 'rgba(255, 215, 0, 0.2)', padding: '5px', textAlign: 'center', fontSize: '10px', color: '#FFD700', fontWeight: 'bold' }}>TAP TO OPEN MISSION MAP</div>
                 </div>
+
+                {/* 2. NUEVO BANNER DAILY BOUNTIES */}
+                <div onClick={() => setShowBountiesModal(true)} className="glass-card" style={{ padding: '0', overflow: 'hidden', cursor: 'pointer', background: 'linear-gradient(135deg, rgba(0, 242, 254, 0.1) 0%, rgba(0, 0, 0, 0.8) 100%)', border: '1px solid #00F2FE', boxShadow: '0 0 15px rgba(0, 242, 254, 0.2)' }}>
+                    <div style={{ padding: '15px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <div style={{ background: '#00F2FE', padding: '10px', borderRadius: '12px', color: '#000' }}><Tv size={24} /></div>
+                            <div>
+                                <div style={{ color: '#00F2FE', fontWeight: '900', fontSize: '16px', letterSpacing: '1px' }}>DAILY BOUNTIES</div>
+                                <div style={{ color: '#aaa', fontSize: '10px' }}>EARN POINTS EVERY 24H</div>
+                            </div>
+                        </div>
+                        <Play size={20} color="#00F2FE" fill="#00F2FE" />
+                    </div>
+                    <div style={{ background: 'rgba(0, 242, 254, 0.2)', padding: '5px', textAlign: 'center', fontSize: '10px', color: '#00F2FE', fontWeight: 'bold' }}>TAP TO OPEN TASKS</div>
+                </div>
+
             </div>
 
+            {/* ARCADE ZONE */}
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'15px', borderBottom:'1px solid #333', paddingBottom:'10px' }}>
                 <h3 style={{ fontSize:'18px', margin:0 }}>🕹️ Arcade Zone</h3>
                 <div style={{ display:'flex', alignItems:'center', gap:'6px', background:'#111', padding:'6px 12px', borderRadius:'20px', border:'1px solid #333' }}>
@@ -461,8 +326,6 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     );
 };
 
-// --- COMPONENTES AUXILIARES ---
-
 const GameCard: React.FC<GameCardProps> = ({ title, desc, reward, icon, color, onPlay }) => (
     <div className="glass-card" style={{ 
         display:'flex', alignItems:'center', justifyContent:'space-between', padding:'15px', 
@@ -488,57 +351,3 @@ const GameCard: React.FC<GameCardProps> = ({ title, desc, reward, icon, color, o
         </div>
     </div>
 );
-
-// 🔥 MODIFICADO PARA GRID: Ajusté los paddings y tamaños para que quepa bien en 2 columnas
-const CommunityTaskCard: React.FC<CommunityTaskCardProps> = ({ title, desc, reward, status, isLoading, onGo, onVerify, icon, color }) => {
-    
-    const renderButton = () => {
-        if (isLoading) {
-            return <button disabled style={btnStyle('#555', 'transparent', '#555')}>...</button>;
-        }
-        if (status === 'claimed') {
-            return <button disabled style={btnStyle('#4CAF50', 'transparent', '#4CAF50')}>DONE</button>;
-        }
-        if (status === 'pending') {
-            return (
-                <button onClick={onVerify} className="btn-neon" style={btnStyle('#000', '#00F2FE', 'none', '0 0 5px rgba(0, 242, 254, 0.4)')}>
-                    VERIFY
-                </button>
-            );
-        }
-        return (
-            <button onClick={onGo} className="btn-neon" style={btnStyle('#000', '#FFD700', 'none', '0 0 5px rgba(255, 215, 0, 0.4)')}>
-                GO
-            </button>
-        );
-    };
-
-    const btnStyle = (textColor: string, bgColor: string, border: string, shadow: string = 'none'): React.CSSProperties => ({
-        padding: '6px 0', width: '100%', fontSize: '10px', borderRadius: '6px', fontWeight: 'bold',
-        color: textColor, background: bgColor, border: border !== 'none' ? `1px solid ${border}` : 'none',
-        boxShadow: shadow, cursor: status === 'claimed' ? 'default' : 'pointer',
-        display: 'flex', justifyContent: 'center', marginTop: '8px'
-    });
-
-    return (
-        <div className="glass-card" style={{ 
-            display: 'flex', flexDirection: 'column', padding: '10px', 
-            background: status === 'claimed' ? 'rgba(76, 175, 80, 0.05)' : 'rgba(255,255,255,0.03)', 
-            border: status === 'claimed' ? '1px solid rgba(76, 175, 80, 0.3)' : '1px solid #333', 
-            opacity: status === 'claimed' ? 0.6 : 1,
-            transition: 'all 0.3s'
-        }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <div style={{ background: `rgba(${parseInt(color.slice(1,3),16)}, ${parseInt(color.slice(3,5),16)}, ${parseInt(color.slice(5,7),16)}, 0.1)`, padding: '6px', borderRadius: '8px' }}>
-                    {icon}
-                </div>
-                <div style={{ overflow: 'hidden' }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '11px', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</div>
-                    <div style={{ fontSize: '9px', color: '#aaa', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{desc}</div>
-                </div>
-            </div>
-            <div style={{ fontSize: '10px', color: '#FFD700', textAlign: 'center', fontWeight: 'bold' }}>+{reward} PTS</div>
-            {renderButton()}
-        </div>
-    );
-};
