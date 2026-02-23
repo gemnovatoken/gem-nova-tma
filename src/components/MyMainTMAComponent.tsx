@@ -161,12 +161,12 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const watchVideo = useCallback(async (type: 'turbo') => {
         if (!user) return; 
         if (type === 'turbo') {
-            if(!window.confirm("📺 Watch Ad to DOUBLE mining speed (60s)?")) return;
+            if(!window.confirm("📺 Watch Ad to DOUBLE mining speed (3 mins)?")) return;
             const { data, error } = await supabase.rpc('watch_overclock_ad', { user_id_in: user.id });
             if (error) alert("Error: " + error.message);
             else if (data && data[0].success) {
-                if (setOverclockTime) setOverclockTime(60); 
-                alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 60 seconds.\nUses today: ${data[0].new_count}/3`);
+                if (setOverclockTime) setOverclockTime(180); 
+                alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 3 minutes.\nUses today: ${data[0].new_count}/3`);
             } else alert(data?.[0]?.message || "Limit reached");
         } 
     }, [user, setOverclockTime]);
