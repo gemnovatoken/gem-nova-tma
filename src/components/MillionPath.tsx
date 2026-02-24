@@ -11,8 +11,8 @@ interface PathProgress {
     task_a_done: boolean;
     task_b_done: boolean;
     is_completed: boolean;
-    task_a_start_value: number | null;
-    task_b_start_value: number | null;
+    task_a_start_value: number | null | undefined;
+    task_b_start_value: number | null | undefined;
     reward_5k_claimed: boolean;
     premium_rewards_claimed: number;
 }
@@ -27,7 +27,7 @@ interface TaskRowProps {
     desc: string;
     isDone: boolean;
     isLoading: boolean;
-    startValue: number | null;
+    startValue: number | null | undefined;
     currentValue: number;
     targetAmount: number;
     type: string;
@@ -50,7 +50,6 @@ interface LiveStats {
     starter_pack_bought: boolean;
 }
 
-// 🗺️ EL NUEVO ROADMAP DE 8 NIVELES (100% Acumulativo)
 const PATH_STEPS = [
     { lvl: 1, title: "Onboarding", taskA: { desc: "Get 5,000 Pts", target: 5000, type: 'wealth' }, taskB: { desc: "Do Daily Check-in", target: 1, type: 'checkin' } },
     { lvl: 2, title: "First Steps", taskA: { desc: "Play 1 Arcade Game", target: 1, type: 'arcade' }, taskB: { desc: "Complete 3 Daily Bounties", target: 3, type: 'bounty' } },
@@ -69,7 +68,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const [tonConnectUI] = useTonConnectUI();
     const [progress, setProgress] = useState<PathProgress>({ 
         current_level: 1, task_a_done: false, task_b_done: false, is_completed: false, 
-        task_a_start_value: null, task_b_start_value: null, reward_5k_claimed: false, premium_rewards_claimed: 0
+        task_a_start_value: undefined, task_b_start_value: undefined, reward_5k_claimed: false, premium_rewards_claimed: 0
     });
     const [loading, setLoading] = useState(false);
     
@@ -90,11 +89,14 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 ...data, 
                 premium_rewards_claimed: data.premium_rewards_claimed || 0,
                 reward_5k_claimed: data.reward_5k_claimed || false,
-                task_a_start_value: data.task_a_start_value ?? null,
-                task_b_start_value: data.task_b_start_value ?? null
+                // 🔥 Aseguramos que si viene nulo de la DB, se quede como nulo y no undefined.
+                task_a_start_value: data.task_a_start_value !== undefined ? data.task_a_start_value : null,
+                task_b_start_value: data.task_b_start_value !== undefined ? data.task_b_start_value : null
             });
         } else if (error?.code === 'PGRST116') {
             await supabase.from('user_million_path').insert([{ user_id: user.id }]);
+            // Si es nuevo, forzamos los valores a null para que aparezca "START"
+            setProgress(prev => ({...prev, task_a_start_value: null, task_b_start_value: null}));
         }
     }, [user]);
 
@@ -558,7 +560,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                             );
                         }
 
-                        // 🔥 NUEVO: RENDER DE NIVELES FUTUROS (Visibles, con tareas y costo)
+                        // 🔥 RENDER DE NIVELES FUTUROS CON TAREAS Y COSTOS VISIBLES
                         if (isFuture) {
                             return (
                                 <div key={step.lvl} style={{ display: 'flex', alignItems: 'flex-start', gap: '15px', position: 'relative', marginTop: '10px' }}>
@@ -596,6 +598,9 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
 };
 
 const TaskRow: React.FC<TaskRowProps> = ({ letter, desc, isDone, isLoading, startValue, currentValue, targetAmount, type, onStart, onVerify }) => {
+    // 🔥 CORRECCIÓN CRÍTICA DE PERSISTENCIA: Solo dibuja el componente cuando la data real llegó
+    if (startValue === undefined) return <div style={{ height: '50px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', animation: 'pulse 1.5s infinite' }}></div>;
+
     const isStarted = startValue !== null;
     let progressVisual = 0;
     
