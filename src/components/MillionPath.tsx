@@ -51,20 +51,20 @@ interface LiveStats {
     starter_pack_bought: boolean;
 }
 
+// 🗺️ EL NUEVO ROADMAP DE 8 NIVELES (100% Acumulativo)
 const PATH_STEPS = [
-    { lvl: 1, title: "Onboarding", taskA: { desc: "Get 5,000 New Pts", target: 5000, type: 'score' }, taskB: { desc: "Do Daily Check-in Today", target: 1, type: 'checkin' } },
-    { lvl: 2, title: "Financial Literacy", taskA: { desc: "Reach 20,000 Total Wealth", target: 20000, type: 'wealth' }, taskB: { desc: "Complete 1 Daily Bounty", target: 1, type: 'bounty' } },
-    { lvl: 3, title: "Effort Filter", taskA: { desc: "Hold 1 Lucky Ticket", target: 1, type: 'ticket' }, taskB: { desc: "Have 1 Active Staking", target: 1, type: 'staking' } },
-    { lvl: 4, title: "In-App Engagement", taskA: { desc: "Reach Account Level 3", target: 3, type: 'level' }, taskB: { desc: "Play 10 New Arcade Games", target: 10, type: 'arcade' } },
-    { lvl: 5, title: "Medium Commitment", taskA: { desc: "Reach 3-Day Streak", target: 3, type: 'streak' }, taskB: { desc: "Play Lottery Event", target: 1, type: 'lottery' } },
-    { lvl: 6, title: "Economic Filter", taskA: { desc: "Have 2 Active Stakings", target: 2, type: 'staking' }, taskB: { desc: "Hold 2 Lucky Tickets", target: 2, type: 'ticket' } },
-    { lvl: 7, title: "Wealth Growth", taskA: { desc: "Reach 500k Total Wealth", target: 500000, type: 'wealth' }, taskB: { desc: "Complete Both Bounties", target: 2, type: 'bounty' } },
-    { lvl: 8, title: "Network Expansion", taskA: { desc: "Reach Account Level 4", target: 4, type: 'level_static' }, taskB: { desc: "Play 15 New Arcade Games", target: 15, type: 'arcade' } },
-    { lvl: 9, title: "The Time Wall", taskA: { desc: "Reach 5-Day Streak", target: 5, type: 'streak' }, taskB: { desc: "Invite 2 New Agents", target: 2, type: 'referral' } },
-    { lvl: 10, title: "The Final Boss", taskA: { desc: "Buy Starter Node", target: 1, type: 'buy' }, taskB: { desc: "Hold 3 Lucky Tickets", target: 3, type: 'ticket' } }
+    { lvl: 1, title: "Onboarding", taskA: { desc: "Get 5,000 Pts", target: 5000, type: 'wealth' }, taskB: { desc: "Do Daily Check-in", target: 1, type: 'checkin' } },
+    { lvl: 2, title: "First Steps", taskA: { desc: "Play 1 Arcade Game", target: 1, type: 'arcade' }, taskB: { desc: "Complete 3 Daily Bounties", target: 3, type: 'bounty' } },
+    { lvl: 3, title: "Gamer", taskA: { desc: "Get 15,000 Pts", target: 15000, type: 'wealth' }, taskB: { desc: "Spin Lucky Wheel", target: 1, type: 'lottery' } },
+    { lvl: 4, title: "Investor", taskA: { desc: "Hold 1 Lucky Ticket", target: 1, type: 'ticket' }, taskB: { desc: "Have 1 Active Staking", target: 1, type: 'staking' } },
+    { lvl: 5, title: "Growing", taskA: { desc: "Get 30,000 Pts", target: 30000, type: 'wealth' }, taskB: { desc: "Play 3 Arcade Games", target: 3, type: 'arcade' } },
+    { lvl: 6, title: "Wealth Builder", taskA: { desc: "Have 2 Active Stakings", target: 2, type: 'staking' }, taskB: { desc: "Hold 2 Lucky Tickets", target: 2, type: 'ticket' } },
+    { lvl: 7, title: "Dedication", taskA: { desc: "Get 50,000 Pts", target: 50000, type: 'wealth' }, taskB: { desc: "Play 6 Arcade Games", target: 6, type: 'arcade' } },
+    { lvl: 8, title: "The Final Boss", taskA: { desc: "Get 80,000 Pts", target: 80000, type: 'wealth' }, taskB: { desc: "Spin Lucky Wheel 2 Times", target: 2, type: 'lottery' } }
 ];
 
-const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy'];
+// 🔥 SE AGREGARON ARCADE, LOTTERY Y BOUNTY PARA QUE LEAN EL HISTORIAL COMPLETO
+const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy', 'arcade', 'lottery', 'bounty'];
 
 export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
