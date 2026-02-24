@@ -27,8 +27,8 @@ const EXTRA_SPINS_PRICE_TON = 0.10; // Precio por 3 tiros VIP (Cuestan 0 pts)
 
 // 🎲 9 PREMIOS (40 grados cada rebanada)
 const WHEEL_ITEMS = [
-    { value: '5TON',   label: "5 TON",  sub: "GRAND",   color: "#FF0055", textCol: "#fff" }, 
-    { value: 25000,    label: "25K",    sub: "REFUND",  color: "#222",    textCol: "#fff" }, 
+    { value: '5TON',   label: "5 TON",  sub: "GRAND",  color: "#FF0055", textCol: "#fff" }, 
+    { value: 25000,    label: "25K",    sub: "REFUND", color: "#222",    textCol: "#fff" }, 
     { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
     { value: 10000,    label: "10K",    sub: "PTS",     color: "#444",    textCol: "#aaa" }, 
     { value: '0.15TON',label: "0.15",   sub: "TON",     color: "#E040FB", textCol: "#fff" }, 
@@ -48,33 +48,42 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [dailySpinsUsed, setDailySpinsUsed] = useState(0); 
     const [adSpinsUsed, setAdSpinsUsed] = useState(0); 
     const [premiumSpins, setPremiumSpins] = useState(0); 
+    
+    const [dataLoaded, setDataLoaded] = useState(false);
 
-    // Memoria Persistente con LocalStorage
+    // Memoria Persistente con LocalStorage (Lectura Segura)
     useEffect(() => {
         if (user) {
+            // 🔥 CORRECCIÓN: Usamos setTimeout para evitar el error de "Cascading renders"
             setTimeout(() => {
                 const today = new Date().toISOString().split('T')[0];
                 const savedData = localStorage.getItem(`lucky_wheel_${user.id}`);
                 
                 if (savedData) {
-                    const parsed = JSON.parse(savedData);
-                    if (parsed.date === today) {
-                        setDailySpinsUsed(parsed.dailySpinsUsed || 0);
-                        setAdSpinsUsed(parsed.adSpinsUsed || 0);
-                        setPremiumSpins(parsed.premiumSpins || 0);
-                    } else {
-                        // Día nuevo: resetear diarios y ads, mantener premium
-                        setDailySpinsUsed(0);
-                        setAdSpinsUsed(0);
-                        setPremiumSpins(parsed.premiumSpins || 0); 
+                    try {
+                        const parsed = JSON.parse(savedData);
+                        if (parsed.date === today) {
+                            setDailySpinsUsed(parsed.dailySpinsUsed || 0);
+                            setAdSpinsUsed(parsed.adSpinsUsed || 0);
+                            setPremiumSpins(parsed.premiumSpins || 0);
+                        } else {
+                            // Día nuevo: resetear diarios y ads, mantener premium
+                            setDailySpinsUsed(0);
+                            setAdSpinsUsed(0);
+                            setPremiumSpins(parsed.premiumSpins || 0); 
+                        }
+                    } catch (e) {
+                        console.error("Storage parse error", e);
                     }
                 }
+                setDataLoaded(true); // Se marca como completado de forma segura
             }, 0);
         }
     }, [user]);
 
+    // Memoria Persistente con LocalStorage (Guardado Seguro)
     useEffect(() => {
-        if (user) {
+        if (user && dataLoaded) {
             const today = new Date().toISOString().split('T')[0];
             localStorage.setItem(`lucky_wheel_${user.id}`, JSON.stringify({ 
                 date: today, 
@@ -83,7 +92,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 premiumSpins 
             }));
         }
-    }, [dailySpinsUsed, adSpinsUsed, premiumSpins, user]);
+    }, [dailySpinsUsed, adSpinsUsed, premiumSpins, user, dataLoaded]);
 
     // Función principal de giro
     const executeSpin = async (spinType: 'premium' | 'daily' | 'ad') => {
@@ -114,7 +123,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             onUpdateScore(prev => prev - SPIN_COST);
         }
 
-        // 🔥 CORRECCIÓN TS: Usamos la interfaz en lugar de 'any'
         const typedUser = user as unknown as SupabaseUser;
         const tgUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
 
@@ -124,14 +132,33 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             username_in: tgUsername 
         });
 
-        if (error || !data || data.length === 0) {
+        if (error) {
+            console.error("RPC Error:", error);
             alert("Connection error. Spin refunded.");
             if (spinType !== 'premium') onUpdateScore(prev => prev + SPIN_COST); 
             setSpinning(false);
             return;
         }
 
-        const wonAmount = data[0].reward; 
+        // 🔥 CORRECCIÓN TS: Tipamos de manera explícita la variable para solucionar el error "implicitly has an 'any' type"
+        let wonAmount: string | number | undefined;
+        
+        if (Array.isArray(data) && data.length > 0) {
+            wonAmount = data[0].reward !== undefined ? data[0].reward : data[0];
+        } else if (data !== null && typeof data === 'object' && 'reward' in data) {
+            // 🔥 CORRECCIÓN TS: Usamos Record en vez de 'any' explícito
+            wonAmount = (data as Record<string, unknown>).reward as string | number;
+        } else if (data !== null && data !== undefined) {
+            wonAmount = data as string | number;
+        }
+
+        if (wonAmount === undefined || wonAmount === null || (Array.isArray(data) && data.length === 0)) {
+            console.error("Invalid format returned:", data);
+            alert("Data error. Spin refunded.");
+            if (spinType !== 'premium') onUpdateScore(prev => prev + SPIN_COST); 
+            setSpinning(false);
+            return;
+        }
         
         // CÁLCULO DE ROTACIÓN
         const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
@@ -205,7 +232,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             };
             const result = await tonConnectUI.sendTransaction(transaction);
             if (result) {
-                // 🔥 CORRECCIÓN TS: Usamos la interfaz en lugar de 'any'
                 const typedUser = user as unknown as SupabaseUser;
                 const tgUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
 
