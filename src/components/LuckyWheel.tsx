@@ -355,23 +355,23 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             backdropFilter: 'blur(10px)'
         }}>
             
-            {/* BOTÓN CÍRCULO DE GANADORES (IZQUIERDA) */}
+            {/* BOTÓN CÍRCULO DE GANADORES (IZQUIERDA) 🔥 Bajado a top: 40px y zIndex: 7000 */}
             <button onClick={() => setShowWinners(true)} style={{
-                position:'absolute', top:20, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
-                background: 'rgba(255, 215, 0, 0.1)', borderRadius: '50%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)'
+                position:'absolute', top:40, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
+                background: 'rgba(255, 215, 0, 0.1)', borderRadius: '50%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)', zIndex: 7000
             }}><Trophy size={20}/></button>
 
-            {/* BOTÓN CERRAR (DERECHA) */}
+            {/* BOTÓN CERRAR (DERECHA) 🔥 Bajado a top: 40px y zIndex: 7000 */}
             <button onClick={onClose} style={{
-                position:'absolute', top:20, right:20, border:'none', color:'#fff', cursor:'pointer',
-                background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '5px'
+                position:'absolute', top:40, right:20, border:'none', color:'#fff', cursor:'pointer',
+                background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 7000
             }}><X size={24}/></button>
 
             <div style={{textAlign:'center', marginBottom:'20px', position:'relative'}}>
                 <div style={{position:'absolute', top:'-20px', left:'50%', transform:'translateX(-50%)', width:'150px', height:'150px', background:'radial-gradient(circle, rgba(0, 136, 204, 0.4) 0%, transparent 70%)', zIndex:-1}}></div>
                 <h2 style={{
                     color:'#fff', textShadow:'0 0 20px #0088CC, 0 0 40px #0088CC', 
-                    fontSize:'32px', margin:0, fontWeight:'900', letterSpacing:'2px'
+                    fontSize:'32px', margin:0, fontWeight:'900', letterSpacing:'2px', marginTop: '20px'
                 }}>
                     HIGH ROLLER <Diamond size={24} style={{verticalAlign: 'middle', color: '#00F2FE'}}/>
                 </h2>
@@ -476,9 +476,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             {/* 🔥 MODAL: LISTA DE GANADORES */}
             {showWinners && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(5, 5, 10, 0.98)', zIndex: 7500, display: 'flex', flexDirection: 'column', padding: '20px', backdropFilter: 'blur(10px)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', marginTop: '20px' }}>
+                    {/* Botón cerrar del Modal de Ganadores, también ajustado */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', marginTop: '40px' }}>
                         <h2 style={{ color: '#FFD700', fontSize: '24px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}><Trophy /> RECENT WINNERS</h2>
-                        <button onClick={() => setShowWinners(false)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={28} /></button>
+                        <button onClick={() => setShowWinners(false)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', zIndex: 7600 }}><X size={28} /></button>
                     </div>
 
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '20px' }}>
