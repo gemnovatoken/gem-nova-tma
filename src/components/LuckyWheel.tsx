@@ -355,15 +355,15 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             backdropFilter: 'blur(10px)'
         }}>
             
-            {/* BOTÓN CÍRCULO DE GANADORES (IZQUIERDA) 🔥 Bajado a top: 40px y zIndex: 7000 */}
+            {/* BOTÓN CÍRCULO DE GANADORES (IZQUIERDA) 🔥 Bajado a top: 80px */}
             <button onClick={() => setShowWinners(true)} style={{
-                position:'absolute', top:40, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
+                position:'absolute', top:80, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
                 background: 'rgba(255, 215, 0, 0.1)', borderRadius: '50%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)', zIndex: 7000
             }}><Trophy size={20}/></button>
 
-            {/* BOTÓN CERRAR (DERECHA) 🔥 Bajado a top: 40px y zIndex: 7000 */}
+            {/* BOTÓN CERRAR (DERECHA) 🔥 Bajado a top: 80px */}
             <button onClick={onClose} style={{
-                position:'absolute', top:40, right:20, border:'none', color:'#fff', cursor:'pointer',
+                position:'absolute', top:80, right:20, border:'none', color:'#fff', cursor:'pointer',
                 background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 7000
             }}><X size={24}/></button>
 
