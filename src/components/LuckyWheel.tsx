@@ -5,6 +5,15 @@ import { useTonConnectUI } from '@tonconnect/ui-react';
 import { X, Ticket, Diamond, RefreshCw, Video } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 
+// 🔥 CORRECCIÓN TS: Creamos una interfaz para el tipo de metadatos del usuario
+interface SupabaseUser {
+    id: string;
+    user_metadata?: {
+        username?: string;
+    };
+    username?: string;
+}
+
 interface LuckyWheelProps {
     onClose: () => void;
     score: number; 
@@ -40,7 +49,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [adSpinsUsed, setAdSpinsUsed] = useState(0); 
     const [premiumSpins, setPremiumSpins] = useState(0); 
 
-    // Memoria Persistente con LocalStorage para evitar reseteo al cerrar
+    // Memoria Persistente con LocalStorage
     useEffect(() => {
         if (user) {
             setTimeout(() => {
@@ -57,7 +66,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                         // Día nuevo: resetear diarios y ads, mantener premium
                         setDailySpinsUsed(0);
                         setAdSpinsUsed(0);
-                        setPremiumSpins(parsed.premiumSpins || 0); // Premium no expira
+                        setPremiumSpins(parsed.premiumSpins || 0); 
                     }
                 }
             }, 0);
@@ -76,11 +85,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
     }, [dailySpinsUsed, adSpinsUsed, premiumSpins, user]);
 
-    // Función principal de giro (Maneja las 3 lógicas)
+    // Función principal de giro
     const executeSpin = async (spinType: 'premium' | 'daily' | 'ad') => {
         if (spinning || !user) return;
 
-        // Validaciones de Puntos y Confirmaciones
         if (spinType === 'premium') {
             const confirmPremium = window.confirm(`💎 USE 1 VIP TICKET?\n\nThis spin will not consume any points. Good luck!`);
             if(!confirmPremium) return;
@@ -93,8 +101,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 const confirmAd = window.confirm(`📺 WATCH AD TO UNLOCK SPIN?\n\nThis will still cost you ${SPIN_COST.toLocaleString()} points.`);
                 if(!confirmAd) return;
                 
-                // Simulación de ver el anuncio (Aquí conectarías el SDK de Adsgram)
-                // console.log("Watching Ad...");
                 await new Promise(r => setTimeout(r, 2000));
             } else {
                 const confirmDaily = window.confirm(`🪙 DEDUCT ${SPIN_COST.toLocaleString()} POINTS?\n\nAre you feeling lucky?`);
@@ -104,14 +110,19 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
         setSpinning(true);
         
-        // Descontar Puntos inmediatamente (Solo si no es premium)
         if (spinType !== 'premium') {
             onUpdateScore(prev => prev - SPIN_COST);
         }
 
-        // LLAMADA A SUPABASE
-        // IMPORTANTE: Tu backend debe saber descontar o no dependiendo del caso, o confiar en el front para el testeo.
-        const { data, error } = await supabase.rpc('spin_wheel_v2', { user_id_in: user.id });
+        // 🔥 CORRECCIÓN TS: Usamos la interfaz en lugar de 'any'
+        const typedUser = user as unknown as SupabaseUser;
+        const tgUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
+
+        const { data, error } = await supabase.rpc('spin_wheel_v2', { 
+            user_id_in: user.id, 
+            spin_type: spinType,
+            username_in: tgUsername 
+        });
 
         if (error || !data || data.length === 0) {
             alert("Connection error. Spin refunded.");
@@ -122,7 +133,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
         const wonAmount = data[0].reward; 
         
-        // CÁLCULO DE ROTACIÓN (9 Segmentos = 40 grados)
+        // CÁLCULO DE ROTACIÓN
         const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
         const targetIndex = winningIndex !== -1 ? winningIndex : 5; // Default to FAIL
 
@@ -139,7 +150,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         setTimeout(() => {
             setSpinning(false);
             
-            // Restar el inventario correspondiente
+            // Restar el inventario
             if (spinType === 'premium') setPremiumSpins(prev => prev - 1);
             else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
             else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
@@ -157,7 +168,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 onUpdateScore(s => s + wonAmount);
                 if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
                 
-                // Los mensajes cambian un poco si fue Premium (ya que le costó 0 puntos)
                 if (spinType === 'premium') {
                     alert(`🎉 VIP WIN! +${wonAmount.toLocaleString()} Pts added to balance!`);
                 } else {
@@ -177,6 +187,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     };
 
     const handleBuyMoreSpins = async () => {
+        if (!user) return; 
         if (!tonConnectUI.account) {
             alert("❌ Please connect your TON wallet first!");
             return;
@@ -194,6 +205,17 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             };
             const result = await tonConnectUI.sendTransaction(transaction);
             if (result) {
+                // 🔥 CORRECCIÓN TS: Usamos la interfaz en lugar de 'any'
+                const typedUser = user as unknown as SupabaseUser;
+                const tgUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
+
+                await supabase.rpc('buy_vip_tickets', { 
+                    user_id_in: user.id, 
+                    ton_amount: EXTRA_SPINS_PRICE_TON, 
+                    tickets_qty: 3,
+                    username_in: tgUsername 
+                });
+
                 setPremiumSpins(prev => prev + 3);
                 alert("🎉 SUCCESS! 3 VIP Tickets added to your account!");
             }
@@ -207,7 +229,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         ${WHEEL_ITEMS.map((item, i) => `${item.color} ${i * (360 / WHEEL_ITEMS.length)}deg ${(i + 1) * (360 / WHEEL_ITEMS.length)}deg`).join(', ')}
     )`;
 
-    // Renderizado Condicional del Botón Principal
     const renderMainButton = () => {
         if (premiumSpins > 0) {
             return (
