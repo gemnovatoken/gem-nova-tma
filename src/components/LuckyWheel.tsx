@@ -5,9 +5,6 @@ import { useTonConnectUI } from '@tonconnect/ui-react';
 import { X, Ticket, Diamond, RefreshCw, Video } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 
-// 🔥 CORRECCIÓN TS: Creamos una interfaz para el tipo de metadatos del usuario
-
-
 interface LuckyWheelProps {
     onClose: () => void;
     score: number; 
@@ -117,19 +114,15 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
 
         try {
-            // Buscamos el username EXACTO desde la tabla user_score
-            const { data: scoreData } = await supabase
-                .from('user_score')
-                .select('username')
-                .eq('user_id', user.id)
-                .single();
-                
-            const exactUsername = scoreData?.username || "HiddenUser";
+            // 🔥 CORRECCIÓN: Tu backend en Supabase ya busca el username, por lo que 
+            // solo enviamos un default por si acaso. El SQL hará la sobreescritura.
+            const typedUser = user as unknown as { user_metadata?: { username?: string }, username?: string };
+            const fallbackUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
 
             const { data, error } = await supabase.rpc('spin_wheel_v2', { 
                 user_id_in: user.id, 
                 spin_type: spinType,
-                username_in: exactUsername 
+                username_in: fallbackUsername 
             });
 
             if (error) throw error;
@@ -200,10 +193,15 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 }
             }, 4000);
 
-        } catch (err) {
-            // 🔥 CORRECCIÓN TS: Manejo de error sin el tipo "any" explícito
+        } catch (err: unknown) {
+            // 🔥 CORRECCIÓN TS: Manejo estricto de error sin romper reglas de ESLint
             console.error("Spin DB Error:", err);
-            const errorMessage = err instanceof Error ? err.message : "Connection failed";
+            let errorMessage = "Connection failed";
+            if (err instanceof Error) {
+                errorMessage = err.message;
+            } else if (err && typeof err === 'object' && 'message' in err) {
+                errorMessage = String((err as Record<string, unknown>).message);
+            }
             alert(`❌ DB Error: ${errorMessage}\n\nSpin refunded.`);
             if (spinType !== 'premium') onUpdateScore(prev => prev + SPIN_COST); 
             setSpinning(false);
@@ -228,30 +226,32 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 messages: [{ address: ADMIN_WALLET, amount: (EXTRA_SPINS_PRICE_TON * 1000000000).toString() }],
             };
             const result = await tonConnectUI.sendTransaction(transaction);
+            
             if (result) {
-                // Buscamos el username EXACTO desde la tabla user_score
-                const { data: scoreData } = await supabase
-                    .from('user_score')
-                    .select('username')
-                    .eq('user_id', user.id)
-                    .single();
-                    
-                const exactUsername = scoreData?.username || "HiddenUser";
+                const typedUser = user as unknown as { user_metadata?: { username?: string }, username?: string };
+                const fallbackUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
 
-                await supabase.rpc('buy_vip_tickets', { 
+                const { error } = await supabase.rpc('buy_vip_tickets', { 
                     user_id_in: user.id, 
                     ton_amount: EXTRA_SPINS_PRICE_TON, 
                     tickets_qty: 3,
-                    username_in: exactUsername 
+                    username_in: fallbackUsername 
                 });
+                
+                if (error) throw error;
 
                 setPremiumSpins(prev => prev + 3);
                 alert("🎉 SUCCESS! 3 VIP Tickets added to your account!");
             }
-        } catch (err) {
-            // 🔥 CORRECCIÓN TS: Tipado del Catch quitado
+        } catch (err: unknown) {
             console.error(err);
-            alert("❌ Transaction cancelled.");
+            let errorMessage = "Transaction cancelled.";
+            if (err instanceof Error) {
+                errorMessage = err.message;
+            } else if (err && typeof err === 'object' && 'message' in err) {
+                errorMessage = String((err as Record<string, unknown>).message);
+            }
+            alert(`❌ Error: ${errorMessage}`);
         }
     };
 
