@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useTonConnectUI } from '@tonconnect/ui-react';
-import { X, Ticket, Diamond, RefreshCw, Video, Trophy, Clock, CheckCircle2, Send } from 'lucide-react';
+import { X, Ticket, Diamond, RefreshCw, Video, Trophy, Clock, CheckCircle2, Send, Star } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 
 interface LuckyWheelProps {
@@ -45,12 +45,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [premiumSpins, setPremiumSpins] = useState(0); 
     const [dataLoaded, setDataLoaded] = useState(false);
 
-    // 🔥 NUEVOS ESTADOS PARA LOS GANADORES Y RECLAMOS
     const [wonTonPrize, setWonTonPrize] = useState<string | null>(null);
     const [walletInput, setWalletInput] = useState("");
     const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
     const [showWinners, setShowWinners] = useState(false);
+    
+    // 🔥 ESTADOS PARA PESTAÑAS DE GANADORES
     const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
+    const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
 
     useEffect(() => {
         if (user) {
@@ -91,13 +93,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
     }, [dailySpinsUsed, adSpinsUsed, premiumSpins, user, dataLoaded]);
 
-    // 🔥 CARGAR LISTA DE GANADORES
     const fetchWinners = async () => {
         const { data, error } = await supabase
             .from('wheel_winners')
             .select('username, prize, status')
             .order('created_at', { ascending: false })
-            .limit(10);
+            .limit(20); // Subimos el límite para abarcar ambas listas
             
         if (!error && data) {
             setWinnersList(data as WheelWinner[]);
@@ -107,6 +108,25 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     useEffect(() => {
         fetchWinners();
     }, []);
+
+    // 🔥 FUNCIÓN PARA REGISTRAR PUNTOS ALTOS EN SEGUNDO PLANO
+    const registerPointWinner = async (prizeLabel: string) => {
+        if (!user) return;
+        try {
+            const { data: scoreData } = await supabase.from('user_score').select('username').eq('user_id', user.id).single();
+            const exactUsername = scoreData?.username || "HiddenUser";
+
+            await supabase.rpc('claim_ton_prize', {
+                user_id_in: user.id,
+                username_in: exactUsername,
+                prize_in: prizeLabel,
+                wallet_in: null // No ocupa wallet
+            });
+            fetchWinners(); // Refrescamos en fondo
+        } catch (e) {
+            console.error("Error logging point winner", e);
+        }
+    };
 
     const executeSpin = async (spinType: 'premium' | 'daily' | 'ad') => {
         if (spinning || !user?.id) return;
@@ -191,11 +211,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     if (wonAmount === '1GOLD') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
                         alert(`🎟️ GOLDEN VOUCHER AQUIRED!\n\nYou found a legendary Golden Voucher. Keep collecting!`);
+                        registerPointWinner("1 GOLD VOUCHER"); // Registra la ganancia grande
                     } else if (wonAmount.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
-                        // 🔥 EN LUGAR DE LA ALERTA, ABRIMOS EL MODAL DE WALLET
                         setWonTonPrize(wonAmount);
-                        // Autocompletar wallet si ya está conectada
                         if (tonConnectUI.account?.address) {
                             setWalletInput(tonConnectUI.account.address);
                         }
@@ -209,6 +228,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     } else {
                         if (wonAmount > SPIN_COST) {
                             alert(`🎉 BIG WIN! +${wonAmount.toLocaleString()} Pts!`);
+                            // 🔥 Si gana 50K o más, lo registramos en la lista de HIGH ROLLERS
+                            if (wonAmount >= 50000) registerPointWinner(`${(wonAmount/1000).toFixed(0)}K PTS`);
                         } else if (wonAmount === SPIN_COST) {
                             alert(`⚖️ Phew! You got your ${wonAmount.toLocaleString()} points back.`);
                         } else {
@@ -235,7 +256,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
     };
 
-    // 🔥 FUNCIÓN PARA ENVIAR EL RECLAMO A SUPABASE
     const handleSubmitWallet = async () => {
         if (!user || !wonTonPrize) return;
         if (walletInput.trim().length < 20) {
@@ -257,7 +277,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
             alert(`✅ REWARD CLAIMED!\n\nPrize: ${wonTonPrize}\nStatus: PENDING.\n\nYour reward will be sent to your wallet soon.`);
             setWonTonPrize(null);
-            fetchWinners(); // Refrescar la lista de ganadores
+            fetchWinners();
         } catch (err) {
             console.error(err);
             alert("Error submitting claim. Please contact support.");
@@ -347,6 +367,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
     };
 
+    // 🔥 FILTROS PARA LAS PESTAÑAS
+    const cryptoWinners = winnersList.filter(w => w.prize.includes('TON'));
+    const pointsWinners = winnersList.filter(w => !w.prize.includes('TON'));
+
     return (
         <div style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -355,15 +379,13 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             backdropFilter: 'blur(10px)'
         }}>
             
-            {/* BOTÓN CÍRCULO DE GANADORES (IZQUIERDA) 🔥 Bajado a top: 80px */}
             <button onClick={() => setShowWinners(true)} style={{
-                position:'absolute', top:80, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
+                position:'absolute', top:150, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
                 background: 'rgba(255, 215, 0, 0.1)', borderRadius: '50%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)', zIndex: 7000
             }}><Trophy size={20}/></button>
 
-            {/* BOTÓN CERRAR (DERECHA) 🔥 Bajado a top: 80px */}
             <button onClick={onClose} style={{
-                position:'absolute', top:80, right:20, border:'none', color:'#fff', cursor:'pointer',
+                position:'absolute', top:100, right:20, border:'none', color:'#fff', cursor:'pointer',
                 background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 7000
             }}><X size={24}/></button>
 
@@ -382,7 +404,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             </div>
 
-            {/* RULETA */}
             <div style={{ position: 'relative', width: '320px', height: '320px', marginBottom: '30px' }}>
                 <div style={{
                     position: 'absolute', top: '-20px', left: '50%', transform: 'translateX(-50%)',
@@ -424,7 +445,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             </div>
 
-            {/* CONTROLES */}
             <div style={{width: '85%', display: 'flex', flexDirection: 'column', gap: '10px'}}>
                 {renderMainButton()}
                 <button 
@@ -446,7 +466,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </button>
             </div>
 
-            {/* 🔥 MODAL: INGRESO DE WALLET (SÓLO CUANDO GANAN TON) */}
             {wonTonPrize && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 8000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
                     <Diamond size={60} color="#00F2FE" style={{ filter: 'drop-shadow(0 0 20px #00F2FE)', marginBottom: '20px' }} />
@@ -473,24 +492,40 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             )}
 
-            {/* 🔥 MODAL: LISTA DE GANADORES */}
+            {/* 🔥 MODAL: LISTA DE GANADORES CON PESTAÑAS */}
             {showWinners && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(5, 5, 10, 0.98)', zIndex: 7500, display: 'flex', flexDirection: 'column', padding: '20px', backdropFilter: 'blur(10px)' }}>
-                    {/* Botón cerrar del Modal de Ganadores, también ajustado */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', marginTop: '40px' }}>
-                        <h2 style={{ color: '#FFD700', fontSize: '24px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}><Trophy /> RECENT WINNERS</h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', marginTop: '40px' }}>
+                        <h2 style={{ color: '#FFD700', fontSize: '24px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}><Trophy /> LEADERBOARD</h2>
                         <button onClick={() => setShowWinners(false)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', zIndex: 7600 }}><X size={28} /></button>
                     </div>
 
+                    {/* Selector de Pestañas */}
+                    <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                        <button 
+                            onClick={() => setActiveTab('crypto')}
+                            style={{ flex: 1, padding: '10px', background: activeTab === 'crypto' ? 'rgba(0, 242, 254, 0.2)' : 'rgba(255,255,255,0.05)', border: activeTab === 'crypto' ? '1px solid #00F2FE' : '1px solid #333', color: activeTab === 'crypto' ? '#00F2FE' : '#888', borderRadius: '8px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', transition: 'all 0.3s' }}
+                        >
+                            <Diamond size={16}/> CRYPTO
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('points')}
+                            style={{ flex: 1, padding: '10px', background: activeTab === 'points' ? 'rgba(255, 215, 0, 0.2)' : 'rgba(255,255,255,0.05)', border: activeTab === 'points' ? '1px solid #FFD700' : '1px solid #333', color: activeTab === 'points' ? '#FFD700' : '#888', borderRadius: '8px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', transition: 'all 0.3s' }}
+                        >
+                            <Star size={16}/> HIGH ROLLERS
+                        </button>
+                    </div>
+
+                    {/* Lista Dinámica basada en Pestaña */}
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '20px' }}>
-                        {winnersList.length === 0 ? (
+                        {(activeTab === 'crypto' ? cryptoWinners : pointsWinners).length === 0 ? (
                             <div style={{ color: '#666', textAlign: 'center', marginTop: '50px' }}>No winners yet. Be the first!</div>
                         ) : (
-                            winnersList.map((w, index) => (
+                            (activeTab === 'crypto' ? cryptoWinners : pointsWinners).map((w, index) => (
                                 <div key={index} style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                         <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>@{w.username}</div>
-                                        <div style={{ color: '#00F2FE', fontSize: '16px', fontWeight: '900', marginTop: '4px' }}>{w.prize}</div>
+                                        <div style={{ color: activeTab === 'crypto' ? '#00F2FE' : '#FFD700', fontSize: '16px', fontWeight: '900', marginTop: '4px' }}>{w.prize}</div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         {w.status === 'Completed' ? (
