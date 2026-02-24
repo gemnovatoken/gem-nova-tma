@@ -141,15 +141,16 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-    const handleStartTask = async (taskLetter: 'A' | 'B', type: string) => {
-        if (!user || loading) return;
+      const handleStartTask = async (taskLetter: 'A' | 'B', type: string) => {
+         if (!user || loading) return;
         setLoading(true);
         try {
-            await loadLiveStats(); 
+            await loadLiveStats(); // 🚨 AQUÍ ESTÁ EL PROBLEMA
             const currentValue = getStatValueByType(type);
             const columnToUpdate = taskLetter === 'A' ? 'task_a_start_value' : 'task_b_start_value';
-            
+        
             await supabase.from('user_million_path').update({ [columnToUpdate]: currentValue }).eq('user_id', user.id);
+        // ...
             setProgress(prev => ({ ...prev, [columnToUpdate]: currentValue }));
         } catch (e) {
             console.error(e);
