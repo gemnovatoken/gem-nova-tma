@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useTonConnectUI } from '@tonconnect/ui-react';
-import { X, Ticket, Diamond, RefreshCw, Video } from 'lucide-react';
+import { X, Ticket, Diamond, RefreshCw, Video, Trophy, Clock, CheckCircle2, Send } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 
 interface LuckyWheelProps {
@@ -11,12 +11,17 @@ interface LuckyWheelProps {
     onUpdateScore: Dispatch<SetStateAction<number>>;
 }
 
-const SPIN_COST = 25000;
-const MAX_DAILY_SPINS = 2; // 2 Tiros de cortesía (cuestan 25k pts)
-const MAX_AD_SPINS = 3;    // 3 Tiros por video (cuestan 25k pts)
-const EXTRA_SPINS_PRICE_TON = 0.10; // Precio por 3 tiros VIP (Cuestan 0 pts)
+interface WheelWinner {
+    username: string;
+    prize: string;
+    status: string;
+}
 
-// 🎲 9 PREMIOS (40 grados cada rebanada)
+const SPIN_COST = 25000;
+const MAX_DAILY_SPINS = 2; 
+const MAX_AD_SPINS = 3;    
+const EXTRA_SPINS_PRICE_TON = 0.10; 
+
 const WHEEL_ITEMS = [
     { value: '5TON',   label: "5 TON",  sub: "GRAND",  color: "#FF0055", textCol: "#fff" }, 
     { value: 25000,    label: "25K",    sub: "REFUND", color: "#222",    textCol: "#fff" }, 
@@ -35,14 +40,18 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [spinning, setSpinning] = useState(false);
     const [rotation, setRotation] = useState(0);
     
-    // Contadores de uso
     const [dailySpinsUsed, setDailySpinsUsed] = useState(0); 
     const [adSpinsUsed, setAdSpinsUsed] = useState(0); 
     const [premiumSpins, setPremiumSpins] = useState(0); 
-    
     const [dataLoaded, setDataLoaded] = useState(false);
 
-    // Memoria Persistente con LocalStorage (Lectura Segura)
+    // 🔥 NUEVOS ESTADOS PARA LOS GANADORES Y RECLAMOS
+    const [wonTonPrize, setWonTonPrize] = useState<string | null>(null);
+    const [walletInput, setWalletInput] = useState("");
+    const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
+    const [showWinners, setShowWinners] = useState(false);
+    const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
+
     useEffect(() => {
         if (user) {
             setTimeout(() => {
@@ -57,7 +66,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                             setAdSpinsUsed(parsed.adSpinsUsed || 0);
                             setPremiumSpins(parsed.premiumSpins || 0);
                         } else {
-                            // Día nuevo: resetear diarios y ads, mantener premium
                             setDailySpinsUsed(0);
                             setAdSpinsUsed(0);
                             setPremiumSpins(parsed.premiumSpins || 0); 
@@ -66,12 +74,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                         console.error("Storage parse error", e);
                     }
                 }
-                setDataLoaded(true); // Se marca como completado de forma segura
+                setDataLoaded(true); 
             }, 0);
         }
     }, [user]);
 
-    // Memoria Persistente con LocalStorage (Guardado Seguro)
     useEffect(() => {
         if (user && dataLoaded) {
             const today = new Date().toISOString().split('T')[0];
@@ -84,7 +91,23 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
     }, [dailySpinsUsed, adSpinsUsed, premiumSpins, user, dataLoaded]);
 
-    // Función principal de giro
+    // 🔥 CARGAR LISTA DE GANADORES
+    const fetchWinners = async () => {
+        const { data, error } = await supabase
+            .from('wheel_winners')
+            .select('username, prize, status')
+            .order('created_at', { ascending: false })
+            .limit(10);
+            
+        if (!error && data) {
+            setWinnersList(data as WheelWinner[]);
+        }
+    };
+
+    useEffect(() => {
+        fetchWinners();
+    }, []);
+
     const executeSpin = async (spinType: 'premium' | 'daily' | 'ad') => {
         if (spinning || !user?.id) return;
 
@@ -114,15 +137,18 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
 
         try {
-            // 🔥 CORRECCIÓN: Tu backend en Supabase ya busca el username, por lo que 
-            // solo enviamos un default por si acaso. El SQL hará la sobreescritura.
-            const typedUser = user as unknown as { user_metadata?: { username?: string }, username?: string };
-            const fallbackUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
+            const { data: scoreData } = await supabase
+                .from('user_score')
+                .select('username')
+                .eq('user_id', user.id)
+                .single();
+                
+            const exactUsername = scoreData?.username || "HiddenUser";
 
             const { data, error } = await supabase.rpc('spin_wheel_v2', { 
                 user_id_in: user.id, 
                 spin_type: spinType,
-                username_in: fallbackUsername 
+                username_in: exactUsername 
             });
 
             if (error) throw error;
@@ -141,9 +167,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 throw new Error("Invalid or empty data returned from database.");
             }
             
-            // CÁLCULO DE ROTACIÓN
             const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
-            const targetIndex = winningIndex !== -1 ? winningIndex : 5; // Default to FAIL
+            const targetIndex = winningIndex !== -1 ? winningIndex : 5; 
 
             const segmentAngle = 360 / WHEEL_ITEMS.length; 
             const centerOffset = segmentAngle / 2; 
@@ -158,19 +183,22 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             setTimeout(() => {
                 setSpinning(false);
                 
-                // Restar el inventario
                 if (spinType === 'premium') setPremiumSpins(prev => prev - 1);
                 else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
                 else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
 
-                // MANEJO DE PREMIOS
                 if (typeof wonAmount === 'string') {
                     if (wonAmount === '1GOLD') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
                         alert(`🎟️ GOLDEN VOUCHER AQUIRED!\n\nYou found a legendary Golden Voucher. Keep collecting!`);
                     } else if (wonAmount.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
-                        alert(`💎 HOLY MOLY! YOU WON ${wonAmount}!\n\nContact support to claim your real crypto reward!`);
+                        // 🔥 EN LUGAR DE LA ALERTA, ABRIMOS EL MODAL DE WALLET
+                        setWonTonPrize(wonAmount);
+                        // Autocompletar wallet si ya está conectada
+                        if (tonConnectUI.account?.address) {
+                            setWalletInput(tonConnectUI.account.address);
+                        }
                     }
                 } else if (typeof wonAmount === 'number' && wonAmount > 0) {
                     onUpdateScore(s => s + wonAmount);
@@ -194,7 +222,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             }, 4000);
 
         } catch (err: unknown) {
-            // 🔥 CORRECCIÓN TS: Manejo estricto de error sin romper reglas de ESLint
             console.error("Spin DB Error:", err);
             let errorMessage = "Connection failed";
             if (err instanceof Error) {
@@ -206,6 +233,36 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             if (spinType !== 'premium') onUpdateScore(prev => prev + SPIN_COST); 
             setSpinning(false);
         }
+    };
+
+    // 🔥 FUNCIÓN PARA ENVIAR EL RECLAMO A SUPABASE
+    const handleSubmitWallet = async () => {
+        if (!user || !wonTonPrize) return;
+        if (walletInput.trim().length < 20) {
+            alert("⚠️ Please enter a valid TON wallet address.");
+            return;
+        }
+
+        setIsSubmittingWallet(true);
+        try {
+            const { data: scoreData } = await supabase.from('user_score').select('username').eq('user_id', user.id).single();
+            const exactUsername = scoreData?.username || "HiddenUser";
+
+            await supabase.rpc('claim_ton_prize', {
+                user_id_in: user.id,
+                username_in: exactUsername,
+                prize_in: wonTonPrize,
+                wallet_in: walletInput.trim()
+            });
+
+            alert(`✅ REWARD CLAIMED!\n\nPrize: ${wonTonPrize}\nStatus: PENDING.\n\nYour reward will be sent to your wallet soon.`);
+            setWonTonPrize(null);
+            fetchWinners(); // Refrescar la lista de ganadores
+        } catch (err) {
+            console.error(err);
+            alert("Error submitting claim. Please contact support.");
+        }
+        setIsSubmittingWallet(false);
     };
 
     const handleBuyMoreSpins = async () => {
@@ -228,14 +285,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             const result = await tonConnectUI.sendTransaction(transaction);
             
             if (result) {
-                const typedUser = user as unknown as { user_metadata?: { username?: string }, username?: string };
-                const fallbackUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
+                const { data: scoreData } = await supabase.from('user_score').select('username').eq('user_id', user.id).single();
+                const exactUsername = scoreData?.username || "HiddenUser";
 
                 const { error } = await supabase.rpc('buy_vip_tickets', { 
                     user_id_in: user.id, 
                     ton_amount: EXTRA_SPINS_PRICE_TON, 
                     tickets_qty: 3,
-                    username_in: fallbackUsername 
+                    username_in: exactUsername 
                 });
                 
                 if (error) throw error;
@@ -298,6 +355,18 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             backdropFilter: 'blur(10px)'
         }}>
             
+            {/* BOTÓN CÍRCULO DE GANADORES (IZQUIERDA) */}
+            <button onClick={() => setShowWinners(true)} style={{
+                position:'absolute', top:20, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
+                background: 'rgba(255, 215, 0, 0.1)', borderRadius: '50%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)'
+            }}><Trophy size={20}/></button>
+
+            {/* BOTÓN CERRAR (DERECHA) */}
+            <button onClick={onClose} style={{
+                position:'absolute', top:20, right:20, border:'none', color:'#fff', cursor:'pointer',
+                background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '5px'
+            }}><X size={24}/></button>
+
             <div style={{textAlign:'center', marginBottom:'20px', position:'relative'}}>
                 <div style={{position:'absolute', top:'-20px', left:'50%', transform:'translateX(-50%)', width:'150px', height:'150px', background:'radial-gradient(circle, rgba(0, 136, 204, 0.4) 0%, transparent 70%)', zIndex:-1}}></div>
                 <h2 style={{
@@ -313,6 +382,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             </div>
 
+            {/* RULETA */}
             <div style={{ position: 'relative', width: '320px', height: '320px', marginBottom: '30px' }}>
                 <div style={{
                     position: 'absolute', top: '-20px', left: '50%', transform: 'translateX(-50%)',
@@ -356,11 +426,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
             {/* CONTROLES */}
             <div style={{width: '85%', display: 'flex', flexDirection: 'column', gap: '10px'}}>
-                
-                {/* Botón Principal Adaptativo */}
                 {renderMainButton()}
-
-                {/* Botón de Compra Siempre Visible */}
                 <button 
                     className="btn-neon"
                     onClick={handleBuyMoreSpins}
@@ -380,10 +446,64 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </button>
             </div>
 
-            <button onClick={onClose} style={{
-                position:'absolute', top:20, right:20, border:'none', color:'#fff', cursor:'pointer',
-                background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '5px'
-            }}><X size={24}/></button>
+            {/* 🔥 MODAL: INGRESO DE WALLET (SÓLO CUANDO GANAN TON) */}
+            {wonTonPrize && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.95)', zIndex: 8000, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+                    <Diamond size={60} color="#00F2FE" style={{ filter: 'drop-shadow(0 0 20px #00F2FE)', marginBottom: '20px' }} />
+                    <h2 style={{ color: '#fff', fontSize: '28px', textAlign: 'center', margin: '0 0 10px' }}>JACKPOT!</h2>
+                    <p style={{ color: '#00F2FE', fontSize: '18px', fontWeight: 'bold', marginBottom: '30px' }}>YOU WON {wonTonPrize}</p>
+                    
+                    <div style={{ width: '100%', maxWidth: '300px', background: '#111', padding: '20px', borderRadius: '15px', border: '1px solid #333' }}>
+                        <label style={{ display: 'block', color: '#aaa', fontSize: '12px', marginBottom: '8px' }}>Enter your TON Wallet Address:</label>
+                        <input 
+                            type="text" 
+                            value={walletInput} 
+                            onChange={(e) => setWalletInput(e.target.value)}
+                            placeholder="EQD..."
+                            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #444', background: '#000', color: '#fff', fontSize: '14px', marginBottom: '20px', boxSizing: 'border-box' }}
+                        />
+                        <button 
+                            onClick={handleSubmitWallet} 
+                            disabled={isSubmittingWallet}
+                            style={{ width: '100%', padding: '15px', background: '#00F2FE', color: '#000', border: 'none', borderRadius: '8px', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', cursor: 'pointer' }}
+                        >
+                            <Send size={18} /> {isSubmittingWallet ? 'SAVING...' : 'CLAIM REWARD'}
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 🔥 MODAL: LISTA DE GANADORES */}
+            {showWinners && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(5, 5, 10, 0.98)', zIndex: 7500, display: 'flex', flexDirection: 'column', padding: '20px', backdropFilter: 'blur(10px)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', marginTop: '20px' }}>
+                        <h2 style={{ color: '#FFD700', fontSize: '24px', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}><Trophy /> RECENT WINNERS</h2>
+                        <button onClick={() => setShowWinners(false)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer' }}><X size={28} /></button>
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '20px' }}>
+                        {winnersList.length === 0 ? (
+                            <div style={{ color: '#666', textAlign: 'center', marginTop: '50px' }}>No winners yet. Be the first!</div>
+                        ) : (
+                            winnersList.map((w, index) => (
+                                <div key={index} style={{ background: 'rgba(255,255,255,0.05)', padding: '15px', borderRadius: '12px', border: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <div style={{ color: '#fff', fontWeight: 'bold', fontSize: '14px' }}>@{w.username}</div>
+                                        <div style={{ color: '#00F2FE', fontSize: '16px', fontWeight: '900', marginTop: '4px' }}>{w.prize}</div>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        {w.status === 'Completed' ? (
+                                            <div style={{ background: 'rgba(76, 175, 80, 0.2)', color: '#4CAF50', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}><CheckCircle2 size={12}/> COMPLETED</div>
+                                        ) : (
+                                            <div style={{ background: 'rgba(255, 152, 0, 0.2)', color: '#FF9800', padding: '4px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px' }}><Clock size={12}/> PENDING</div>
+                                        )}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
 
             <style>{`@keyframes spinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
