@@ -373,7 +373,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             )}
             
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
-            {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} onUpdateScore={setScore} />}
+            {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} score={score} onUpdateScore={setScore} />}
             {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} />}
             
             <style>{`
