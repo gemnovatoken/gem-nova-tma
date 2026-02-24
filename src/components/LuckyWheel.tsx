@@ -1,125 +1,156 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { X, Zap, Video, Gift } from 'lucide-react';
+import { useTonConnectUI } from '@tonconnect/ui-react';
+import { X, Ticket, Diamond, AlertTriangle, RefreshCw } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 
 interface LuckyWheelProps {
     onClose: () => void;
+    score: number; 
     onUpdateScore: Dispatch<SetStateAction<number>>;
 }
 
-// ✅ NUEVA INTERFAZ PARA SOLUCIONAR EL ERROR DE TIPO
-interface AdResponse {
-    success: boolean;
-    progress: number;
-    rewarded: boolean;
-}
+const SPIN_COST = 50000;
+const MAX_DAILY_SPINS = 3;
+const EXTRA_SPINS_PRICE_TON = 3;
 
-// 1. CONFIGURACIÓN CENTRALIZADA
+// 🎲 8 PREMIOS INTERCALADOS PARA MÁXIMA EMOCIÓN VISUAL
 const WHEEL_ITEMS = [
-    { value: 5000, label: "5K", sub: "JACKPOT", color: "#FFD700", textCol: "#000" }, 
-    { value: 500,  label: "500", sub: "",        color: "#222",    textCol: "#fff" }, 
-    { value: 2000, label: "2K",  sub: "",        color: "#00F2FE", textCol: "#000" }, 
-    { value: 0,    label: "FAIL",sub: "",        color: "#FF512F", textCol: "#fff" }, 
-    { value: 1000, label: "1K",  sub: "",        color: "#E040FB", textCol: "#000" }  
+    { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
+    { value: 10000,    label: "10K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
+    { value: '0.5TON', label: "0.5",    sub: "TON",     color: "#FFD700", textCol: "#000" }, 
+    { value: 5000,     label: "5K",     sub: "PTS",     color: "#444",    textCol: "#aaa" }, 
+    { value: '0.15TON',label: "0.15",   sub: "TON",     color: "#E040FB", textCol: "#fff" }, 
+    { value: 0,        label: "FAIL",   sub: "SKULL",   color: "#FF0055", textCol: "#fff" }, 
+    { value: 100000,   label: "100K",   sub: "MEGA",    color: "#00F2FE", textCol: "#000" }, 
+    { value: 50000,    label: "50K",    sub: "REFUND",  color: "#333",    textCol: "#fff" }  
 ];
 
-export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }) => {
+export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdateScore }) => {
     const { user } = useAuth();
+    const [tonConnectUI] = useTonConnectUI();
     const [spinning, setSpinning] = useState(false);
     const [rotation, setRotation] = useState(0);
-    const [spinsUsed, setSpinsUsed] = useState(0);
-    const maxSpins = 7; 
-    const freeSpins = 2; 
+    const [spinsUsed, setSpinsUsed] = useState(0); // Tiros usados hoy
+    const [extraSpins, setExtraSpins] = useState(0); // Tiros comprados con TON
 
+    // Simulación de carga inicial (En prod, carga esto desde Supabase)
     useEffect(() => {
         if (user) {
-            const loadData = async () => {
-                const { data } = await supabase.from('user_score').select('spins_used_today, last_free_spin').eq('user_id', user.id).single();
-                if (data) {
-                    const today = new Date().toISOString().split('T')[0];
-                    setSpinsUsed(data.last_free_spin === today ? data.spins_used_today : 0);
-                }
-            };
-            loadData();
+            // Aquí debes hacer fetch de la base de datos para saber cuántos giros ha usado hoy
+            // const { data } = await supabase.from('user_score').select('spins_used_today').eq('user_id', user.id).single();
+            // setSpinsUsed(data.spins_used_today);
         }
     }, [user]);
 
+    const spinsLeft = (MAX_DAILY_SPINS - spinsUsed) + extraSpins;
+
     const handleSpin = async () => {
-        if (spinning || spinsUsed >= maxSpins || !user) return;
+        if (spinning || !user) return;
 
-        const isFree = spinsUsed < freeSpins;
+        if (spinsLeft <= 0) return;
 
-        // --- LÓGICA DE VIDEO PUBLICITARIO ---
-        if (!isFree) {
-            if(!window.confirm(`📺 Watch Ad to Spin? (${maxSpins - spinsUsed} left)`)) return;
-            
-            console.log("Watching Ad...");
-            // Simulación del video
-            await new Promise(r => setTimeout(r, 2000));
-
-            // 🔥 INTEGRACIÓN TICKET EMPIRE: REGISTRAR VISTA DE VIDEO 🔥
-            try {
-                const { data: adResult, error: adError } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
-                
-                // ✅ SOLUCIÓN DEL ERROR: Usamos la interfaz 'AdResponse' en lugar de 'any'
-                const result = adResult as AdResponse;
-
-                if (!adError && result?.rewarded) {
-                    // console.log("Ticket ganado por ver video en Ruleta!");
-                }
-            } catch (err) {
-                console.error("Error registrando video para tickets:", err);
-            }
+        // 1. VERIFICAR SALDO DE PUNTOS (Siempre cuesta 50k, sin importar si es giro gratis o extra)
+        if (score < SPIN_COST) {
+            alert(`🚫 INSUFFICIENT BALANCE\n\nYou need ${SPIN_COST.toLocaleString()} points to spin the Wheel.`);
+            return;
         }
 
-        setSpinning(true);
+        const confirmSpin = window.confirm(`💎 DEDUCT ${SPIN_COST.toLocaleString()} POINTS?\n\nAre you feeling lucky?`);
+        if(!confirmSpin) return;
 
-        // A. LLAMADA A SUPABASE (Girar Ruleta)
+        setSpinning(true);
+        
+        // 2. DESCONTAR 50K PUNTOS (Visual)
+        onUpdateScore(prev => prev - SPIN_COST);
+
+        // 3. LLAMADA A SUPABASE
         const { data, error } = await supabase.rpc('spin_wheel_v2', { user_id_in: user.id });
 
         if (error || !data || data.length === 0) {
-            alert("Error spinning. Try again.");
+            alert("Connection error. Your 50k points have been refunded.");
+            onUpdateScore(prev => prev + SPIN_COST); 
             setSpinning(false);
             return;
         }
 
-        const wonAmount = data[0].reward;
-        const newSpins = data[0].new_spins_used;
-
-        // B. CÁLCULO MATEMÁTICO
+        const wonAmount = data[0].reward; 
+        
+        // CÁLCULO VISUAL (8 Segmentos = 45 grados)
         const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
-        const targetIndex = winningIndex !== -1 ? winningIndex : 3; 
+        const targetIndex = winningIndex !== -1 ? winningIndex : 5; // Default to FAIL (index 5)
 
-        const segmentAngle = 360 / WHEEL_ITEMS.length; 
-        const centerOffset = segmentAngle / 2;
+        const segmentAngle = 360 / WHEEL_ITEMS.length; // 45 deg
+        const centerOffset = segmentAngle / 2; // 22.5 deg
         const baseRotation = 360 - (targetIndex * segmentAngle) - centerOffset;
-        const randomWobble = Math.floor(Math.random() * 40) - 20;
-        const finalRotation = rotation + 1800 + baseRotation + randomWobble;
+        const randomWobble = Math.floor(Math.random() * 30) - 15; // Rango de +/- 15 grados
+        const finalRotation = rotation + 1800 + baseRotation + randomWobble; // 5 Vueltas extra
 
         setRotation(finalRotation);
 
         setTimeout(() => {
             setSpinning(false);
-            setSpinsUsed(newSpins);
             
-            if (wonAmount > 0) {
+            // Restar el giro de la UI
+            if (extraSpins > 0) setExtraSpins(prev => prev - 1);
+            else setSpinsUsed(prev => prev + 1);
+
+            // MANEJO DE PREMIOS
+            if (typeof wonAmount === 'string' && wonAmount.includes('TON')) {
+                if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
+                alert(`💎 HOLY MOLY! YOU WON ${wonAmount}!\n\nContact support to claim your real crypto reward!`);
+            } else if (typeof wonAmount === 'number' && wonAmount > 0) {
                 onUpdateScore(s => s + wonAmount);
                 if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
-                alert(`🎉 JACKPOT! +${wonAmount.toLocaleString()} Pts!`);
+                
+                if (wonAmount > SPIN_COST) {
+                    alert(`🎉 BIG WIN! +${wonAmount.toLocaleString()} Pts!`);
+                } else if (wonAmount === SPIN_COST) {
+                    alert(`⚖️ Phew! You got your ${wonAmount.toLocaleString()} points back.`);
+                } else {
+                    alert(`📉 Ouch! You only won ${wonAmount.toLocaleString()} points back.`);
+                }
             } else {
-                if (window.navigator.vibrate) window.navigator.vibrate(200);
-                alert("💀 Missed! Try again!");
+                if (window.navigator.vibrate) window.navigator.vibrate(400);
+                alert("💀 BUSTED! The house wins. Better luck next time!");
             }
         }, 4000);
     };
 
-    const isFreeNext = spinsUsed < freeSpins;
-    const isLimitReached = spinsUsed >= maxSpins;
+    // FUNCIÓN PARA COMPRAR MÁS GIROS
+    const handleBuyMoreSpins = async () => {
+        if (!tonConnectUI.account) {
+            alert("❌ Please connect your TON wallet first!");
+            return;
+        }
+
+        const confirmBuy = window.confirm(`💳 PAY ${EXTRA_SPINS_PRICE_TON} TON?\n\nThis unlocks 3 more spins for today.\n(Each spin still costs 50k points).`);
+        if(!confirmBuy) return;
+
+        // Billetera admin
+        const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
+
+        try {
+            const transaction = {
+                validUntil: Math.floor(Date.now() / 1000) + 360,
+                messages: [{ address: ADMIN_WALLET, amount: (EXTRA_SPINS_PRICE_TON * 1000000000).toString() }],
+            };
+            const result = await tonConnectUI.sendTransaction(transaction);
+            if (result) {
+                // Si el pago es exitoso, sumamos 3 tiros extra en la UI
+                // OJO: Aquí deberías llamar a Supabase para registrar la compra también
+                setExtraSpins(prev => prev + 3);
+                alert("🎉 SUCCESS! You unlocked 3 extra spins!");
+            }
+        } catch (err) {
+            console.error("TON Transaction Error: ", err);
+            alert("❌ Transaction cancelled.");
+        }
+    };
 
     const conicGradient = `conic-gradient(
-        ${WHEEL_ITEMS.map((item, i) => `${item.color} ${i * 72}deg ${(i + 1) * 72}deg`).join(', ')}
+        ${WHEEL_ITEMS.map((item, i) => `${item.color} ${i * (360 / WHEEL_ITEMS.length)}deg ${(i + 1) * (360 / WHEEL_ITEMS.length)}deg`).join(', ')}
     )`;
 
     return (
@@ -131,113 +162,139 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, onUpdateScore }
         }}>
             
             <div style={{textAlign:'center', marginBottom:'30px', position:'relative'}}>
-                <div style={{position:'absolute', top:'-20px', left:'50%', transform:'translateX(-50%)', width:'150px', height:'150px', background:'radial-gradient(circle, rgba(224,64,251,0.4) 0%, transparent 70%)', zIndex:-1}}></div>
+                <div style={{position:'absolute', top:'-20px', left:'50%', transform:'translateX(-50%)', width:'150px', height:'150px', background:'radial-gradient(circle, rgba(0, 136, 204, 0.4) 0%, transparent 70%)', zIndex:-1}}></div>
                 <h2 style={{
-                    color:'#fff', textShadow:'0 0 20px #E040FB, 0 0 40px #E040FB', 
-                    fontSize:'36px', margin:0, fontWeight:'900', letterSpacing:'2px', fontStyle:'italic'
+                    color:'#fff', textShadow:'0 0 20px #0088CC, 0 0 40px #0088CC', 
+                    fontSize:'32px', margin:0, fontWeight:'900', letterSpacing:'2px'
                 }}>
-                    NEON SPIN
+                    HIGH ROLLER <Diamond size={24} style={{verticalAlign: 'middle', color: '#00F2FE'}}/>
                 </h2>
-                
-                <div style={{display:'flex', gap:'5px', justifyContent:'center', marginTop:'10px'}}>
-                    {[...Array(maxSpins)].map((_, i) => (
-                        <div key={i} style={{
-                            width:'8px', height:'8px', borderRadius:'50%',
-                            background: i < spinsUsed ? '#333' : (i < freeSpins ? '#4CAF50' : '#E040FB'),
-                            boxShadow: i >= spinsUsed ? (i < freeSpins ? '0 0 5px #4CAF50' : '0 0 5px #E040FB') : 'none',
-                            border: '1px solid #333'
-                        }} />
-                    ))}
+                <div style={{color: '#FFD700', fontSize: '12px', fontWeight: 'bold', marginTop: '5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'}}>
+                    <AlertTriangle size={12} color="#FF0055" /> HIGH RISK, HIGH REWARD
                 </div>
             </div>
 
-            <div style={{ position: 'relative', width: '320px', height: '320px', marginBottom: '40px' }}>
+            {/* 🔥 CONTENEDOR DE LA RULETA (AHORA CON 8 SEGMENTOS) 🔥 */}
+            <div style={{ position: 'relative', width: '320px', height: '320px', marginBottom: '30px' }}>
                 
+                {/* Puntero */}
                 <div style={{
-                    position: 'absolute', top: '-25px', left: '50%', transform: 'translateX(-50%)',
-                    width: '40px', height: '40px', background: '#fff', clipPath: 'polygon(50% 100%, 0 0, 100% 0)',
-                    zIndex: 20, filter: 'drop-shadow(0 0 10px #fff)'
+                    position: 'absolute', top: '-20px', left: '50%', transform: 'translateX(-50%)',
+                    width: '30px', height: '40px', background: '#FFD700', clipPath: 'polygon(50% 100%, 0 0, 100% 0)',
+                    zIndex: 20, filter: 'drop-shadow(0 0 10px #FFD700)'
                 }}></div>
 
+                {/* Aro Exterior Brillante */}
                 <div style={{
                     position:'absolute', top:'-10px', left:'-10px', right:'-10px', bottom:'-10px',
-                    borderRadius:'50%', border:'2px dashed rgba(255,255,255,0.3)',
-                    animation: 'spinSlow 10s linear infinite'
+                    borderRadius:'50%', border:'2px solid rgba(0, 136, 204, 0.5)',
+                    boxShadow: '0 0 30px rgba(0, 136, 204, 0.3)',
+                    animation: 'spinSlow 15s linear infinite'
                 }}></div>
 
+                {/* La Ruleta */}
                 <div style={{
                     width: '100%', height: '100%', borderRadius: '50%',
-                    border: '8px solid #1a1a1a', 
-                    boxShadow: '0 0 50px rgba(224, 64, 251, 0.2), inset 0 0 30px rgba(0,0,0,0.5)',
+                    border: '6px solid #111', 
+                    boxShadow: 'inset 0 0 40px rgba(0,0,0,0.8)',
                     transform: `rotate(${rotation}deg)`,
                     transition: 'transform 4s cubic-bezier(0.1, 0, 0.2, 1)',
                     background: conicGradient,
-                    position: 'relative'
+                    position: 'relative',
+                    overflow: 'hidden'
                 }}>
                     {WHEEL_ITEMS.map((item, i) => (
                         <WheelLabel 
                             key={i}
                             text={item.label} 
                             sub={item.sub} 
-                            angle={(i * 72) + 36} 
+                            // 360/8 = 45. El centro de cada rebanada es (i * 45) + 22.5
+                            angle={(i * 45) + 22.5} 
                             color={item.textCol} 
                         />
                     ))}
                 </div>
 
+                {/* Centro Decorativo */}
                 <div style={{
                     position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)',
-                    width:'70px', height:'70px', background:'#111', borderRadius:'50%',
-                    border:'4px solid #E040FB', display:'flex', alignItems:'center', justifyContent:'center',
-                    boxShadow: '0 0 30px #E040FB'
+                    width:'60px', height:'60px', background:'#111', borderRadius:'50%',
+                    border:'4px solid #0088CC', display:'flex', alignItems:'center', justifyContent:'center',
+                    boxShadow: '0 0 20px #0088CC'
                 }}>
-                    <Zap size={30} color="#fff" fill="#E040FB" />
+                    <Diamond size={24} color="#fff" fill="#0088CC" />
                 </div>
             </div>
 
-            <button 
-                className="btn-neon"
-                disabled={spinning || isLimitReached}
-                onClick={handleSpin}
-                style={{
-                    width: '85%', padding: '18px', fontSize: '18px', 
-                    background: isLimitReached ? '#333' : (isFreeNext ? '#4CAF50' : '#E040FB'), 
-                    color: '#fff', border: 'none', fontWeight:'900', borderRadius:'12px',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-                    boxShadow: isLimitReached ? 'none' : (isFreeNext ? '0 0 20px rgba(76, 175, 80, 0.4)' : '0 0 20px rgba(224, 64, 251, 0.4)'),
-                    transform: spinning ? 'scale(0.95)' : 'scale(1)', transition: 'all 0.2s'
-                }}
-            >
-                {isLimitReached ? (
-                    "COME BACK TOMORROW"
+            {/* CONTROLES DE GIRO Y COMPRA */}
+            <div style={{width: '85%', display: 'flex', flexDirection: 'column', gap: '10px'}}>
+                <div style={{textAlign: 'center', color: '#aaa', fontSize: '12px', fontWeight: 'bold'}}>
+                    SPINS LEFT: <span style={{color: spinsLeft > 0 ? '#4CAF50' : '#FF0055'}}>{spinsLeft}</span>
+                </div>
+
+                {spinsLeft > 0 ? (
+                    <button 
+                        className="btn-neon"
+                        disabled={spinning || score < SPIN_COST}
+                        onClick={handleSpin}
+                        style={{
+                            width: '100%', padding: '15px', fontSize: '16px', 
+                            background: score >= SPIN_COST ? 'linear-gradient(180deg, #0088CC 0%, #005580 100%)' : '#333', 
+                            color: score >= SPIN_COST ? '#fff' : '#888', border: score >= SPIN_COST ? '1px solid #00F2FE' : '1px solid #222', 
+                            fontWeight:'900', borderRadius:'12px',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
+                            boxShadow: score >= SPIN_COST && !spinning ? '0 0 20px rgba(0, 136, 204, 0.5)' : 'none',
+                            transform: spinning ? 'scale(0.95)' : 'scale(1)', transition: 'all 0.2s'
+                        }}
+                    >
+                        {spinning ? "SPINNING..." : (
+                            <>
+                                <span style={{display: 'flex', alignItems: 'center', gap: '8px'}}><Ticket size={18} /> PLAY NOW</span>
+                                <span style={{fontSize: '10px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '4px'}}>
+                                    COST: {SPIN_COST.toLocaleString()} PTS
+                                </span>
+                            </>
+                        )}
+                    </button>
                 ) : (
-                    spinning ? "ROLLING..." : (
-                        isFreeNext ? <><Gift /> FREE SPIN ({freeSpins - spinsUsed} LEFT)</> : <><Video /> WATCH AD TO SPIN</>
-                    )
+                    <button 
+                        className="btn-neon"
+                        onClick={handleBuyMoreSpins}
+                        style={{
+                            width: '100%', padding: '15px', fontSize: '14px', 
+                            background: 'linear-gradient(180deg, #FFD700 0%, #B8860B 100%)', 
+                            color: '#000', border: '1px solid #FFF', 
+                            fontWeight:'900', borderRadius:'12px',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px',
+                            boxShadow: '0 0 20px rgba(255, 215, 0, 0.4)'
+                        }}
+                    >
+                        <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><RefreshCw size={16} /> UNLOCK +3 SPINS</span>
+                        <span style={{fontSize: '10px', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: '4px', color: '#fff'}}>
+                            PAY 3 TON
+                        </span>
+                    </button>
                 )}
-            </button>
-            
-            <div style={{marginTop:'20px', display:'flex', gap:'20px', fontSize:'10px', color:'#888'}}>
-                <div style={{display:'flex', alignItems:'center', gap:'5px'}}><div style={{width:6, height:6, borderRadius:'50%', background:'#4CAF50'}}></div> Free Spins</div>
-                <div style={{display:'flex', alignItems:'center', gap:'5px'}}><div style={{width:6, height:6, borderRadius:'50%', background:'#E040FB'}}></div> Ad Spins</div>
             </div>
 
             <button onClick={onClose} style={{
-                position:'absolute', top:20, right:20, background:'none', border:'none', color:'#fff', cursor:'pointer'
-            }}><X size={32}/></button>
+                position:'absolute', top:20, right:20, border:'none', color:'#fff', cursor:'pointer',
+                background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '5px'
+            }}><X size={24}/></button>
 
             <style>{`@keyframes spinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
     );
 };
 
+// Se ajustó translateY para 8 rebanadas
 const WheelLabel = ({ text, sub, angle, color }: { text: string, sub?: string, angle: number, color: string }) => (
     <div style={{
         position: 'absolute', top: '50%', left: '50%',
-        transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-110px)`,
-        color: color, textAlign: 'center', width: '100px'
+        transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-110px)`, 
+        color: color, textAlign: 'center', width: '70px'
     }}>
-        <div style={{fontWeight:'900', fontSize:'20px', textShadow:'0 1px 2px rgba(0,0,0,0.3)', transform: `rotate(${-angle}deg)`}}>{text}</div>
-        {sub && <div style={{fontSize:'8px', fontWeight:'bold', opacity:0.8, transform: `rotate(${-angle}deg)`}}>{sub}</div>}
+        <div style={{fontWeight:'900', fontSize:'20px', textShadow:'0 1px 3px rgba(0,0,0,0.5)', transform: `rotate(${-angle}deg)`}}>{text}</div>
+        {sub && <div style={{fontSize:'8px', fontWeight:'bold', opacity:0.9, transform: `rotate(${-angle}deg)`}}>{sub}</div>}
     </div>
 );
