@@ -17,7 +17,6 @@ const GAME_CONFIG = {
 
 const MANIFEST_URL = 'https://gem-nova-tma.vercel.app/tonconnect-manifest.json'; 
 
-// Interfaz para leer Referidos
 interface TelegramWebApp {
     initDataUnsafe?: {
         user?: {
@@ -46,12 +45,11 @@ export default function App() {
     const [botTime, setBotTime] = useState(0);
     const [adsWatched, setAdsWatched] = useState(0);
 
-    const [overclockTime, setOverclockTime] = useState(0); // Tiempo restante del turbo
+    const [overclockTime, setOverclockTime] = useState(0); 
 
     const { user, loading: authLoading } = useAuth();
     
     const limitIdx = Math.min(Math.max(0, levels.limit - 1), 7);
-    // FORZAMOS QUE LA VELOCIDAD USE EL MISMO NIVEL QUE EL LIMITE
     const speedIdx = Math.min(Math.max(0, levels.limit - 1), 7);
     const maxEnergy = GAME_CONFIG.limit.values[limitIdx] || 500;
     const regenRate = GAME_CONFIG.speed.values[speedIdx] || 1;
@@ -61,37 +59,45 @@ export default function App() {
 
 
     // =========================================================================
-    // 🚀 NUEVA CAPTURA GLOBAL DE REFERIDO (Milisegundo 1 al abrir la app) 🚀
+    // 🚀 NUEVA CAPTURA GLOBAL DE REFERIDO BLINDADA
     // =========================================================================
     useEffect(() => {
         const captureReferralGlobal = async () => {
-            // 1. Esperamos a que el usuario esté logueado en Supabase
             if (!user) return; 
 
-            // 2. Validamos que no se haya procesado ya en esta misma sesión
             if (sessionStorage.getItem('referral_checked')) return;
 
-            // 3. Obtenemos el parámetro directamente de Telegram
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
             const startParam = tg?.initDataUnsafe?.start_param;
+            const tgUser = tg?.initDataUnsafe?.user;
+            const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
             if (startParam && startParam !== user.id) {
                 console.log("🚀 Referrer detected globally:", startParam);
                 
-                const { error } = await supabase.rpc('register_referral_on_load', { 
+                // 🔥 SOLUCIÓN: Limpiamos el código AQUÍ antes de enviarlo
+                let cleanReferrerId = startParam;
+                if (startParam.includes('ref_')) {
+                    cleanReferrerId = startParam.split('ref_')[1]; 
+                } else if (startParam.includes('_')) {
+                    cleanReferrerId = startParam.split('_')[1];
+                }
+
+                // Usamos la función unificada
+                const { error } = await supabase.rpc('register_new_user', { 
                     p_user_id: user.id, 
-                    p_referrer_code: startParam 
+                    p_username: username,
+                    p_referral_code_text: cleanReferrerId 
                 });
 
                 if (error) {
                     console.error("❌ Error guardando el referido global:", error);
                 } else {
-                    console.log("✅ Referido global guardado con éxito en la BD (Lucky Ticket Entregado)");
+                    console.log("✅ Referido global guardado con éxito en la BD");
                 }
             }
 
-            // 4. Marcamos la sesión para no repetir la llamada a la BD
             sessionStorage.setItem('referral_checked', 'true');
         };
 
@@ -174,40 +180,32 @@ export default function App() {
 
                 } 
                 // ==========================================
-                // CASO B: USUARIO NUEVO (CORREGIDO & VERIFICADO)
+                // CASO B: USUARIO NUEVO
                 // ==========================================
                 else {
                     console.log("🆕 Usuario Nuevo detectado. Start Param:", startParam);
                     
                     let referrerId = null;
 
-                    // LÓGICA ROBUSTA PARA EXTRAER REFERIDO
-                    if (startParam && startParam.length > 5) { // Evitamos códigos basura muy cortos
+                    if (startParam && startParam.length > 5) { 
                         if (startParam.includes('ref_')) {
-                            // Caso 1: t.me/bot?start=ref_e3a4...
                             referrerId = startParam.split('ref_')[1]; 
                         } 
                         else if (startParam.includes('_')) {
-                             // Caso 2: t.me/bot?start=algo_e3a4...
                              referrerId = startParam.split('_')[1];
                         }
                         else {
-                            // Caso 3: t.me/bot?start=e3a4... (Directo)
                             referrerId = startParam; 
                         }
                     }
 
-                    console.log("🔗 ID de Referido enviado al SQL:", referrerId);
-
-                    // REGISTRO DEL USUARIO CON EL REFERIDO LIMPIO
                     const { error: insertError } = await supabase.rpc('register_new_user', {
                         p_user_id: user.id,
                         p_username: username,
-                        p_referral_code_text: referrerId // Enviamos el UUID limpio o null
+                        p_referral_code_text: referrerId 
                     });
                     
                     if (!insertError) {
-                        // BONO VISUAL: Si entró con referido, iniciamos el contador en 5000
                         setScore(referrerId ? 5000 : 0); 
                         scoreRef.current = referrerId ? 5000 : 0;
                         
@@ -310,7 +308,6 @@ export default function App() {
 
                     {currentTab === 'mission' && (
                         <div style={{ animation: 'fadeIn 0.3s' }}>
-                            {/* 🔥 AQUÍ ESTABA EL ERROR: AHORA PASAMOS SETSCORE 🔥 */}
                             <MissionZone setGlobalScore={setScore} />
                         </div>
                     )}
