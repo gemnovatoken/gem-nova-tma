@@ -32,17 +32,43 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [tonConnectUI] = useTonConnectUI();
     const [spinning, setSpinning] = useState(false);
     const [rotation, setRotation] = useState(0);
-    const [spinsUsed, setSpinsUsed] = useState(0); // Tiros usados hoy
-    const [extraSpins, setExtraSpins] = useState(0); // Tiros comprados con TON
+    const [spinsUsed, setSpinsUsed] = useState(0); 
+    const [extraSpins, setExtraSpins] = useState(0); 
 
-    // Simulación de carga inicial (En prod, carga esto desde Supabase)
+    // 🔥 SOLUCIÓN AL CASCADING RENDER: Ejecución Asíncrona 🔥
     useEffect(() => {
         if (user) {
-            // Aquí debes hacer fetch de la base de datos para saber cuántos giros ha usado hoy
-            // const { data } = await supabase.from('user_score').select('spins_used_today').eq('user_id', user.id).single();
-            // setSpinsUsed(data.spins_used_today);
+            // El setTimeout(..., 0) evita el error de "setState synchronously" en React
+            setTimeout(() => {
+                const today = new Date().toISOString().split('T')[0];
+                const savedData = localStorage.getItem(`lucky_wheel_${user.id}`);
+                
+                if (savedData) {
+                    const parsed = JSON.parse(savedData);
+                    if (parsed.date === today) {
+                        setSpinsUsed(parsed.spinsUsed || 0);
+                        setExtraSpins(parsed.extraSpins || 0);
+                    } else {
+                        // Si es un día nuevo, limpiamos la memoria
+                        setSpinsUsed(0);
+                        setExtraSpins(0);
+                    }
+                }
+            }, 0);
         }
     }, [user]);
+
+    // Guardar en memoria cada vez que cambien los tiros
+    useEffect(() => {
+        if (user) {
+            const today = new Date().toISOString().split('T')[0];
+            localStorage.setItem(`lucky_wheel_${user.id}`, JSON.stringify({ 
+                date: today, 
+                spinsUsed, 
+                extraSpins 
+            }));
+        }
+    }, [spinsUsed, extraSpins, user]);
 
     const spinsLeft = (MAX_DAILY_SPINS - spinsUsed) + extraSpins;
 
@@ -51,7 +77,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
         if (spinsLeft <= 0) return;
 
-        // 1. VERIFICAR SALDO DE PUNTOS (Siempre cuesta 50k, sin importar si es giro gratis o extra)
+        // 1. VERIFICAR SALDO
         if (score < SPIN_COST) {
             alert(`🚫 INSUFFICIENT BALANCE\n\nYou need ${SPIN_COST.toLocaleString()} points to spin the Wheel.`);
             return;
@@ -62,14 +88,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
         setSpinning(true);
         
-        // 2. DESCONTAR 50K PUNTOS (Visual)
+        // 2. DESCONTAR PUNTOS INMEDIATAMENTE
         onUpdateScore(prev => prev - SPIN_COST);
 
         // 3. LLAMADA A SUPABASE
         const { data, error } = await supabase.rpc('spin_wheel_v2', { user_id_in: user.id });
 
         if (error || !data || data.length === 0) {
-            alert("Connection error. Your 50k points have been refunded.");
+            alert("Connection error. Your points have been refunded.");
             onUpdateScore(prev => prev + SPIN_COST); 
             setSpinning(false);
             return;
@@ -77,15 +103,17 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
         const wonAmount = data[0].reward; 
         
-        // CÁLCULO VISUAL (8 Segmentos = 45 grados)
+        // 4. CÁLCULO DE ROTACIÓN
         const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
-        const targetIndex = winningIndex !== -1 ? winningIndex : 5; // Default to FAIL (index 5)
+        const targetIndex = winningIndex !== -1 ? winningIndex : 5; 
 
-        const segmentAngle = 360 / WHEEL_ITEMS.length; // 45 deg
-        const centerOffset = segmentAngle / 2; // 22.5 deg
+        const segmentAngle = 360 / WHEEL_ITEMS.length; 
+        const centerOffset = segmentAngle / 2; 
         const baseRotation = 360 - (targetIndex * segmentAngle) - centerOffset;
-        const randomWobble = Math.floor(Math.random() * 30) - 15; // Rango de +/- 15 grados
-        const finalRotation = rotation + 1800 + baseRotation + randomWobble; // 5 Vueltas extra
+        const randomWobble = Math.floor(Math.random() * 30) - 15; 
+        
+        const currentFullSpins = Math.floor(rotation / 360);
+        const finalRotation = ((currentFullSpins + 5) * 360) + baseRotation + randomWobble;
 
         setRotation(finalRotation);
 
@@ -118,7 +146,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }, 4000);
     };
 
-    // FUNCIÓN PARA COMPRAR MÁS GIROS
     const handleBuyMoreSpins = async () => {
         if (!tonConnectUI.account) {
             alert("❌ Please connect your TON wallet first!");
@@ -128,7 +155,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         const confirmBuy = window.confirm(`💳 PAY ${EXTRA_SPINS_PRICE_TON} TON?\n\nThis unlocks 3 more spins for today.\n(Each spin still costs 50k points).`);
         if(!confirmBuy) return;
 
-        // Billetera admin
         const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
         try {
@@ -138,13 +164,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             };
             const result = await tonConnectUI.sendTransaction(transaction);
             if (result) {
-                // Si el pago es exitoso, sumamos 3 tiros extra en la UI
-                // OJO: Aquí deberías llamar a Supabase para registrar la compra también
                 setExtraSpins(prev => prev + 3);
                 alert("🎉 SUCCESS! You unlocked 3 extra spins!");
             }
         } catch (err) {
-            console.error("TON Transaction Error: ", err);
+            console.error(err);
             alert("❌ Transaction cancelled.");
         }
     };
@@ -174,17 +198,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             </div>
 
-            {/* 🔥 CONTENEDOR DE LA RULETA (AHORA CON 8 SEGMENTOS) 🔥 */}
             <div style={{ position: 'relative', width: '320px', height: '320px', marginBottom: '30px' }}>
                 
-                {/* Puntero */}
                 <div style={{
                     position: 'absolute', top: '-20px', left: '50%', transform: 'translateX(-50%)',
                     width: '30px', height: '40px', background: '#FFD700', clipPath: 'polygon(50% 100%, 0 0, 100% 0)',
                     zIndex: 20, filter: 'drop-shadow(0 0 10px #FFD700)'
                 }}></div>
 
-                {/* Aro Exterior Brillante */}
                 <div style={{
                     position:'absolute', top:'-10px', left:'-10px', right:'-10px', bottom:'-10px',
                     borderRadius:'50%', border:'2px solid rgba(0, 136, 204, 0.5)',
@@ -192,7 +213,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     animation: 'spinSlow 15s linear infinite'
                 }}></div>
 
-                {/* La Ruleta */}
                 <div style={{
                     width: '100%', height: '100%', borderRadius: '50%',
                     border: '6px solid #111', 
@@ -208,14 +228,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                             key={i}
                             text={item.label} 
                             sub={item.sub} 
-                            // 360/8 = 45. El centro de cada rebanada es (i * 45) + 22.5
                             angle={(i * 45) + 22.5} 
                             color={item.textCol} 
                         />
                     ))}
                 </div>
 
-                {/* Centro Decorativo */}
                 <div style={{
                     position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)',
                     width:'60px', height:'60px', background:'#111', borderRadius:'50%',
@@ -226,7 +244,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             </div>
 
-            {/* CONTROLES DE GIRO Y COMPRA */}
             <div style={{width: '85%', display: 'flex', flexDirection: 'column', gap: '10px'}}>
                 <div style={{textAlign: 'center', color: '#aaa', fontSize: '12px', fontWeight: 'bold'}}>
                     SPINS LEFT: <span style={{color: spinsLeft > 0 ? '#4CAF50' : '#FF0055'}}>{spinsLeft}</span>
@@ -287,7 +304,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     );
 };
 
-// Se ajustó translateY para 8 rebanadas
 const WheelLabel = ({ text, sub, angle, color }: { text: string, sub?: string, angle: number, color: string }) => (
     <div style={{
         position: 'absolute', top: '50%', left: '50%',
