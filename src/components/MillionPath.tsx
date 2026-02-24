@@ -141,17 +141,27 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         }
     };
 
-      const handleStartTask = async (taskLetter: 'A' | 'B', type: string) => {
-         if (!user || loading) return;
+    const handleStartTask = async (taskLetter: 'A' | 'B', type: string) => {
+        if (!user || loading) return;
         setLoading(true);
+        
         try {
-            await loadLiveStats(); // 🚨 AQUÍ ESTÁ EL PROBLEMA
+            // 1. Obtenemos el valor actual SIN llamar a la base de datos de nuevo
+            // Usamos el estado que ya se actualiza cada 3 segundos
             const currentValue = getStatValueByType(type);
             const columnToUpdate = taskLetter === 'A' ? 'task_a_start_value' : 'task_b_start_value';
-        
-            await supabase.from('user_million_path').update({ [columnToUpdate]: currentValue }).eq('user_id', user.id);
-        // ...
+            
+            // 2. 🔥 ACTUALIZAMOS EL ESTADO LOCAL PRIMERO (Optimistic UI Update)
+            // Esto hace que el botón cambie a "VERIFY" instantáneamente
             setProgress(prev => ({ ...prev, [columnToUpdate]: currentValue }));
+
+            // 3. Enviamos la actualización a Supabase de fondo
+            await supabase.from('user_million_path').update({ [columnToUpdate]: currentValue }).eq('user_id', user.id);
+            
+            // 4. Pausa de medio segundo. Esto obliga al navegador a no cerrar la función 
+            // instantáneamente si el usuario se sale rápido a otra app.
+            await new Promise(resolve => setTimeout(resolve, 500));
+
         } catch (e) {
             console.error(e);
             alert("Error starting task");
