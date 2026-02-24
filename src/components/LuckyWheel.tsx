@@ -50,7 +50,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
     const [showWinners, setShowWinners] = useState(false);
     
-    // 🔥 ESTADOS PARA PESTAÑAS DE GANADORES
     const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
     const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
 
@@ -98,7 +97,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             .from('wheel_winners')
             .select('username, prize, status')
             .order('created_at', { ascending: false })
-            .limit(20); // Subimos el límite para abarcar ambas listas
+            .limit(50); // 🔥 Aumentado a 50 para que no se borren tan rápido
             
         if (!error && data) {
             setWinnersList(data as WheelWinner[]);
@@ -109,7 +108,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         fetchWinners();
     }, []);
 
-    // 🔥 FUNCIÓN PARA REGISTRAR PUNTOS ALTOS EN SEGUNDO PLANO
     const registerPointWinner = async (prizeLabel: string) => {
         if (!user) return;
         try {
@@ -120,9 +118,9 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 user_id_in: user.id,
                 username_in: exactUsername,
                 prize_in: prizeLabel,
-                wallet_in: null // No ocupa wallet
+                wallet_in: null 
             });
-            fetchWinners(); // Refrescamos en fondo
+            fetchWinners(); 
         } catch (e) {
             console.error("Error logging point winner", e);
         }
@@ -207,11 +205,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
                 else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
 
+                // MANEJO DE PREMIOS
                 if (typeof wonAmount === 'string') {
                     if (wonAmount === '1GOLD') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
                         alert(`🎟️ GOLDEN VOUCHER AQUIRED!\n\nYou found a legendary Golden Voucher. Keep collecting!`);
-                        registerPointWinner("1 GOLD VOUCHER"); // Registra la ganancia grande
+                        registerPointWinner("1 GOLD VOUCHER"); 
                     } else if (wonAmount.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
                         setWonTonPrize(wonAmount);
@@ -223,13 +222,16 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     onUpdateScore(s => s + wonAmount);
                     if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
                     
+                    // 🔥 CORRECCIÓN: Ahora registra los puntos grandes para CUALQUIER tipo de tiro
+                    if (wonAmount >= 50000) {
+                        registerPointWinner(`${(wonAmount/1000).toFixed(0)}K PTS`);
+                    }
+
                     if (spinType === 'premium') {
                         alert(`🎉 VIP WIN! +${wonAmount.toLocaleString()} Pts added to balance!`);
                     } else {
                         if (wonAmount > SPIN_COST) {
                             alert(`🎉 BIG WIN! +${wonAmount.toLocaleString()} Pts!`);
-                            // 🔥 Si gana 50K o más, lo registramos en la lista de HIGH ROLLERS
-                            if (wonAmount >= 50000) registerPointWinner(`${(wonAmount/1000).toFixed(0)}K PTS`);
                         } else if (wonAmount === SPIN_COST) {
                             alert(`⚖️ Phew! You got your ${wonAmount.toLocaleString()} points back.`);
                         } else {
@@ -348,7 +350,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             return (
                 <button className="btn-neon" disabled={spinning || score < SPIN_COST} onClick={() => executeSpin('daily')}
                     style={{ width: '100%', padding: '15px', background: score >= SPIN_COST ? '#333' : '#222', color: score >= SPIN_COST ? '#fff' : '#666', border: score >= SPIN_COST ? '1px solid #fff' : '1px solid #333', fontWeight:'900', borderRadius:'12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', transform: spinning ? 'scale(0.95)' : 'scale(1)', transition: 'all 0.2s' }}>
-                    {spinning ? "SPINNING..." : <><span style={{display: 'flex', alignItems: 'center', gap: '8px'}}>🎰 PLAY NOW</span><span style={{fontSize: '10px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '4px'}}>COST: {SPIN_COST.toLocaleString()} PTS</span></>}
+                    {spinning ? "SPINNING..." : <><span style={{display: 'flex', alignItems: 'center', gap: '8px'}}><Ticket size={18} /> PLAY NOW</span><span style={{fontSize: '10px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '4px'}}>COST: {SPIN_COST.toLocaleString()} PTS</span></>}
                 </button>
             );
         } else if (adSpinsUsed < MAX_AD_SPINS) {
@@ -367,7 +369,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
     };
 
-    // 🔥 FILTROS PARA LAS PESTAÑAS
     const cryptoWinners = winnersList.filter(w => w.prize.includes('TON'));
     const pointsWinners = winnersList.filter(w => !w.prize.includes('TON'));
 
@@ -380,12 +381,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }}>
             
             <button onClick={() => setShowWinners(true)} style={{
-                position:'absolute', top:150, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
+                position:'absolute', top:80, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
                 background: 'rgba(255, 215, 0, 0.1)', borderRadius: '50%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)', zIndex: 7000
             }}><Trophy size={20}/></button>
 
             <button onClick={onClose} style={{
-                position:'absolute', top:100, right:20, border:'none', color:'#fff', cursor:'pointer',
+                position:'absolute', top:80, right:20, border:'none', color:'#fff', cursor:'pointer',
                 background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 7000
             }}><X size={24}/></button>
 
@@ -492,7 +493,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             )}
 
-            {/* 🔥 MODAL: LISTA DE GANADORES CON PESTAÑAS */}
             {showWinners && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(5, 5, 10, 0.98)', zIndex: 7500, display: 'flex', flexDirection: 'column', padding: '20px', backdropFilter: 'blur(10px)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', marginTop: '40px' }}>
@@ -500,7 +500,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                         <button onClick={() => setShowWinners(false)} style={{ background: 'transparent', border: 'none', color: '#fff', cursor: 'pointer', zIndex: 7600 }}><X size={28} /></button>
                     </div>
 
-                    {/* Selector de Pestañas */}
                     <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
                         <button 
                             onClick={() => setActiveTab('crypto')}
@@ -516,7 +515,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                         </button>
                     </div>
 
-                    {/* Lista Dinámica basada en Pestaña */}
                     <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', paddingBottom: '20px' }}>
                         {(activeTab === 'crypto' ? cryptoWinners : pointsWinners).length === 0 ? (
                             <div style={{ color: '#666', textAlign: 'center', marginTop: '50px' }}>No winners yet. Be the first!</div>
