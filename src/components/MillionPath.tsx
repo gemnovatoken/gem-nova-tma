@@ -62,7 +62,6 @@ const PATH_STEPS = [
     { lvl: 8, title: "The Final Boss", taskA: { desc: "Get 80,000 Pts", target: 80000, type: 'wealth' }, taskB: { desc: "Spin Lucky Wheel 2 Times", target: 2, type: 'lottery' } }
 ];
 
-// 🔥 TODOS LOS TIPOS SON ESTÁTICOS PARA QUE SEAN ACUMULATIVOS DESDE EL HISTORIAL GLOBAL
 const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy', 'arcade', 'lottery', 'bounty'];
 
 export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
@@ -90,7 +89,9 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
             setProgress({ 
                 ...data, 
                 premium_rewards_claimed: data.premium_rewards_claimed || 0,
-                reward_5k_claimed: data.reward_5k_claimed || false
+                reward_5k_claimed: data.reward_5k_claimed || false,
+                task_a_start_value: data.task_a_start_value ?? null,
+                task_b_start_value: data.task_b_start_value ?? null
             });
         } else if (error?.code === 'PGRST116') {
             await supabase.from('user_million_path').insert([{ user_id: user.id }]);
@@ -114,7 +115,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         return () => clearInterval(interval);
     }, [loadProgress, loadLiveStats]);
 
-    // 🔥 LA FUNCIÓN QUE FALTABA
     const getGateCost = (level: number) => {
         if (level <= 6) return 0.35; 
         return 0.45;
@@ -558,17 +558,28 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                             );
                         }
 
-                        // RENDER DE NIVELES FUTUROS
+                        // 🔥 NUEVO: RENDER DE NIVELES FUTUROS (Visibles, con tareas y costo)
                         if (isFuture) {
                             return (
-                                <div key={step.lvl} style={{ display: 'flex', alignItems: 'center', gap: '15px', position: 'relative' }}>
-                                    <div style={{ position: 'absolute', left: '-16px', background: '#111', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #444' }}></div>
-                                    <div style={{ opacity: 0.4, padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #222' }}>
-                                        <div>
-                                            <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div>
-                                            <div style={{ color: '#666', fontSize: '10px' }}>{step.title}</div>
+                                <div key={step.lvl} style={{ display: 'flex', alignItems: 'flex-start', gap: '15px', position: 'relative', marginTop: '10px' }}>
+                                    <div style={{ position: 'absolute', left: '-16px', top: '15px', background: '#111', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid #444' }}></div>
+                                    <div style={{ padding: '15px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', width: '100%', border: '1px solid #222', position: 'relative', overflow: 'hidden' }}>
+                                        
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                            <div>
+                                                <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>Level {step.lvl}</div>
+                                                <div style={{ color: '#666', fontSize: '10px' }}>{step.title}</div>
+                                            </div>
+                                            <div style={{ background: 'rgba(255, 0, 85, 0.1)', border: '1px solid rgba(255, 0, 85, 0.3)', padding: '4px 8px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Lock size={12} color="#FF0055" />
+                                                <span style={{ fontSize: '10px', color: '#FF0055', fontWeight: 'bold' }}>{getGateCost(step.lvl - 1)} TON REQ.</span>
+                                            </div>
                                         </div>
-                                        <Lock size={14} color="#555" />
+
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', opacity: 0.3 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '16px', height: '16px', background: '#333', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#888', fontWeight: 'bold' }}>A</div><div style={{ fontSize: '11px', color: '#888' }}>{step.taskA.desc}</div></div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><div style={{ width: '16px', height: '16px', background: '#333', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', color: '#888', fontWeight: 'bold' }}>B</div><div style={{ fontSize: '11px', color: '#888' }}>{step.taskB.desc}</div></div>
+                                        </div>
                                     </div>
                                 </div>
                             );
