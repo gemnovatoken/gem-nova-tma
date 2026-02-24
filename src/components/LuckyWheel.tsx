@@ -6,13 +6,7 @@ import { X, Ticket, Diamond, RefreshCw, Video } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 
 // 🔥 CORRECCIÓN TS: Creamos una interfaz para el tipo de metadatos del usuario
-interface SupabaseUser {
-    id: string;
-    user_metadata?: {
-        username?: string;
-    };
-    username?: string;
-}
+
 
 interface LuckyWheelProps {
     onClose: () => void;
@@ -54,7 +48,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     // Memoria Persistente con LocalStorage (Lectura Segura)
     useEffect(() => {
         if (user) {
-            // 🔥 CORRECCIÓN: Usamos setTimeout para evitar el error de "Cascading renders"
             setTimeout(() => {
                 const today = new Date().toISOString().split('T')[0];
                 const savedData = localStorage.getItem(`lucky_wheel_${user.id}`);
@@ -96,7 +89,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
     // Función principal de giro
     const executeSpin = async (spinType: 'premium' | 'daily' | 'ad') => {
-        if (spinning || !user) return;
+        if (spinning || !user?.id) return;
 
         if (spinType === 'premium') {
             const confirmPremium = window.confirm(`💎 USE 1 VIP TICKET?\n\nThis spin will not consume any points. Good luck!`);
@@ -123,94 +116,98 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             onUpdateScore(prev => prev - SPIN_COST);
         }
 
-        const typedUser = user as unknown as SupabaseUser;
-        const tgUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
-
-        const { data, error } = await supabase.rpc('spin_wheel_v2', { 
-            user_id_in: user.id, 
-            spin_type: spinType,
-            username_in: tgUsername 
-        });
-
-        if (error) {
-            console.error("RPC Error:", error);
-            alert("Connection error. Spin refunded.");
-            if (spinType !== 'premium') onUpdateScore(prev => prev + SPIN_COST); 
-            setSpinning(false);
-            return;
-        }
-
-        // 🔥 CORRECCIÓN TS: Tipamos de manera explícita la variable para solucionar el error "implicitly has an 'any' type"
-        let wonAmount: string | number | undefined;
-        
-        if (Array.isArray(data) && data.length > 0) {
-            wonAmount = data[0].reward !== undefined ? data[0].reward : data[0];
-        } else if (data !== null && typeof data === 'object' && 'reward' in data) {
-            // 🔥 CORRECCIÓN TS: Usamos Record en vez de 'any' explícito
-            wonAmount = (data as Record<string, unknown>).reward as string | number;
-        } else if (data !== null && data !== undefined) {
-            wonAmount = data as string | number;
-        }
-
-        if (wonAmount === undefined || wonAmount === null || (Array.isArray(data) && data.length === 0)) {
-            console.error("Invalid format returned:", data);
-            alert("Data error. Spin refunded.");
-            if (spinType !== 'premium') onUpdateScore(prev => prev + SPIN_COST); 
-            setSpinning(false);
-            return;
-        }
-        
-        // CÁLCULO DE ROTACIÓN
-        const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
-        const targetIndex = winningIndex !== -1 ? winningIndex : 5; // Default to FAIL
-
-        const segmentAngle = 360 / WHEEL_ITEMS.length; 
-        const centerOffset = segmentAngle / 2; 
-        const baseRotation = 360 - (targetIndex * segmentAngle) - centerOffset;
-        const randomWobble = Math.floor(Math.random() * 26) - 13; 
-        
-        const currentFullSpins = Math.floor(rotation / 360);
-        const finalRotation = ((currentFullSpins + 5) * 360) + baseRotation + randomWobble;
-
-        setRotation(finalRotation);
-
-        setTimeout(() => {
-            setSpinning(false);
-            
-            // Restar el inventario
-            if (spinType === 'premium') setPremiumSpins(prev => prev - 1);
-            else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
-            else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
-
-            // MANEJO DE PREMIOS
-            if (typeof wonAmount === 'string') {
-                if (wonAmount === '1GOLD') {
-                    if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
-                    alert(`🎟️ GOLDEN VOUCHER AQUIRED!\n\nYou found a legendary Golden Voucher. Keep collecting!`);
-                } else if (wonAmount.includes('TON')) {
-                    if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
-                    alert(`💎 HOLY MOLY! YOU WON ${wonAmount}!\n\nContact support to claim your real crypto reward!`);
-                }
-            } else if (typeof wonAmount === 'number' && wonAmount > 0) {
-                onUpdateScore(s => s + wonAmount);
-                if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
+        try {
+            // Buscamos el username EXACTO desde la tabla user_score
+            const { data: scoreData } = await supabase
+                .from('user_score')
+                .select('username')
+                .eq('user_id', user.id)
+                .single();
                 
-                if (spinType === 'premium') {
-                    alert(`🎉 VIP WIN! +${wonAmount.toLocaleString()} Pts added to balance!`);
-                } else {
-                    if (wonAmount > SPIN_COST) {
-                        alert(`🎉 BIG WIN! +${wonAmount.toLocaleString()} Pts!`);
-                    } else if (wonAmount === SPIN_COST) {
-                        alert(`⚖️ Phew! You got your ${wonAmount.toLocaleString()} points back.`);
-                    } else {
-                        alert(`📉 Ouch! You only won ${wonAmount.toLocaleString()} points back.`);
-                    }
-                }
-            } else {
-                if (window.navigator.vibrate) window.navigator.vibrate(400);
-                alert("💀 BUSTED! The house wins. Better luck next time!");
+            const exactUsername = scoreData?.username || "HiddenUser";
+
+            const { data, error } = await supabase.rpc('spin_wheel_v2', { 
+                user_id_in: user.id, 
+                spin_type: spinType,
+                username_in: exactUsername 
+            });
+
+            if (error) throw error;
+
+            let wonAmount: string | number | undefined;
+            
+            if (Array.isArray(data) && data.length > 0) {
+                wonAmount = data[0].reward !== undefined ? data[0].reward : data[0];
+            } else if (data !== null && typeof data === 'object' && 'reward' in data) {
+                wonAmount = (data as Record<string, unknown>).reward as string | number;
+            } else if (data !== null && data !== undefined) {
+                wonAmount = data as string | number;
             }
-        }, 4000);
+
+            if (wonAmount === undefined || wonAmount === null || (Array.isArray(data) && data.length === 0)) {
+                throw new Error("Invalid or empty data returned from database.");
+            }
+            
+            // CÁLCULO DE ROTACIÓN
+            const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
+            const targetIndex = winningIndex !== -1 ? winningIndex : 5; // Default to FAIL
+
+            const segmentAngle = 360 / WHEEL_ITEMS.length; 
+            const centerOffset = segmentAngle / 2; 
+            const baseRotation = 360 - (targetIndex * segmentAngle) - centerOffset;
+            const randomWobble = Math.floor(Math.random() * 26) - 13; 
+            
+            const currentFullSpins = Math.floor(rotation / 360);
+            const finalRotation = ((currentFullSpins + 5) * 360) + baseRotation + randomWobble;
+
+            setRotation(finalRotation);
+
+            setTimeout(() => {
+                setSpinning(false);
+                
+                // Restar el inventario
+                if (spinType === 'premium') setPremiumSpins(prev => prev - 1);
+                else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
+                else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
+
+                // MANEJO DE PREMIOS
+                if (typeof wonAmount === 'string') {
+                    if (wonAmount === '1GOLD') {
+                        if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
+                        alert(`🎟️ GOLDEN VOUCHER AQUIRED!\n\nYou found a legendary Golden Voucher. Keep collecting!`);
+                    } else if (wonAmount.includes('TON')) {
+                        if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
+                        alert(`💎 HOLY MOLY! YOU WON ${wonAmount}!\n\nContact support to claim your real crypto reward!`);
+                    }
+                } else if (typeof wonAmount === 'number' && wonAmount > 0) {
+                    onUpdateScore(s => s + wonAmount);
+                    if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
+                    
+                    if (spinType === 'premium') {
+                        alert(`🎉 VIP WIN! +${wonAmount.toLocaleString()} Pts added to balance!`);
+                    } else {
+                        if (wonAmount > SPIN_COST) {
+                            alert(`🎉 BIG WIN! +${wonAmount.toLocaleString()} Pts!`);
+                        } else if (wonAmount === SPIN_COST) {
+                            alert(`⚖️ Phew! You got your ${wonAmount.toLocaleString()} points back.`);
+                        } else {
+                            alert(`📉 Ouch! You only won ${wonAmount.toLocaleString()} points back.`);
+                        }
+                    }
+                } else {
+                    if (window.navigator.vibrate) window.navigator.vibrate(400);
+                    alert("💀 BUSTED! The house wins. Better luck next time!");
+                }
+            }, 4000);
+
+        } catch (err) {
+            // 🔥 CORRECCIÓN TS: Manejo de error sin el tipo "any" explícito
+            console.error("Spin DB Error:", err);
+            const errorMessage = err instanceof Error ? err.message : "Connection failed";
+            alert(`❌ DB Error: ${errorMessage}\n\nSpin refunded.`);
+            if (spinType !== 'premium') onUpdateScore(prev => prev + SPIN_COST); 
+            setSpinning(false);
+        }
     };
 
     const handleBuyMoreSpins = async () => {
@@ -232,20 +229,27 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             };
             const result = await tonConnectUI.sendTransaction(transaction);
             if (result) {
-                const typedUser = user as unknown as SupabaseUser;
-                const tgUsername = typedUser.user_metadata?.username || typedUser.username || "HiddenUser";
+                // Buscamos el username EXACTO desde la tabla user_score
+                const { data: scoreData } = await supabase
+                    .from('user_score')
+                    .select('username')
+                    .eq('user_id', user.id)
+                    .single();
+                    
+                const exactUsername = scoreData?.username || "HiddenUser";
 
                 await supabase.rpc('buy_vip_tickets', { 
                     user_id_in: user.id, 
                     ton_amount: EXTRA_SPINS_PRICE_TON, 
                     tickets_qty: 3,
-                    username_in: tgUsername 
+                    username_in: exactUsername 
                 });
 
                 setPremiumSpins(prev => prev + 3);
                 alert("🎉 SUCCESS! 3 VIP Tickets added to your account!");
             }
         } catch (err) {
+            // 🔥 CORRECCIÓN TS: Tipado del Catch quitado
             console.error(err);
             alert("❌ Transaction cancelled.");
         }
