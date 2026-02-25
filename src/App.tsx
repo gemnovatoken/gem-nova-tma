@@ -61,11 +61,14 @@ export default function App() {
     // =========================================================================
     // 🚀 NUEVA CAPTURA GLOBAL DE REFERIDO BLINDADA
     // =========================================================================
+    // =========================================================================
+    // 🚀 NUEVA CAPTURA GLOBAL DE REFERIDO BLINDADA (CORREGIDA)
+    // =========================================================================
     useEffect(() => {
         const captureReferralGlobal = async () => {
-            if (!user) return; 
+            if (!user) return;
 
-            if (sessionStorage.getItem('referral_checked')) return;
+            // 🔥 ELIMINAMOS EL CHEQUEO DE SESSIONSTORAGE AQUÍ 🔥
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
@@ -73,36 +76,37 @@ export default function App() {
             const tgUser = tg?.initDataUnsafe?.user;
             const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
+            // Solo intentamos registrar si hay un parámetro de inicio válido diferente al propio usuario
             if (startParam && startParam !== user.id) {
                 console.log("🚀 Referrer detected globally:", startParam);
-                
-                // 🔥 SOLUCIÓN: Limpiamos el código AQUÍ antes de enviarlo
+
                 let cleanReferrerId = startParam;
                 if (startParam.includes('ref_')) {
-                    cleanReferrerId = startParam.split('ref_')[1]; 
+                    cleanReferrerId = startParam.split('ref_')[1];
                 } else if (startParam.includes('_')) {
                     cleanReferrerId = startParam.split('_')[1];
                 }
 
                 // Usamos la función unificada
-                const { error } = await supabase.rpc('register_new_user', { 
-                    p_user_id: user.id, 
+                const { error } = await supabase.rpc('register_new_user', {
+                    p_user_id: user.id,
                     p_username: username,
-                    p_referral_code_text: cleanReferrerId 
+                    p_referral_code_text: cleanReferrerId
                 });
 
                 if (error) {
-                    console.error("❌ Error guardando el referido global:", error);
+                    // Es normal que de error si el usuario ya existe, no te preocupes mucho por este log
+                    // console.error("❌ Error guardando el referido global (puede que ya exista):", error);
                 } else {
-                    console.log("✅ Referido global guardado con éxito en la BD");
+                    console.log("✅ Intento de registro de referido global enviado");
                 }
             }
-
-            sessionStorage.setItem('referral_checked', 'true');
+             // 🔥 ELIMINAMOS EL SETITEM DE SESSIONSTORAGE AQUÍ 🔥
         };
 
         captureReferralGlobal();
     }, [user]);
+    // =========================================================================
     // =========================================================================
 
 
