@@ -93,7 +93,10 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 task_b_start_value: data.task_b_start_value !== undefined ? data.task_b_start_value : null
             });
         } else if (error?.code === 'PGRST116') {
-            await supabase.from('user_million_path').insert([{ user_id: user.id }]);
+            // 🔥 Notificamos si la creación inicial falla
+            const { error: insertError } = await supabase.from('user_million_path').insert([{ user_id: user.id }]);
+            if (insertError) console.error("Insert Error:", insertError);
+            
             setProgress(prev => ({...prev, task_a_start_value: null, task_b_start_value: null}));
         }
     }, [user]);
@@ -150,24 +153,27 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
         setLoading(true);
         
         try {
-            const currentValue = getStatValueByType(type);
+            const currentValue = getStatValueByType(type) ?? 0;
             const columnToUpdate = taskLetter === 'A' ? 'task_a_start_value' : 'task_b_start_value';
             
-            // 🔥 SOLUCIÓN DEFINITIVA AL ERROR DE START 🔥
-            // 1. Forzamos el update visual inmediato.
+            // 1. Forzamos el update visual inmediato para que se sienta fluido.
             setProgress(prev => ({ ...prev, [columnToUpdate]: currentValue }));
 
-            // 2. Ejecutamos la petición de red, pero la ESPERAMOS para que el navegador no la cancele si el usuario minimiza rápido.
-            const { error } = await supabase
+            // 2. 🔥 SOLUCIÓN: Agregamos .select() para forzar a Supabase a confirmar si la fila realmente existe y se actualizó.
+            const { data, error } = await supabase
                 .from('user_million_path')
                 .update({ [columnToUpdate]: currentValue })
-                .eq('user_id', user.id);
+                .eq('user_id', user.id)
+                .select(); // Importante para detectar fallos silenciosos
 
             if (error) {
                 console.error("Fallo al guardar en DB:", error);
-                // Si falla de verdad la base de datos, revertimos visualmente.
                 setProgress(prev => ({ ...prev, [columnToUpdate]: null }));
-                alert("Network error. Please tap start again.");
+                alert(`❌ DB Error: ${error.message}`);
+            } else if (!data || data.length === 0) {
+                // Si la tabla devolvió 0 filas modificadas, la fila del usuario no existe.
+                setProgress(prev => ({ ...prev, [columnToUpdate]: null }));
+                alert("❌ Fallo crítico: Tu usuario no está registrado en la tabla user_million_path. (Contacta a soporte)");
             }
 
         } catch (e) {
@@ -184,7 +190,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
 
         try {
             await loadLiveStats(); 
-            const currentValue = getStatValueByType(type);
+            const currentValue = getStatValueByType(type) ?? 0;
             const startValue = taskLetter === 'A' ? progress.task_a_start_value : progress.task_b_start_value;
             
             let passed = false;
@@ -413,8 +419,8 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 <div className="confetti" style={{ position:'absolute', top:0, left:'50%', width:'10px', height:'10px', background:'#FFD700', animation:'fall 2s linear infinite' }}></div>
                 <div className="confetti" style={{ position:'absolute', top:0, left:'80%', width:'10px', height:'10px', background:'#E040FB', animation:'fall 4s linear infinite' }}></div>
                 
-                {/* BOTON X EPIC WIN BAJADO */}
-                <button onClick={() => setShowEpicWin(false)} style={{ position: 'absolute', top: 60, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}><X size={24} /></button>
+                {/* 🔥 BOTON X EPIC WIN - Modificado a fixed y top 60 */}
+                <button onClick={() => setShowEpicWin(false)} style={{ position: 'fixed', top: 60, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}><X size={24} /></button>
                 
                 <div style={{ animation: 'bounce 2s infinite', zIndex: 2 }}><Trophy size={100} color="#FFD700" style={{ filter: 'drop-shadow(0 0 30px #FFD700)' }} /></div>
                 <h1 style={{ color: '#FFD700', fontSize: '42px', textAlign: 'center', margin: '20px 0 10px', textShadow: '0 0 20px #FFD700', fontFamily: 'monospace', zIndex: 2 }}>GOD MODE<br/>UNLOCKED</h1>
@@ -452,11 +458,11 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
             background: 'rgba(5, 5, 10, 0.95)', zIndex: 5000, 
             overflowY: 'auto', padding: '20px', paddingBottom: '100px', backdropFilter: 'blur(10px)'
         }}>
-            {/* 🔥 BOTÓN CERRAR GENERAL BAJADO A TOP: 60 */}
+            {/* 🔥 BOTÓN CERRAR GENERAL - Modificado a fixed, top: 60, zIndex altísimo */}
             {onClose && (
                 <button onClick={onClose} style={{
-                    position:'absolute', top: 60, right: 20, border:'none', color:'#fff', cursor:'pointer',
-                    background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 7000
+                    position:'fixed', top: 60, right: 20, border:'none', color:'#fff', cursor:'pointer',
+                    background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 9999
                 }}>
                     <X size={24}/>
                 </button>
