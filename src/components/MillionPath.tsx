@@ -63,7 +63,7 @@ const PATH_STEPS = [
 
 const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy', 'arcade', 'lottery', 'bounty'];
 
-export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
+export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClose }) => {
     const { user } = useAuth();
     const [tonConnectUI] = useTonConnectUI();
     const [progress, setProgress] = useState<PathProgress>({ 
@@ -89,13 +89,11 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 ...data, 
                 premium_rewards_claimed: data.premium_rewards_claimed || 0,
                 reward_5k_claimed: data.reward_5k_claimed || false,
-                // 🔥 Aseguramos que si viene nulo de la DB, se quede como nulo y no undefined.
                 task_a_start_value: data.task_a_start_value !== undefined ? data.task_a_start_value : null,
                 task_b_start_value: data.task_b_start_value !== undefined ? data.task_b_start_value : null
             });
         } else if (error?.code === 'PGRST116') {
             await supabase.from('user_million_path').insert([{ user_id: user.id }]);
-            // Si es nuevo, forzamos los valores a null para que aparezca "START"
             setProgress(prev => ({...prev, task_a_start_value: null, task_b_start_value: null}));
         }
     }, [user]);
@@ -113,8 +111,15 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     useEffect(() => {
         loadProgress();
         loadLiveStats();
+        // 🔥 CORRECCIÓN: Actualizar al volver a la app
+        const handleFocus = () => { loadProgress(); loadLiveStats(); };
+        window.addEventListener('focus', handleFocus);
+
         const interval = setInterval(loadLiveStats, 3000);
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener('focus', handleFocus);
+        };
     }, [loadProgress, loadLiveStats]);
 
     const getGateCost = (level: number) => {
@@ -146,21 +151,19 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
         setLoading(true);
         
         try {
-            // 1. Obtenemos el valor actual SIN llamar a la base de datos de nuevo
-            // Usamos el estado que ya se actualiza cada 3 segundos
             const currentValue = getStatValueByType(type);
             const columnToUpdate = taskLetter === 'A' ? 'task_a_start_value' : 'task_b_start_value';
             
-            // 2. 🔥 ACTUALIZAMOS EL ESTADO LOCAL PRIMERO (Optimistic UI Update)
-            // Esto hace que el botón cambie a "VERIFY" instantáneamente
+            // 🔥 CORRECCIÓN 1: OPTIMISTIC UPDATE. Actualizamos la UI inmediatamente para que no parpadee a START.
             setProgress(prev => ({ ...prev, [columnToUpdate]: currentValue }));
 
-            // 3. Enviamos la actualización a Supabase de fondo
-            await supabase.from('user_million_path').update({ [columnToUpdate]: currentValue }).eq('user_id', user.id);
+            // 🔥 CORRECCIÓN 2: Enviamos a Supabase, pero SIN usar await para que no se bloquee si sales de la app.
+            supabase.from('user_million_path').update({ [columnToUpdate]: currentValue }).eq('user_id', user.id).then(({error}) => {
+                if(error) console.error("Fallo al guardar silenciosamente:", error);
+            });
             
-            // 4. Pausa de medio segundo. Esto obliga al navegador a no cerrar la función 
-            // instantáneamente si el usuario se sale rápido a otra app.
-            await new Promise(resolve => setTimeout(resolve, 500));
+            // Pausa obligada para darle tiempo al navegador a enviar el paquete de red antes de cerrar/minimizar
+            await new Promise(resolve => setTimeout(resolve, 300));
 
         } catch (e) {
             console.error(e);
@@ -186,7 +189,8 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 progressAmount = currentValue;
                 passed = currentValue >= target;
             } else {
-                progressAmount = Math.max(0, currentValue - (startValue || 0));
+                // Prevenir que startValue sea null matemáticamente
+                progressAmount = Math.max(0, currentValue - (startValue ?? 0));
                 passed = progressAmount >= target;
             }
 
@@ -404,7 +408,10 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
                 <div className="confetti" style={{ position:'absolute', top:0, left:'20%', width:'10px', height:'10px', background:'#00F2FE', animation:'fall 3s linear infinite' }}></div>
                 <div className="confetti" style={{ position:'absolute', top:0, left:'50%', width:'10px', height:'10px', background:'#FFD700', animation:'fall 2s linear infinite' }}></div>
                 <div className="confetti" style={{ position:'absolute', top:0, left:'80%', width:'10px', height:'10px', background:'#E040FB', animation:'fall 4s linear infinite' }}></div>
-                <button onClick={() => setShowEpicWin(false)} style={{ position: 'absolute', top: 30, right: 30, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}><X size={24} /></button>
+                
+                {/* 🔥 BOTÓN CERRAR EPIC WIN BAJADO A TOP: 80 */}
+                <button onClick={() => setShowEpicWin(false)} style={{ position: 'absolute', top: 80, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}><X size={24} /></button>
+                
                 <div style={{ animation: 'bounce 2s infinite', zIndex: 2 }}><Trophy size={100} color="#FFD700" style={{ filter: 'drop-shadow(0 0 30px #FFD700)' }} /></div>
                 <h1 style={{ color: '#FFD700', fontSize: '42px', textAlign: 'center', margin: '20px 0 10px', textShadow: '0 0 20px #FFD700', fontFamily: 'monospace', zIndex: 2 }}>GOD MODE<br/>UNLOCKED</h1>
                 <div style={{ background: 'rgba(255,255,255,0.1)', border: '2px solid #FFD700', padding: '20px 40px', borderRadius: '20px', marginBottom: '30px', boxShadow: '0 0 40px rgba(255,215,0,0.3)', zIndex: 2 }}>
@@ -436,8 +443,22 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
     const progressPercent = (totalClaimed / 5000000) * 100;
 
     return (
-        <div style={{ padding: '20px', paddingBottom: '100px' }}>
-            <div style={{ textAlign: 'center', marginBottom: '25px' }}>
+        <div style={{ 
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+            background: 'rgba(5, 5, 10, 0.95)', zIndex: 5000, 
+            overflowY: 'auto', padding: '20px', paddingBottom: '100px', backdropFilter: 'blur(10px)'
+        }}>
+            {/* 🔥 BOTÓN CERRAR GENERAL BAJADO A TOP: 60 */}
+            {onClose && (
+                <button onClick={onClose} style={{
+                    position:'absolute', top: 60, right: 20, border:'none', color:'#fff', cursor:'pointer',
+                    background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 7000
+                }}>
+                    <X size={24}/>
+                </button>
+            )}
+
+            <div style={{ textAlign: 'center', marginBottom: '25px', marginTop: '40px' }}>
                 <h2 style={{ color: '#fff', fontSize: '28px', margin: 0, textShadow: '0 0 15px rgba(255,255,255,0.3)' }}>THE 5M PATH</h2>
                 <p style={{ color: '#FFD700', fontSize: '12px', letterSpacing: '2px' }}>PREMIUM BATTLE PASS</p>
                 <div style={{ display: 'flex', justifyContent: 'center', marginTop: '15px', transform: 'scale(0.8)' }}>
@@ -609,7 +630,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore }) => {
 };
 
 const TaskRow: React.FC<TaskRowProps> = ({ letter, desc, isDone, isLoading, startValue, currentValue, targetAmount, type, onStart, onVerify }) => {
-    // 🔥 CORRECCIÓN CRÍTICA DE PERSISTENCIA: Solo dibuja el componente cuando la data real llegó
+    // Si startValue es undefined, el backend todavía no carga
     if (startValue === undefined) return <div style={{ height: '50px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', animation: 'pulse 1.5s infinite' }}></div>;
 
     const isStarted = startValue !== null;
