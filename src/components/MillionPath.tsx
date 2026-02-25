@@ -471,7 +471,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
             {/* 🔥 BOTÓN CERRAR GENERAL */}
             {onClose && (
                 <button onClick={onClose} style={{
-                    position:'fixed', top: 60, right: 20, border:'none', color:'#fff', cursor:'pointer',
+                    position:'fixed', top: 100, right: 20, border:'none', color:'#fff', cursor:'pointer',
                     background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 9999
                 }}>
                     <X size={24}/>
