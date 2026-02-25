@@ -98,14 +98,30 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
         }
     }, [user]);
 
+    // 🔥 SISTEMA DE RESPALDO (FALLBACK) PARA STATS
     const loadLiveStats = useCallback(async () => {
         if (!user) return;
         try {
-            const { data: userData } = await supabase.rpc('get_user_full_stats_for_path', { p_user_id: user.id });
-            if (userData && userData[0]) {
-                setLiveStats(userData[0] as LiveStats); 
+            // Intento 1: Llamar al RPC
+            const { data: userData, error } = await supabase.rpc('get_user_full_stats_for_path', { p_user_id: user.id });
+            
+            if (!error && userData && userData[0]) {
+                setLiveStats(prev => ({ ...prev, ...userData[0] }));
+            } else {
+                // Intento 2 (FALLBACK): Si el RPC falla o no existe, leer directo de user_score
+                const { data: scoreData } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
+                if (scoreData) {
+                    setLiveStats(prev => ({
+                        ...prev,
+                        score: scoreData.score || 0,
+                        total_wealth: scoreData.total_wealth || scoreData.score || 0,
+                        arcade_games_played: scoreData.arcade_games_played || 0,
+                        lottery_played: scoreData.lottery_played || 0,
+                        lucky_tickets: scoreData.lucky_tickets || 0
+                    }));
+                }
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.error("Error loading live stats:", e); }
     }, [user]);
 
     useEffect(() => {
@@ -126,20 +142,21 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
         return 0.45;
     };
 
+    // 🔥 LECTURA BLINDADA: Prioriza el "score" real para tareas de Wealth
     const getStatValueByType = (type: string): number => {
         switch(type) {
-            case 'score': return liveStats.score;
-            case 'wealth': return liveStats.total_wealth;
-            case 'ticket': return liveStats.lucky_tickets;
-            case 'staking': return liveStats.active_stakes;
-            case 'level': return liveStats.user_level;
-            case 'level_static': return liveStats.user_level; 
-            case 'arcade': return liveStats.arcade_games_played;
-            case 'streak': return liveStats.current_streak;
-            case 'lottery': return liveStats.lottery_played;
-            case 'bounty': return liveStats.bounties_done_today;
+            case 'score': return liveStats.score || 0;
+            case 'wealth': return liveStats.total_wealth > 0 ? liveStats.total_wealth : (liveStats.score || 0);
+            case 'ticket': return liveStats.lucky_tickets || 0;
+            case 'staking': return liveStats.active_stakes || 0;
+            case 'level': return liveStats.user_level || 1;
+            case 'level_static': return liveStats.user_level || 1; 
+            case 'arcade': return liveStats.arcade_games_played || 0;
+            case 'streak': return liveStats.current_streak || 0;
+            case 'lottery': return liveStats.lottery_played || 0;
+            case 'bounty': return liveStats.bounties_done_today || 0;
             case 'checkin': return liveStats.checked_in_today ? 1 : 0;
-            case 'referral': return liveStats.new_referrals_since_lvl9;
+            case 'referral': return liveStats.new_referrals_since_lvl9 || 0;
             case 'buy': return liveStats.starter_pack_bought ? 1 : 0;
             default: return 0;
         }
@@ -153,10 +170,8 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
             const currentValue = getStatValueByType(type) ?? 0;
             const columnToUpdate = taskLetter === 'A' ? 'task_a_start_value' : 'task_b_start_value';
             
-            // Forzamos el update visual inmediato.
             setProgress(prev => ({ ...prev, [columnToUpdate]: currentValue }));
 
-            // 🔥 SOLUCIÓN DEFINITIVA: Usamos UPSERT. Si la fila no existe por el retraso de red, la crea al instante.
             const { error } = await supabase
                 .from('user_million_path')
                 .upsert({ 
@@ -167,7 +182,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
 
             if (error) {
                 console.error("Fallo al guardar en DB:", error);
-                // Revertimos si hay un error real de Supabase (ej. RLS)
                 setProgress(prev => ({ ...prev, [columnToUpdate]: null }));
                 alert(`❌ DB Error: ${error.message}`);
             }
@@ -416,7 +430,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 <div className="confetti" style={{ position:'absolute', top:0, left:'80%', width:'10px', height:'10px', background:'#E040FB', animation:'fall 4s linear infinite' }}></div>
                 
                 {/* BOTON X EPIC WIN BAJADO */}
-                <button onClick={() => setShowEpicWin(false)} style={{ position: 'absolute', top: 60, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}><X size={24} /></button>
+                <button onClick={() => setShowEpicWin(false)} style={{ position: 'fixed', top: 60, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}><X size={24} /></button>
                 
                 <div style={{ animation: 'bounce 2s infinite', zIndex: 2 }}><Trophy size={100} color="#FFD700" style={{ filter: 'drop-shadow(0 0 30px #FFD700)' }} /></div>
                 <h1 style={{ color: '#FFD700', fontSize: '42px', textAlign: 'center', margin: '20px 0 10px', textShadow: '0 0 20px #FFD700', fontFamily: 'monospace', zIndex: 2 }}>GOD MODE<br/>UNLOCKED</h1>
