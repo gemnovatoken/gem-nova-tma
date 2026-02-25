@@ -123,7 +123,7 @@ export const DailyBounties: React.FC<DailyBountiesProps> = ({ setGlobalScore }) 
                     title="TG News" 
                     desc="@gnovaofiicialnews"
                     reward={500} status={newsStatus} isLoading={claimingTask === 'news'}
-                    onGo={() => handleTaskGo('news', 'https://t.me/gnovaofiicialnews')}
+                    onGo={() => handleTaskGo('news', 'https://t.me/gnovaofficialnews')}
                     onVerify={() => handleTaskVerify('news')}
                     icon={<Tv size={16} color="#00F2FE"/>} color="#00F2FE"
                 />
