@@ -79,6 +79,8 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
 
             if (newSelected.length === pattern.length) {
                 if (round >= 3) {
+                    // 🔥 Lógica de Victoria 🔥
+                    if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
                     setTimeout(() => onFinish(true, 1500), 500);
                 } else {
                     setTimeout(() => {
@@ -98,6 +100,8 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                     return;
                 }
             }
+            // 🔥 Lógica de Derrota 🔥
+            if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
             onFinish(false, 0);
         }
     };
@@ -161,6 +165,8 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                 return;
             }
         }
+        // 🔥 Lógica de Terminar Juego 🔥
+        if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
         onFinish(true, scoreRef.current * 100);
     };
 
@@ -241,6 +247,8 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const handleLock = async () => {
         if (Math.abs(posRef.current - targetZone) < 10) {
             if (level >= 3) {
+                // 🔥 Lógica de Victoria 🔥
+                if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
                 onFinish(true, 1500);
             } else { 
                 setLevel(l => l + 1); 
@@ -259,6 +267,8 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                     return;
                 }
             }
+            // 🔥 Lógica de Derrota 🔥
+            if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
             onFinish(false, 0);
         }
     };
