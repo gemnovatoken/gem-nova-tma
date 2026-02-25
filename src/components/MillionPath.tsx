@@ -111,7 +111,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
     useEffect(() => {
         loadProgress();
         loadLiveStats();
-        // 🔥 CORRECCIÓN: Actualizar al volver a la app
         const handleFocus = () => { loadProgress(); loadLiveStats(); };
         window.addEventListener('focus', handleFocus);
 
@@ -154,16 +153,22 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
             const currentValue = getStatValueByType(type);
             const columnToUpdate = taskLetter === 'A' ? 'task_a_start_value' : 'task_b_start_value';
             
-            // 🔥 CORRECCIÓN 1: OPTIMISTIC UPDATE. Actualizamos la UI inmediatamente para que no parpadee a START.
+            // 🔥 SOLUCIÓN DEFINITIVA AL ERROR DE START 🔥
+            // 1. Forzamos el update visual inmediato.
             setProgress(prev => ({ ...prev, [columnToUpdate]: currentValue }));
 
-            // 🔥 CORRECCIÓN 2: Enviamos a Supabase, pero SIN usar await para que no se bloquee si sales de la app.
-            supabase.from('user_million_path').update({ [columnToUpdate]: currentValue }).eq('user_id', user.id).then(({error}) => {
-                if(error) console.error("Fallo al guardar silenciosamente:", error);
-            });
-            
-            // Pausa obligada para darle tiempo al navegador a enviar el paquete de red antes de cerrar/minimizar
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // 2. Ejecutamos la petición de red, pero la ESPERAMOS para que el navegador no la cancele si el usuario minimiza rápido.
+            const { error } = await supabase
+                .from('user_million_path')
+                .update({ [columnToUpdate]: currentValue })
+                .eq('user_id', user.id);
+
+            if (error) {
+                console.error("Fallo al guardar en DB:", error);
+                // Si falla de verdad la base de datos, revertimos visualmente.
+                setProgress(prev => ({ ...prev, [columnToUpdate]: null }));
+                alert("Network error. Please tap start again.");
+            }
 
         } catch (e) {
             console.error(e);
@@ -189,7 +194,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 progressAmount = currentValue;
                 passed = currentValue >= target;
             } else {
-                // Prevenir que startValue sea null matemáticamente
                 progressAmount = Math.max(0, currentValue - (startValue ?? 0));
                 passed = progressAmount >= target;
             }
@@ -409,8 +413,8 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 <div className="confetti" style={{ position:'absolute', top:0, left:'50%', width:'10px', height:'10px', background:'#FFD700', animation:'fall 2s linear infinite' }}></div>
                 <div className="confetti" style={{ position:'absolute', top:0, left:'80%', width:'10px', height:'10px', background:'#E040FB', animation:'fall 4s linear infinite' }}></div>
                 
-                {/* 🔥 BOTÓN CERRAR EPIC WIN BAJADO A TOP: 80 */}
-                <button onClick={() => setShowEpicWin(false)} style={{ position: 'absolute', top: 80, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}><X size={24} /></button>
+                {/* BOTON X EPIC WIN BAJADO */}
+                <button onClick={() => setShowEpicWin(false)} style={{ position: 'absolute', top: 60, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}><X size={24} /></button>
                 
                 <div style={{ animation: 'bounce 2s infinite', zIndex: 2 }}><Trophy size={100} color="#FFD700" style={{ filter: 'drop-shadow(0 0 30px #FFD700)' }} /></div>
                 <h1 style={{ color: '#FFD700', fontSize: '42px', textAlign: 'center', margin: '20px 0 10px', textShadow: '0 0 20px #FFD700', fontFamily: 'monospace', zIndex: 2 }}>GOD MODE<br/>UNLOCKED</h1>
