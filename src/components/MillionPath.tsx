@@ -44,6 +44,7 @@ interface LiveStats {
     arcade_games_played: number;
     current_streak: number;
     lottery_played: number;
+    roulette_played: number; // 🔥 AGREGADO PARA LA RULETA
     bounties_done_today: number;
     checked_in_today: boolean;
     new_referrals_since_lvl9: number;
@@ -53,15 +54,15 @@ interface LiveStats {
 const PATH_STEPS = [
     { lvl: 1, title: "Onboarding", taskA: { desc: "Get 5,000 Pts", target: 5000, type: 'wealth' }, taskB: { desc: "Do Daily Check-in", target: 1, type: 'checkin' } },
     { lvl: 2, title: "First Steps", taskA: { desc: "Play 1 Arcade Game", target: 1, type: 'arcade' }, taskB: { desc: "Complete 3 Daily Bounties", target: 3, type: 'bounty' } },
-    { lvl: 3, title: "Gamer", taskA: { desc: "Get 15,000 Pts", target: 15000, type: 'wealth' }, taskB: { desc: "Spin Lucky Wheel", target: 1, type: 'lottery' } },
+    { lvl: 3, title: "Gamer", taskA: { desc: "Get 15,000 Pts", target: 15000, type: 'wealth' }, taskB: { desc: "Spin Lucky Wheel", target: 1, type: 'roulette' } },
     { lvl: 4, title: "Investor", taskA: { desc: "Hold 1 Lucky Ticket", target: 1, type: 'ticket' }, taskB: { desc: "Have 1 Active Staking", target: 1, type: 'staking' } },
     { lvl: 5, title: "Growing", taskA: { desc: "Get 30,000 Pts", target: 30000, type: 'wealth' }, taskB: { desc: "Play 3 Arcade Games", target: 3, type: 'arcade' } },
     { lvl: 6, title: "Wealth Builder", taskA: { desc: "Have 2 Active Stakings", target: 2, type: 'staking' }, taskB: { desc: "Hold 2 Lucky Tickets", target: 2, type: 'ticket' } },
     { lvl: 7, title: "Dedication", taskA: { desc: "Get 50,000 Pts", target: 50000, type: 'wealth' }, taskB: { desc: "Play 6 Arcade Games", target: 6, type: 'arcade' } },
-    { lvl: 8, title: "The Final Boss", taskA: { desc: "Get 80,000 Pts", target: 80000, type: 'wealth' }, taskB: { desc: "Spin Lucky Wheel 2 Times", target: 2, type: 'lottery' } }
+    { lvl: 8, title: "The Final Boss", taskA: { desc: "Get 80,000 Pts", target: 80000, type: 'wealth' }, taskB: { desc: "Spin Lucky Wheel 2 Times", target: 2, type: 'roulette' } }
 ];
 
-const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy', 'arcade', 'lottery', 'bounty'];
+const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy'];
 
 export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClose }) => {
     const { user } = useAuth();
@@ -77,7 +78,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
     
     const [liveStats, setLiveStats] = useState<LiveStats>({
         score: 0, total_wealth: 0, lucky_tickets: 0, active_stakes: 0, user_level: 1,
-        arcade_games_played: 0, current_streak: 0, lottery_played: 0, bounties_done_today: 0,
+        arcade_games_played: 0, current_streak: 0, lottery_played: 0, roulette_played: 0, bounties_done_today: 0,
         checked_in_today: false, new_referrals_since_lvl9: 0, starter_pack_bought: false
     });
 
@@ -98,17 +99,14 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
         }
     }, [user]);
 
-    // 🔥 SISTEMA DE RESPALDO (FALLBACK) PARA STATS
     const loadLiveStats = useCallback(async () => {
         if (!user) return;
         try {
-            // Intento 1: Llamar al RPC
             const { data: userData, error } = await supabase.rpc('get_user_full_stats_for_path', { p_user_id: user.id });
             
             if (!error && userData && userData[0]) {
                 setLiveStats(prev => ({ ...prev, ...userData[0] }));
             } else {
-                // Intento 2 (FALLBACK): Si el RPC falla o no existe, leer directo de user_score
                 const { data: scoreData } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
                 if (scoreData) {
                     setLiveStats(prev => ({
@@ -117,6 +115,8 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                         total_wealth: scoreData.total_wealth || scoreData.score || 0,
                         arcade_games_played: scoreData.arcade_games_played || 0,
                         lottery_played: scoreData.lottery_played || 0,
+                        // 🔥 AQUÍ ESTÁ EL CAMBIO PRO: AHORA LEE spins_today PARA LA RULETA
+                        roulette_played: scoreData.spins_today || 0, 
                         lucky_tickets: scoreData.lucky_tickets || 0
                     }));
                 }
@@ -142,7 +142,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
         return 0.45;
     };
 
-    // 🔥 LECTURA BLINDADA: Prioriza el "score" real para tareas de Wealth
     const getStatValueByType = (type: string): number => {
         switch(type) {
             case 'score': return liveStats.score || 0;
@@ -154,6 +153,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
             case 'arcade': return liveStats.arcade_games_played || 0;
             case 'streak': return liveStats.current_streak || 0;
             case 'lottery': return liveStats.lottery_played || 0;
+            case 'roulette': return liveStats.roulette_played || 0; // 🔥 RETORNA LAS JUGADAS DE HOY
             case 'bounty': return liveStats.bounties_done_today || 0;
             case 'checkin': return liveStats.checked_in_today ? 1 : 0;
             case 'referral': return liveStats.new_referrals_since_lvl9 || 0;
@@ -356,7 +356,7 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
 
     const handleShareVictory = () => {
         const mediaUrl = 'https://gem-nova-tma.vercel.app/epic-win.jpg'; 
-        const inviteLink = `https://t.me/Gnovatoken_bot/app?startapp=${user?.id}`;
+        const inviteLink = `https://t.me/Gnovatoken_bot?start=${user?.id}`; 
         try {
             // @ts-expect-error TypeScript
             if (window.Telegram?.WebApp?.shareToStory) {
@@ -429,7 +429,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 <div className="confetti" style={{ position:'absolute', top:0, left:'50%', width:'10px', height:'10px', background:'#FFD700', animation:'fall 2s linear infinite' }}></div>
                 <div className="confetti" style={{ position:'absolute', top:0, left:'80%', width:'10px', height:'10px', background:'#E040FB', animation:'fall 4s linear infinite' }}></div>
                 
-                {/* BOTON X EPIC WIN BAJADO */}
                 <button onClick={() => setShowEpicWin(false)} style={{ position: 'fixed', top: 60, right: 20, background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.3)', borderRadius: '50%', padding: '10px', color: '#fff', cursor: 'pointer', zIndex: 10000 }}><X size={24} /></button>
                 
                 <div style={{ animation: 'bounce 2s infinite', zIndex: 2 }}><Trophy size={100} color="#FFD700" style={{ filter: 'drop-shadow(0 0 30px #FFD700)' }} /></div>
@@ -468,7 +467,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
             background: 'rgba(5, 5, 10, 0.95)', zIndex: 5000, 
             overflowY: 'auto', padding: '20px', paddingBottom: '100px', backdropFilter: 'blur(10px)'
         }}>
-            {/* 🔥 BOTÓN CERRAR GENERAL */}
             {onClose && (
                 <button onClick={onClose} style={{
                     position:'fixed', top: 100, right: 20, border:'none', color:'#fff', cursor:'pointer',
@@ -486,7 +484,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 </div>
             </div>
 
-            {/* MASTER PROGRESS BAR */}
             <div className="glass-card" style={{ padding: '15px', marginBottom: '25px', background: 'rgba(255, 215, 0, 0.05)', border: '1px solid rgba(255, 215, 0, 0.3)' }}>
                 <div style={{ textAlign: 'center', fontSize: '10px', color: '#FFD700', letterSpacing: '1px', marginBottom: '8px', fontWeight: '900' }}>
                     ULTIMATE REWARD POOL
@@ -500,7 +497,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 </div>
             </div>
 
-            {/* PREMIUM REWARD TRACK */}
             <div style={{ marginBottom: '30px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <h4 style={{ color: '#00F2FE', fontSize: '12px', margin: 0, letterSpacing: '1px' }}>PREMIUM REWARDS</h4>
@@ -515,11 +511,9 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                 </div>
             </div>
 
-            {/* ROADMAP VERTICAL */}
             <div style={{ marginBottom: '30px' }}>
                 <h4 style={{ color: '#aaa', fontSize: '12px', marginBottom: '15px', letterSpacing: '1px', borderBottom: '1px solid #333', paddingBottom: '5px' }}>MISSION ROADMAP</h4>
                 
-                {/* BOTÓN PRESTIGIO */}
                 {progress.is_completed && progress.premium_rewards_claimed === 8 && (
                     <div style={{ background: 'rgba(0, 242, 254, 0.1)', border: '1px dashed #00F2FE', padding: '20px', borderRadius: '12px', textAlign: 'center', marginBottom: '20px' }}>
                         <RefreshCcw size={40} color="#00F2FE" style={{ marginBottom: '10px' }}/>
@@ -539,7 +533,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                         const isFuture = step.lvl > progress.current_level;
                         const isCompletedMode = progress.is_completed && step.lvl === 8;
 
-                        // RENDER DE NIVELES PASADOS
                         if (isPast || isCompletedMode) {
                             return (
                                 <div key={step.lvl} style={{ position: 'relative' }}>
@@ -566,7 +559,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                             );
                         }
 
-                        // RENDER DEL NIVEL ACTUAL
                         if (isCurrent) {
                             return (
                                 <div key={step.lvl} style={{ position: 'relative', margin: '15px 0' }}>
@@ -590,7 +582,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                                             />
                                         </div>
 
-                                        {/* PEAJE PREMIUM */}
                                         {progress.task_a_done && progress.task_b_done && (
                                             <div style={{ marginTop: '20px', borderTop: '1px dashed rgba(255,255,255,0.2)', paddingTop: '15px' }}>
                                                 {!progress.reward_5k_claimed ? (
@@ -612,7 +603,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                             );
                         }
 
-                        // 🔥 RENDER DE NIVELES FUTUROS CON TAREAS Y COSTOS VISIBLES
                         if (isFuture) {
                             return (
                                 <div key={step.lvl} style={{ display: 'flex', alignItems: 'flex-start', gap: '15px', position: 'relative', marginTop: '10px' }}>
@@ -650,7 +640,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
 };
 
 const TaskRow: React.FC<TaskRowProps> = ({ letter, desc, isDone, isLoading, startValue, currentValue, targetAmount, type, onStart, onVerify }) => {
-    // Si startValue es undefined, el backend todavía no carga
     if (startValue === undefined) return <div style={{ height: '50px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', animation: 'pulse 1.5s infinite' }}></div>;
 
     const isStarted = startValue !== null;
