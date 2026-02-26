@@ -62,8 +62,7 @@ const PATH_STEPS = [
     { lvl: 8, title: "The Final Boss", taskA: { desc: "Get 80,000 Pts", target: 80000, type: 'wealth' }, taskB: { desc: "Spin Lucky Wheel 2 Times", target: 2, type: 'roulette' } }
 ];
 
-const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy'];
-
+const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy', 'roulette'];
 export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClose }) => {
     const { user } = useAuth();
     const [tonConnectUI] = useTonConnectUI();
@@ -105,7 +104,11 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
             const { data: userData, error } = await supabase.rpc('get_user_full_stats_for_path', { p_user_id: user.id });
             
             if (!error && userData && userData[0]) {
-                setLiveStats(prev => ({ ...prev, ...userData[0] }));
+                setLiveStats(prev => ({ 
+                    ...prev, 
+                    ...userData[0], 
+                    roulette_played: userData[0].spins_today // Mapea el valor de la DB al estado de la app
+                }));
             } else {
                 const { data: scoreData } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
                 if (scoreData) {
