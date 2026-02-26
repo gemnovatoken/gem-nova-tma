@@ -184,25 +184,22 @@ export default function App() {
 
                 } 
                 // ==========================================
-                // CASO B: USUARIO NUEVO
+                // ==========================================
+                // CASO B: USUARIO NUEVO (CORREGIDO PRO)
                 // ==========================================
                 else {
-                    console.log("🆕 Usuario Nuevo detectado. Start Param:", startParam);
+                    console.log("🆕 Usuario Nuevo detectado. Start Param Original:", startParam);
                     
                     let referrerId = null;
 
-                    if (startParam && startParam.length > 5) { 
-                        if (startParam.includes('ref_')) {
-                            referrerId = startParam.split('ref_')[1]; 
-                        } 
-                        else if (startParam.includes('_')) {
-                             referrerId = startParam.split('_')[1];
-                        }
-                        else {
-                            referrerId = startParam; 
-                        }
+                    // 🔥 SOLUCIÓN: Pasamos el código EXACTO. Solo limpiamos si trae "ref_" de algún formato viejo.
+                    // Ya NO hacemos split por "_" porque destruye los códigos como "Allieeee_a21e".
+                    if (startParam && startParam.trim() !== '') { 
+                        referrerId = startParam.replace('ref_', ''); 
+                        console.log("🎯 Código a enviar a Supabase:", referrerId);
                     }
 
+                    // Hacemos UNA SOLA llamada a la base de datos con el código íntegro
                     const { error: insertError } = await supabase.rpc('register_new_user', {
                         p_user_id: user.id,
                         p_username: username,
@@ -210,13 +207,16 @@ export default function App() {
                     });
                     
                     if (!insertError) {
-                        setScore(referrerId ? 5000 : 0); 
-                        scoreRef.current = referrerId ? 5000 : 0;
+                        // Si entró con referido, le damos 5000 pts. Si entró solo, 0 pts.
+                        const initialScore = referrerId ? 5000 : 0;
+                        setScore(initialScore); 
+                        scoreRef.current = initialScore;
                         
                         setEnergy(1000); 
                         energyRef.current = 1000;
                         
                         setCanSave(true);
+                        console.log("✅ Usuario registrado exitosamente. Referido:", referrerId || "Ninguno");
                     } else {
                         console.error("❌ Error registrando usuario:", insertError);
                     }
