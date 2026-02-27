@@ -251,19 +251,20 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const getBotColor = () => botTime > 0 ? "#4CAF50" : "#FF512F";
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '15px', height: 'calc(100dvh - 135px)', padding: '0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+        // 🔥 CORRECCIÓN 1: Reduje el gap principal a 5px para juntar todo de forma natural sin usar márgenes negativos
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '5px', height: 'calc(100dvh - 135px)', padding: '10px 0 0 0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
             
-            {/* 🔥 CONTENEDOR SUPERIOR - SE AUMENTÓ EL MARGEN NEGATIVO PARA ELIMINAR ESPACIO ROJO 🔥 */}
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-40px', width: '100%', position: 'relative' }}>
+            {/* 🔥 CORRECCIÓN 2: Eliminado el marginTop negativo. Flujo natural limpio. */}
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, width: '100%', position: 'relative' }}>
                 
                 {/* BOTÓN DEL RIG (Ranking) - Centrado arriba */}
-                <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 16px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '8px' }}>
+                <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 16px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '4px' }}>
                     <Server size={14} color={isGodMode ? "#FFD700" : "#aaa"}/>
                     <span style={{fontSize:'10px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}</span>
                 </div>
 
-                {/* CONTENEDOR DEL BALANCE Y EL BOTÓN SPIN JUNTOS (Círculo Verde) */}
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                {/* CONTENEDOR DEL BALANCE Y EL BOTÓN SPIN JUNTOS */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: '60px' }}>
                     
                     {/* El número de Score centrado */}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -271,7 +272,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                         <div style={{fontSize:'10px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
                     </div>
 
-                    {/* 🔥 BOTÓN CASINO SPIN - Alineado con el texto "TOTAL MINED" 🔥 */}
+                    {/* 🔥 BOTÓN CASINO SPIN - Alineado con "TOTAL MINED" como solicitaste 🔥 */}
                     <div style={{ position: 'absolute', right: '15px', bottom: '0px' }}>
                         <div style={{ position: 'relative' }}>
                             <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', background: '#FF0055', borderRadius: '50%', boxShadow: '0 0 10px #FF0055', zIndex: 51, animation: 'pulse-dot 1.5s infinite' }}></div>
