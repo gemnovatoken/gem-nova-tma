@@ -253,45 +253,42 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '15px', height: 'calc(100dvh - 135px)', padding: '0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
             
-            {/* 🔥 CASINO SPIN - NUEVO BOTÓN FLOTANTE FUTURISTA (ARRIBA A LA DERECHA) 🔥 */}
-            <div style={{ position: 'absolute', top: '15px', right: '15px', zIndex: 50 }}>
-                <div style={{ position: 'relative' }}>
-                    {/* Indicador rojo de notificación (Genera FOMO) */}
-                    <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '12px', height: '12px', background: '#FF0055', borderRadius: '50%', boxShadow: '0 0 10px #FF0055', zIndex: 51, animation: 'pulse-dot 1.5s infinite' }}></div>
-                    
-                    <button 
-                        onClick={() => setShowLucky(true)}
-                        style={{
-                            background: 'linear-gradient(45deg, rgba(224, 64, 251, 0.15), rgba(0, 242, 254, 0.15))',
-                            border: '1px solid rgba(0, 242, 254, 0.5)',
-                            borderRadius: '30px',
-                            padding: '6px 12px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px',
-                            color: '#fff',
-                            cursor: 'pointer',
-                            animation: 'float-spin-btn 3s ease-in-out infinite',
-                            backdropFilter: 'blur(8px)',
-                            boxShadow: '0 4px 15px rgba(0, 242, 254, 0.2), inset 0 0 10px rgba(224, 64, 251, 0.2)'
-                        }}
-                    >
-                        <div style={{ background: '#00F2FE', padding: '5px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px #00F2FE' }}>
-                            <Gamepad2 size={14} color="#000" style={{ animation: 'wiggle-icon 2.5s infinite' }} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
-                            <span style={{ color: '#00F2FE', textShadow: '0 0 5px rgba(0, 242, 254, 0.5)', lineHeight: '1', fontSize: '9px', fontWeight: '900', letterSpacing: '1px' }}>LUCKY</span>
-                            <span style={{ color: '#E040FB', textShadow: '0 0 5px rgba(224, 64, 251, 0.5)', lineHeight: '1', fontSize: '11px', fontWeight: '900', letterSpacing: '1px' }}>SPIN</span>
-                        </div>
-                    </button>
-                </div>
-            </div>
-
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-10px' }}>
-                <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '4px 12px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '2px' }}>
-                    <Server size={12} color={isGodMode ? "#FFD700" : "#aaa"}/>
-                    <span style={{fontSize:'9px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}</span>
+                
+                {/* 🔥 CONTENEDOR FLEX PARA ALINEAR EL RIG Y EL CASINO 🔥 */}
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+                    
+                    {/* BOTÓN DEL RIG (Ranking) */}
+                    <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 12px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer' }}>
+                        <Server size={14} color={isGodMode ? "#FFD700" : "#aaa"}/>
+                        <span style={{fontSize:'10px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}</span>
+                    </div>
+
+                    {/* 🔥 BOTÓN CASINO SPIN MOVIDO AQUÍ 🔥 */}
+                    <div style={{ position: 'relative' }}>
+                        <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', background: '#FF0055', borderRadius: '50%', boxShadow: '0 0 10px #FF0055', zIndex: 51, animation: 'pulse-dot 1.5s infinite' }}></div>
+                        <button 
+                            onClick={() => setShowLucky(true)}
+                            style={{
+                                background: 'linear-gradient(45deg, rgba(224, 64, 251, 0.2), rgba(0, 242, 254, 0.2))',
+                                border: '1px solid rgba(0, 242, 254, 0.5)',
+                                borderRadius: '20px',
+                                padding: '4px 10px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                cursor: 'pointer',
+                                animation: 'float-spin-btn 3s ease-in-out infinite',
+                                boxShadow: '0 4px 10px rgba(0, 242, 254, 0.2), inset 0 0 8px rgba(224, 64, 251, 0.2)'
+                            }}
+                        >
+                            <Gamepad2 size={14} color="#00F2FE" style={{ animation: 'wiggle-icon 2.5s infinite' }} />
+                            <span style={{ color: '#fff', textShadow: '0 0 5px rgba(224, 64, 251, 0.8)', fontSize: '10px', fontWeight: '900', letterSpacing: '1px' }}>SPIN</span>
+                        </button>
+                    </div>
+
                 </div>
+
                 <div className="text-gradient" style={{ fontSize: '36px', fontWeight: '900', margin: '0', lineHeight:1 }}>{score.toLocaleString()}</div>
                 <div style={{fontSize:'9px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
             </div>
@@ -409,7 +406,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} score={score} onUpdateScore={setScore} />}
             {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} />}
             
-            {/* 🔥 ANIMACIONES AÑADIDAS AL FINAL DEL ARCHIVO 🔥 */}
             <style>{`
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 @keyframes pulse { 0% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px #FF0055; } 100% { transform: scale(1.1); opacity: 0.8; text-shadow: 0 0 20px #FF0055; } }
@@ -417,7 +413,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 @keyframes floatUp { 0% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -150px) scale(1.5); opacity: 0; } }
                 
                 /* ANIMACIONES NUEVAS DEL BOTÓN CASINO */
-                @keyframes float-spin-btn { 0%, 100% { transform: translateY(0); box-shadow: 0 4px 15px rgba(0, 242, 254, 0.2), inset 0 0 10px rgba(224, 64, 251, 0.2); } 50% { transform: translateY(-3px); box-shadow: 0 8px 25px rgba(0, 242, 254, 0.5), inset 0 0 15px rgba(224, 64, 251, 0.4); } }
+                @keyframes float-spin-btn { 0%, 100% { transform: translateY(0); box-shadow: 0 4px 10px rgba(0, 242, 254, 0.2), inset 0 0 8px rgba(224, 64, 251, 0.2); } 50% { transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0, 242, 254, 0.4), inset 0 0 12px rgba(224, 64, 251, 0.3); } }
                 @keyframes wiggle-icon { 0%, 100% { transform: rotate(0deg) scale(1); } 10% { transform: rotate(-15deg) scale(1.1); } 20% { transform: rotate(15deg) scale(1.1); } 30% { transform: rotate(-15deg) scale(1.1); } 40% { transform: rotate(15deg) scale(1.1); } 50% { transform: rotate(0deg) scale(1); } }
                 @keyframes pulse-dot { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.3); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
             `}</style>
