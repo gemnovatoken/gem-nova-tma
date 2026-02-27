@@ -101,15 +101,28 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
     const loadLiveStats = useCallback(async () => {
         if (!user) return;
         try {
+            // 1. Buscamos los datos generales (RPC)
             const { data: userData, error } = await supabase.rpc('get_user_full_stats_for_path', { p_user_id: user.id });
             
+            // 🔥 2. SOLUCIÓN: Vamos a la tabla CORRECTA a buscar los giros de hoy
+            const { data: wheelData } = await supabase
+                .from('wheel_analytics')
+                .select('spins_today')
+                .eq('user_id', user.id)
+                .single();
+
+            // Extraemos los giros de forma segura
+            const actualSpinsToday = wheelData?.spins_today || 0;
+
             if (!error && userData && userData[0]) {
                 setLiveStats(prev => ({ 
                     ...prev, 
                     ...userData[0], 
-                    roulette_played: userData[0].spins_today // Mapea el valor de la DB al estado de la app
+                    // Usamos el dato de la tabla wheel_analytics
+                    roulette_played: actualSpinsToday 
                 }));
             } else {
+                // Si el RPC falla, usamos el fallback
                 const { data: scoreData } = await supabase.from('user_score').select('*').eq('user_id', user.id).single();
                 if (scoreData) {
                     setLiveStats(prev => ({
@@ -118,8 +131,8 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                         total_wealth: scoreData.total_wealth || scoreData.score || 0,
                         arcade_games_played: scoreData.arcade_games_played || 0,
                         lottery_played: scoreData.lottery_played || 0,
-                        // 🔥 AQUÍ ESTÁ EL CAMBIO PRO: AHORA LEE spins_today PARA LA RULETA
-                        roulette_played: scoreData.spins_today || 0, 
+                        // Usamos el dato de la tabla wheel_analytics aquí también
+                        roulette_played: actualSpinsToday, 
                         lucky_tickets: scoreData.lucky_tickets || 0
                     }));
                 }
