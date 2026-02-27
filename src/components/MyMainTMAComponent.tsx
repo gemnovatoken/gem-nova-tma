@@ -253,44 +253,50 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '15px', height: 'calc(100dvh - 135px)', padding: '0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
             
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-10px' }}>
+            {/* 🔥 CONTENEDOR SUPERIOR - REORGANIZADO PARA ELIMINAR EL ESPACIO 🔥 */}
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-25px', width: '100%', position: 'relative' }}>
                 
-                {/* 🔥 CONTENEDOR FLEX PARA ALINEAR EL RIG Y EL CASINO 🔥 */}
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+                {/* BOTÓN DEL RIG (Ranking) - Centrado arriba */}
+                <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 16px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '8px' }}>
+                    <Server size={14} color={isGodMode ? "#FFD700" : "#aaa"}/>
+                    <span style={{fontSize:'10px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}</span>
+                </div>
+
+                {/* CONTENEDOR DEL BALANCE Y EL BOTÓN SPIN JUNTOS (Círculo Verde) */}
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                     
-                    {/* BOTÓN DEL RIG (Ranking) */}
-                    <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 12px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer' }}>
-                        <Server size={14} color={isGodMode ? "#FFD700" : "#aaa"}/>
-                        <span style={{fontSize:'10px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}</span>
+                    {/* El número de Score centrado */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div className="text-gradient" style={{ fontSize: '42px', fontWeight: '900', margin: '0', lineHeight:1 }}>{score.toLocaleString()}</div>
+                        <div style={{fontSize:'10px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
                     </div>
 
-                    {/* 🔥 BOTÓN CASINO SPIN MOVIDO AQUÍ 🔥 */}
-                    <div style={{ position: 'relative' }}>
-                        <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', background: '#FF0055', borderRadius: '50%', boxShadow: '0 0 10px #FF0055', zIndex: 51, animation: 'pulse-dot 1.5s infinite' }}></div>
-                        <button 
-                            onClick={() => setShowLucky(true)}
-                            style={{
-                                background: 'linear-gradient(45deg, rgba(224, 64, 251, 0.2), rgba(0, 242, 254, 0.2))',
-                                border: '1px solid rgba(0, 242, 254, 0.5)',
-                                borderRadius: '20px',
-                                padding: '4px 10px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                cursor: 'pointer',
-                                animation: 'float-spin-btn 3s ease-in-out infinite',
-                                boxShadow: '0 4px 10px rgba(0, 242, 254, 0.2), inset 0 0 8px rgba(224, 64, 251, 0.2)'
-                            }}
-                        >
-                            <Gamepad2 size={14} color="#00F2FE" style={{ animation: 'wiggle-icon 2.5s infinite' }} />
-                            <span style={{ color: '#fff', textShadow: '0 0 5px rgba(224, 64, 251, 0.8)', fontSize: '10px', fontWeight: '900', letterSpacing: '1px' }}>SPIN</span>
-                        </button>
+                    {/* 🔥 BOTÓN CASINO SPIN - A la derecha del balance (Círculo verde) 🔥 */}
+                    <div style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)' }}>
+                        <div style={{ position: 'relative' }}>
+                            <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', background: '#FF0055', borderRadius: '50%', boxShadow: '0 0 10px #FF0055', zIndex: 51, animation: 'pulse-dot 1.5s infinite' }}></div>
+                            <button 
+                                onClick={() => setShowLucky(true)}
+                                style={{
+                                    background: 'linear-gradient(45deg, rgba(224, 64, 251, 0.2), rgba(0, 242, 254, 0.2))',
+                                    border: '1px solid rgba(0, 242, 254, 0.5)',
+                                    borderRadius: '20px',
+                                    padding: '6px 12px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    cursor: 'pointer',
+                                    animation: 'float-spin-btn 3s ease-in-out infinite',
+                                    boxShadow: '0 4px 10px rgba(0, 242, 254, 0.2), inset 0 0 8px rgba(224, 64, 251, 0.2)'
+                                }}
+                            >
+                                <Gamepad2 size={16} color="#00F2FE" style={{ animation: 'wiggle-icon 2.5s infinite' }} />
+                                <span style={{ color: '#fff', textShadow: '0 0 5px rgba(224, 64, 251, 0.8)', fontSize: '12px', fontWeight: '900', letterSpacing: '1px' }}>SPIN</span>
+                            </button>
+                        </div>
                     </div>
 
                 </div>
-
-                <div className="text-gradient" style={{ fontSize: '36px', fontWeight: '900', margin: '0', lineHeight:1 }}>{score.toLocaleString()}</div>
-                <div style={{fontSize:'9px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
             </div>
 
             <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '280px', height: '280px' }}>
