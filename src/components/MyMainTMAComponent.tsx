@@ -253,8 +253,8 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '15px', height: 'calc(100dvh - 135px)', padding: '0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
             
-            {/* 🔥 CONTENEDOR SUPERIOR - REORGANIZADO PARA ELIMINAR EL ESPACIO 🔥 */}
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-25px', width: '100%', position: 'relative' }}>
+            {/* 🔥 CONTENEDOR SUPERIOR - SE AUMENTÓ EL MARGEN NEGATIVO PARA ELIMINAR ESPACIO ROJO 🔥 */}
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-50px', width: '100%', position: 'relative' }}>
                 
                 {/* BOTÓN DEL RIG (Ranking) - Centrado arriba */}
                 <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 16px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '8px' }}>
@@ -271,8 +271,8 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                         <div style={{fontSize:'10px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
                     </div>
 
-                    {/* 🔥 BOTÓN CASINO SPIN - A la derecha del balance (Círculo verde) 🔥 */}
-                    <div style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)' }}>
+                    {/* 🔥 BOTÓN CASINO SPIN - Alineado con el texto "TOTAL MINED" 🔥 */}
+                    <div style={{ position: 'absolute', right: '15px', bottom: '0px' }}>
                         <div style={{ position: 'relative' }}>
                             <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', background: '#FF0055', borderRadius: '50%', boxShadow: '0 0 10px #FF0055', zIndex: 51, animation: 'pulse-dot 1.5s infinite' }}></div>
                             <button 
