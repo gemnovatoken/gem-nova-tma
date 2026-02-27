@@ -62,8 +62,7 @@ const PATH_STEPS = [
     { lvl: 8, title: "The Final Boss", taskA: { desc: "Get 80,000 Pts", target: 80000, type: 'wealth' }, taskB: { desc: "Spin Lucky Wheel 2 Times", target: 2, type: 'roulette' } }
 ];
 
-const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy', 'roulette'];
-
+const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy', 'roulette', 'arcade'];
 export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClose }) => {
     const { user } = useAuth();
     const [tonConnectUI] = useTonConnectUI();
