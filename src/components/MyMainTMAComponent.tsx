@@ -157,7 +157,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     }, [botTime, energy, maxEnergy, handleClaim]);
 
-    // 🔥 LIMPIAMOS WATCH VIDEO: Solo queda el Overclock 🔥
     const watchVideo = useCallback(async (type: 'turbo') => {
         if (!user) return; 
         if (type === 'turbo') {
@@ -251,28 +250,29 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const getBotColor = () => botTime > 0 ? "#4CAF50" : "#FF512F";
 
     return (
-        // 🔥 ARQUITECTURA FLEX: gap reducido y el Orbe usa flex-grow para empujar todo
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px', height: 'calc(100dvh - 135px)', padding: '0px', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+        // 🔥 CORRECCIÓN AQUI: Cambié overflow: 'hidden' a overflowY: 'auto', añadí padding bottom extra, y la clase no-scrollbar
+        <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center', gap: '20px', height: 'calc(100dvh - 135px)', padding: '15px 0 20px 0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflowY: 'auto', overflowX: 'hidden' }}>
             
-            {/* =========================================
-                GRUPO SUPERIOR (RIG + SCORE + SPIN) 
-               ========================================= */}
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, width: '100%', position: 'relative' }}>
                 
                 {/* BOTÓN DEL RIG (Ranking) */}
-                <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 16px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '2px' }}>
+                <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 16px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '8px' }}>
                     <Server size={14} color={isGodMode ? "#FFD700" : "#aaa"}/>
                     <span style={{fontSize:'10px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}</span>
                 </div>
 
                 {/* CONTENEDOR DEL BALANCE Y EL BOTÓN SPIN JUNTOS */}
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', width: '100%' }}>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                     
-                    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '15px' }}>
-                        <div className="text-gradient" style={{ fontSize: '42px', fontWeight: '900', margin: '0', lineHeight: 1 }}>{score.toLocaleString()}</div>
-                        
-                        {/* 🔥 BOTÓN CASINO SPIN - Alineado con el Score 🔥 */}
-                        <div style={{ position: 'relative', marginBottom: '4px' }}>
+                    {/* El número de Score centrado */}
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <div className="text-gradient" style={{ fontSize: '42px', fontWeight: '900', margin: '0', lineHeight:1 }}>{score.toLocaleString()}</div>
+                        <div style={{fontSize:'10px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
+                    </div>
+
+                    {/* 🔥 BOTÓN CASINO SPIN */}
+                    <div style={{ position: 'absolute', right: '15px', bottom: '0px' }}>
+                        <div style={{ position: 'relative' }}>
                             <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', background: '#FF0055', borderRadius: '50%', boxShadow: '0 0 10px #FF0055', zIndex: 51, animation: 'pulse-dot 1.5s infinite' }}></div>
                             <button 
                                 onClick={() => setShowLucky(true)}
@@ -280,31 +280,27 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                                     background: 'linear-gradient(45deg, rgba(224, 64, 251, 0.2), rgba(0, 242, 254, 0.2))',
                                     border: '1px solid rgba(0, 242, 254, 0.5)',
                                     borderRadius: '20px',
-                                    padding: '4px 10px',
+                                    padding: '6px 12px',
                                     display: 'flex',
                                     alignItems: 'center',
-                                    gap: '4px',
+                                    gap: '6px',
                                     cursor: 'pointer',
                                     animation: 'float-spin-btn 3s ease-in-out infinite',
                                     boxShadow: '0 4px 10px rgba(0, 242, 254, 0.2), inset 0 0 8px rgba(224, 64, 251, 0.2)'
                                 }}
                             >
-                                <Gamepad2 size={14} color="#00F2FE" style={{ animation: 'wiggle-icon 2.5s infinite' }} />
-                                <span style={{ color: '#fff', textShadow: '0 0 5px rgba(224, 64, 251, 0.8)', fontSize: '10px', fontWeight: '900', letterSpacing: '1px' }}>SPIN</span>
+                                <Gamepad2 size={16} color="#00F2FE" style={{ animation: 'wiggle-icon 2.5s infinite' }} />
+                                <span style={{ color: '#fff', textShadow: '0 0 5px rgba(224, 64, 251, 0.8)', fontSize: '12px', fontWeight: '900', letterSpacing: '1px' }}>SPIN</span>
                             </button>
                         </div>
                     </div>
-                    
-                    <div style={{fontSize:'10px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
                 </div>
             </div>
 
-            {/* =========================================
-                EL ORBE (Con Flex-Grow para ocupar el espacio azul)
-               ========================================= */}
-            <div style={{ flexGrow: 1, position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', minHeight: '280px' }}>
-                <div style={{ position: 'absolute', width: '280px', height: '280px', borderRadius: '50%', border: '1px dashed rgba(255,255,255,0.1)', animation: 'spin 20s linear infinite', zIndex: 0 }}></div>
-                <div style={{ position: 'absolute', width: '250px', height: '250px', borderRadius: '50%', border: '1px solid rgba(0, 242, 254, 0.05)', animation: 'pulse-glow 4s ease-in-out infinite', zIndex: 0 }}></div>
+            {/* 🔥 EL ORBE */}
+            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '280px', height: '280px', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', border: '1px dashed rgba(255,255,255,0.1)', animation: 'spin 20s linear infinite', zIndex: 0 }}></div>
+                <div style={{ position: 'absolute', width: '90%', height: '90%', borderRadius: '50%', border: '1px solid rgba(0, 242, 254, 0.05)', animation: 'pulse-glow 4s ease-in-out infinite', zIndex: 0 }}></div>
                 <div style={{ position: 'absolute', width: '260px', height: '260px', zIndex: 1, transform: 'rotate(-90deg)' }}>
                     <svg width="260" height="260">
                         <circle cx="130" cy="130" r={radius} stroke="#1a1a1a" strokeWidth="12" fill="transparent" />
@@ -323,10 +319,8 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 ))}
             </div>
 
-            {/* =========================================
-                GRUPO INFERIOR (FOOTER / DOCK) 
-               ========================================= */}
-            <div style={{ width: '100%', padding: '0 15px', zIndex: 10, paddingBottom: '10px' }}>
+            {/* 🔥 EL DOCK INFERIOR */}
+            <div style={{ width: '100%', padding: '0 15px', zIndex: 10, flexShrink: 0 }}>
                 <div style={{ marginBottom:'4px', display:'flex', justifyContent:'center', fontSize:'9px', color: ringColor, fontWeight:'bold' }}><span>PRODUCTION: {(overclockTime && overclockTime > 0) ? (regenRate * 3600 * 2) : (regenRate * 3600)} PTS/HOUR</span></div>
                 
                 <div className="glass-card" style={{ padding: '8px 6px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -418,6 +412,10 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} />}
             
             <style>{`
+                /* 🔥 ESTA CLASE OCULTA LA BARRA DE SCROLL PERO PERMITE DESLIZAR 🔥 */
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 @keyframes pulse { 0% { transform: scale(1); opacity: 1; text-shadow: 0 0 10px #FF0055; } 100% { transform: scale(1.1); opacity: 0.8; text-shadow: 0 0 20px #FF0055; } }
                 @keyframes pulse-glow { 0% { transform: scale(1); opacity: 0.5; border-color: rgba(0, 242, 254, 0.1); } 50% { transform: scale(1.05); opacity: 0.8; border-color: rgba(0, 242, 254, 0.3); } 100% { transform: scale(1); opacity: 0.5; border-color: rgba(0, 242, 254, 0.1); } }
