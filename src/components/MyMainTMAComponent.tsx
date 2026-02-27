@@ -94,7 +94,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
     }, [user, syncMiningData]);
 
-    // Reducir el timer del bot visualmente cada segundo
     useEffect(() => {
         if (botTime > 0) {
             const timer = setInterval(() => {
@@ -116,7 +115,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         return `${m}m ${s}s`;
     };
 
-    // --- FUNCIÓN DE COBRO (CLAIM) ORIGINAL ---
     const handleClaim = useCallback(async () => {
         if (!user || energy < 1 || claiming) return;
         setClaiming(true);
@@ -157,7 +155,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     }, [botTime, energy, maxEnergy, handleClaim]);
 
-    // 🔥 LIMPIAMOS WATCH VIDEO: Solo queda el Overclock 🔥
     const watchVideo = useCallback(async (type: 'turbo') => {
         if (!user) return; 
         if (type === 'turbo') {
@@ -251,80 +248,89 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const getBotColor = () => botTime > 0 ? "#4CAF50" : "#FF512F";
 
     return (
-        // 🔥 CORRECCIÓN 1: Reduje el gap principal a 5px para juntar todo de forma natural sin usar márgenes negativos
-        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '5px', height: 'calc(100dvh - 135px)', padding: '10px 0 0 0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+        // 🔥 ARQUITECTURA CORREGIDA: space-between envía el sobrante de pantalla al medio/abajo, bloqueando los elementos superiores juntos.
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'center', height: 'calc(100dvh - 135px)', padding: '15px 0 0 0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
             
-            {/* 🔥 CORRECCIÓN 2: Eliminado el marginTop negativo. Flujo natural limpio. */}
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, width: '100%', position: 'relative' }}>
+            {/* =========================================
+                GRUPO SUPERIOR (BLOQUEADO JUNTO: RIG + SCORE + ORB) 
+               ========================================= */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', gap: '15px' }}>
                 
-                {/* BOTÓN DEL RIG (Ranking) - Centrado arriba */}
-                <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 16px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '4px' }}>
-                    <Server size={14} color={isGodMode ? "#FFD700" : "#aaa"}/>
-                    <span style={{fontSize:'10px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}</span>
-                </div>
-
-                {/* CONTENEDOR DEL BALANCE Y EL BOTÓN SPIN JUNTOS */}
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', minHeight: '60px' }}>
+                {/* 1. Header (Rig, Score y Spin) */}
+                <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, width: '100%', position: 'relative' }}>
                     
-                    {/* El número de Score centrado */}
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                        <div className="text-gradient" style={{ fontSize: '42px', fontWeight: '900', margin: '0', lineHeight:1 }}>{score.toLocaleString()}</div>
-                        <div style={{fontSize:'10px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
+                    {/* BOTÓN DEL RIG (Ranking) */}
+                    <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 16px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '8px' }}>
+                        <Server size={14} color={isGodMode ? "#FFD700" : "#aaa"}/>
+                        <span style={{fontSize:'10px', color:'#fff', fontWeight:'bold', letterSpacing:'1px'}}>RIG: {LEVEL_NAMES[Math.min(globalLevel-1, 7)]?.toUpperCase()}</span>
                     </div>
 
-                    {/* 🔥 BOTÓN CASINO SPIN - Alineado con "TOTAL MINED" como solicitaste 🔥 */}
-                    <div style={{ position: 'absolute', right: '15px', bottom: '0px' }}>
-                        <div style={{ position: 'relative' }}>
-                            <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', background: '#FF0055', borderRadius: '50%', boxShadow: '0 0 10px #FF0055', zIndex: 51, animation: 'pulse-dot 1.5s infinite' }}></div>
-                            <button 
-                                onClick={() => setShowLucky(true)}
-                                style={{
-                                    background: 'linear-gradient(45deg, rgba(224, 64, 251, 0.2), rgba(0, 242, 254, 0.2))',
-                                    border: '1px solid rgba(0, 242, 254, 0.5)',
-                                    borderRadius: '20px',
-                                    padding: '6px 12px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    cursor: 'pointer',
-                                    animation: 'float-spin-btn 3s ease-in-out infinite',
-                                    boxShadow: '0 4px 10px rgba(0, 242, 254, 0.2), inset 0 0 8px rgba(224, 64, 251, 0.2)'
-                                }}
-                            >
-                                <Gamepad2 size={16} color="#00F2FE" style={{ animation: 'wiggle-icon 2.5s infinite' }} />
-                                <span style={{ color: '#fff', textShadow: '0 0 5px rgba(224, 64, 251, 0.8)', fontSize: '12px', fontWeight: '900', letterSpacing: '1px' }}>SPIN</span>
-                            </button>
+                    {/* CONTENEDOR DEL BALANCE Y EL BOTÓN SPIN JUNTOS (La alineación verde exacta) */}
+                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                        
+                        {/* El número de Score centrado */}
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <div className="text-gradient" style={{ fontSize: '42px', fontWeight: '900', margin: '0', lineHeight:1 }}>{score.toLocaleString()}</div>
+                            <div style={{fontSize:'10px', color:'#aaa', marginTop:'2px'}}>TOTAL MINED</div>
+                        </div>
+
+                        {/* 🔥 BOTÓN CASINO SPIN - Alineado con "TOTAL MINED" a la derecha 🔥 */}
+                        <div style={{ position: 'absolute', right: '15px', bottom: '0px' }}>
+                            <div style={{ position: 'relative' }}>
+                                <div style={{ position: 'absolute', top: '-2px', right: '-2px', width: '10px', height: '10px', background: '#FF0055', borderRadius: '50%', boxShadow: '0 0 10px #FF0055', zIndex: 51, animation: 'pulse-dot 1.5s infinite' }}></div>
+                                <button 
+                                    onClick={() => setShowLucky(true)}
+                                    style={{
+                                        background: 'linear-gradient(45deg, rgba(224, 64, 251, 0.2), rgba(0, 242, 254, 0.2))',
+                                        border: '1px solid rgba(0, 242, 254, 0.5)',
+                                        borderRadius: '20px',
+                                        padding: '6px 12px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        cursor: 'pointer',
+                                        animation: 'float-spin-btn 3s ease-in-out infinite',
+                                        boxShadow: '0 4px 10px rgba(0, 242, 254, 0.2), inset 0 0 8px rgba(224, 64, 251, 0.2)'
+                                    }}
+                                >
+                                    <Gamepad2 size={16} color="#00F2FE" style={{ animation: 'wiggle-icon 2.5s infinite' }} />
+                                    <span style={{ color: '#fff', textShadow: '0 0 5px rgba(224, 64, 251, 0.8)', fontSize: '12px', fontWeight: '900', letterSpacing: '1px' }}>SPIN</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
-
                 </div>
-            </div>
 
-            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '280px', height: '280px' }}>
-                <div style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', border: '1px dashed rgba(255,255,255,0.1)', animation: 'spin 20s linear infinite', zIndex: 0 }}></div>
-                <div style={{ position: 'absolute', width: '90%', height: '90%', borderRadius: '50%', border: '1px solid rgba(0, 242, 254, 0.05)', animation: 'pulse-glow 4s ease-in-out infinite', zIndex: 0 }}></div>
-                <div style={{ position: 'absolute', width: '260px', height: '260px', zIndex: 1, transform: 'rotate(-90deg)' }}>
-                    <svg width="260" height="260">
-                        <circle cx="130" cy="130" r={radius} stroke="#1a1a1a" strokeWidth="12" fill="transparent" />
-                        <circle cx="130" cy="130" r={radius} stroke={ringColor} strokeWidth="12" fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.5s ease-out, stroke 0.5s ease' }} />
-                    </svg>
+                {/* 2. El Orbe (Botón central de energía) */}
+                <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center', width: '280px', height: '280px' }}>
+                    <div style={{ position: 'absolute', width: '100%', height: '100%', borderRadius: '50%', border: '1px dashed rgba(255,255,255,0.1)', animation: 'spin 20s linear infinite', zIndex: 0 }}></div>
+                    <div style={{ position: 'absolute', width: '90%', height: '90%', borderRadius: '50%', border: '1px solid rgba(0, 242, 254, 0.05)', animation: 'pulse-glow 4s ease-in-out infinite', zIndex: 0 }}></div>
+                    <div style={{ position: 'absolute', width: '260px', height: '260px', zIndex: 1, transform: 'rotate(-90deg)' }}>
+                        <svg width="260" height="260">
+                            <circle cx="130" cy="130" r={radius} stroke="#1a1a1a" strokeWidth="12" fill="transparent" />
+                            <circle cx="130" cy="130" r={radius} stroke={ringColor} strokeWidth="12" fill="transparent" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.5s ease-out, stroke 0.5s ease' }} />
+                        </svg>
+                    </div>
+                    <button onTouchStart={handleTapWithJuice} onMouseDown={handleTapWithJuice} disabled={energy < 1} style={{ width: '170px', height: '170px', borderRadius: '50%', zIndex: 2, border: 'none', background: claiming ? '#fff' : `radial-gradient(circle at 30% 30%, ${ringColor}, #050505)`, boxShadow: `0 0 ${fillPercent/2}px ${ringColor}`, cursor: 'pointer', transform: isPressed ? 'scale(0.92)' : (claiming ? 'scale(0.95)' : 'scale(1)'), transition: 'transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                        {claiming ? <span style={{color:'#000', fontWeight:'bold', fontSize:'14px'}}>COLLECTING...</span> : <>
+                            <div style={{fontSize:'24px', filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))'}}>{(overclockTime && overclockTime > 0) ? '🔥' : (fillPercent >= 100 ? '⚠️' : '⚡')}</div>
+                            <div style={{fontSize:'18px', fontWeight:'900', color:'#fff', textShadow:'0 0 5px #000'}}>+{Math.floor(energy)}</div>
+                            {(overclockTime && overclockTime > 0) ? <div style={{ color: '#FF0055', fontWeight: '900', fontSize: '14px', marginTop: '2px', animation: 'pulse 0.8s infinite alternate' }}>TURBO {overclockTime}s</div> : <div style={{fontSize:'8px', color:'rgba(255,255,255,0.8)', marginTop:'2px'}}>{fillPercent.toFixed(0)}% FULL</div>}
+                        </>}
+                    </button>
+                    {clickEffects.map((effect) => (
+                        <div key={effect.id} style={{ position: 'fixed', left: effect.x, top: effect.y, pointerEvents: 'none', zIndex: 100, color: ringColor, fontWeight: '900', fontSize: '24px', textShadow: '0 0 10px rgba(0,0,0,0.8)', animation: 'floatUp 0.8s ease-out forwards', transform: 'translate(-50%, -50%)' }}>+{effect.value}</div>
+                    ))}
                 </div>
-                <button onTouchStart={handleTapWithJuice} onMouseDown={handleTapWithJuice} disabled={energy < 1} style={{ width: '170px', height: '170px', borderRadius: '50%', zIndex: 2, border: 'none', background: claiming ? '#fff' : `radial-gradient(circle at 30% 30%, ${ringColor}, #050505)`, boxShadow: `0 0 ${fillPercent/2}px ${ringColor}`, cursor: 'pointer', transform: isPressed ? 'scale(0.92)' : (claiming ? 'scale(0.95)' : 'scale(1)'), transition: 'transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                    {claiming ? <span style={{color:'#000', fontWeight:'bold', fontSize:'14px'}}>COLLECTING...</span> : <>
-                        <div style={{fontSize:'24px', filter: 'drop-shadow(0 0 5px rgba(0,0,0,0.5))'}}>{(overclockTime && overclockTime > 0) ? '🔥' : (fillPercent >= 100 ? '⚠️' : '⚡')}</div>
-                        <div style={{fontSize:'18px', fontWeight:'900', color:'#fff', textShadow:'0 0 5px #000'}}>+{Math.floor(energy)}</div>
-                        {(overclockTime && overclockTime > 0) ? <div style={{ color: '#FF0055', fontWeight: '900', fontSize: '14px', marginTop: '2px', animation: 'pulse 0.8s infinite alternate' }}>TURBO {overclockTime}s</div> : <div style={{fontSize:'8px', color:'rgba(255,255,255,0.8)', marginTop:'2px'}}>{fillPercent.toFixed(0)}% FULL</div>}
-                    </>}
-                </button>
-                {clickEffects.map((effect) => (
-                    <div key={effect.id} style={{ position: 'fixed', left: effect.x, top: effect.y, pointerEvents: 'none', zIndex: 100, color: ringColor, fontWeight: '900', fontSize: '24px', textShadow: '0 0 10px rgba(0,0,0,0.8)', animation: 'floatUp 0.8s ease-out forwards', transform: 'translate(-50%, -50%)' }}>+{effect.value}</div>
-                ))}
-            </div>
 
-            <div style={{ width: '100%', padding: '0 15px', zIndex: 10 }}>
-                <div style={{ marginBottom:'2px', display:'flex', justifyContent:'center', fontSize:'9px', color: ringColor, fontWeight:'bold' }}><span>PRODUCTION: {(overclockTime && overclockTime > 0) ? (regenRate * 3600 * 2) : (regenRate * 3600)} PTS/HOUR</span></div>
+            </div> {/* FIN DEL GRUPO SUPERIOR */}
+
+            {/* =========================================
+                GRUPO INFERIOR (FOOTER / DOCK) 
+               ========================================= */}
+            <div style={{ width: '100%', padding: '0 15px', zIndex: 10, paddingBottom: '10px' }}>
+                <div style={{ marginBottom:'4px', display:'flex', justifyContent:'center', fontSize:'9px', color: ringColor, fontWeight:'bold' }}><span>PRODUCTION: {(overclockTime && overclockTime > 0) ? (regenRate * 3600 * 2) : (regenRate * 3600)} PTS/HOUR</span></div>
                 
-                {/* 🔥 DOCK LIMPIO DE 3 BOTONES 🔥 */}
                 <div className="glass-card" style={{ padding: '8px 6px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px' }}>
                         <DockButton icon={<Rocket/>} label="UPGRADE" color="#00F2FE" onClick={() => setShowBoosts(true)} />
