@@ -102,27 +102,19 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
     const loadLiveStats = useCallback(async () => {
         if (!user) return;
         try {
-            // 1. Buscamos los datos generales (RPC)
+            // 1. Buscamos los datos generales (RPC principal)
             const { data: userData, error } = await supabase.rpc('get_user_full_stats_for_path', { p_user_id: user.id });
             
-            // 🔥 2. SOLUCIÓN: Vamos a la tabla CORRECTA a buscar los giros de hoy
-            const { data: wheelData, error: wheelError } = await supabase
-                .from('wheel_analytics')
-                .select('spins_today')
-                .eq('user_id', user.id)
-                .single();
+            // 🔥 2. SOLUCIÓN ÉLITE: Usamos la "ventanilla" segura en lugar de consultar la tabla.
+            const { data: wheelSpins } = await supabase.rpc('get_safe_wheel_spins', { p_user_id: user.id });
             
-            // 🕵️‍♂️ EL DETECTIVE (Micrófono oculto sin romper el código)
-            console.log("🕵️‍♂️ REPORTE RULETA -> Datos:", wheelData, "| Error:", wheelError);
-
-            // Extraemos los giros de forma segura
-            const actualSpinsToday = wheelData?.spins_today || 0;
+            // Extraemos el número exacto devuelto por la ventanilla
+            const actualSpinsToday = wheelSpins || 0;
 
             if (!error && userData && userData[0]) {
                 setLiveStats(prev => ({ 
                     ...prev, 
                     ...userData[0], 
-                    // Usamos el dato de la tabla wheel_analytics
                     roulette_played: actualSpinsToday 
                 }));
             } else {
@@ -135,7 +127,6 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
                         total_wealth: scoreData.total_wealth || scoreData.score || 0,
                         arcade_games_played: scoreData.arcade_games_played || 0,
                         lottery_played: scoreData.lottery_played || 0,
-                        // Usamos el dato de la tabla wheel_analytics aquí también
                         roulette_played: actualSpinsToday, 
                         lucky_tickets: scoreData.lucky_tickets || 0
                     }));
