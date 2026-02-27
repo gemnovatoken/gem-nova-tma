@@ -57,59 +57,6 @@ export default function App() {
     useEffect(() => { energyRef.current = energy; }, [energy]);
     useEffect(() => { scoreRef.current = score; }, [score]);
 
-
-    // =========================================================================
-    // 🚀 NUEVA CAPTURA GLOBAL DE REFERIDO BLINDADA
-    // =========================================================================
-    // =========================================================================
-    // 🚀 NUEVA CAPTURA GLOBAL DE REFERIDO BLINDADA (CORREGIDA)
-    // =========================================================================
-    useEffect(() => {
-        const captureReferralGlobal = async () => {
-            if (!user) return;
-
-            // 🔥 ELIMINAMOS EL CHEQUEO DE SESSIONSTORAGE AQUÍ 🔥
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
-            const startParam = tg?.initDataUnsafe?.start_param;
-            const tgUser = tg?.initDataUnsafe?.user;
-            const username = tgUser?.username || tgUser?.first_name || 'Miner';
-
-            // Solo intentamos registrar si hay un parámetro de inicio válido diferente al propio usuario
-            if (startParam && startParam !== user.id) {
-                console.log("🚀 Referrer detected globally:", startParam);
-
-                let cleanReferrerId = startParam;
-                if (startParam.includes('ref_')) {
-                    cleanReferrerId = startParam.split('ref_')[1];
-                } else if (startParam.includes('_')) {
-                    cleanReferrerId = startParam.split('_')[1];
-                }
-
-                // Usamos la función unificada
-                const { error } = await supabase.rpc('register_new_user', {
-                    p_user_id: user.id,
-                    p_username: username,
-                    p_referral_code_text: cleanReferrerId
-                });
-
-                if (error) {
-                    // Es normal que de error si el usuario ya existe, no te preocupes mucho por este log
-                    // console.error("❌ Error guardando el referido global (puede que ya exista):", error);
-                } else {
-                    console.log("✅ Intento de registro de referido global enviado");
-                }
-            }
-             // 🔥 ELIMINAMOS EL SETITEM DE SESSIONSTORAGE AQUÍ 🔥
-        };
-
-        captureReferralGlobal();
-    }, [user]);
-    // =========================================================================
-    // =========================================================================
-
-
     // AUTO-SAVE
     const saveProgress = useCallback(async () => {
         if (!user || !canSave) return; 
@@ -121,7 +68,7 @@ export default function App() {
         if (error) console.error("Save Error:", error);
     }, [user, canSave]);
 
-    // 1. CARGA INICIAL
+    // 1. CARGA INICIAL (Aquí ocurre la magia del referido de forma limpia)
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -184,16 +131,14 @@ export default function App() {
 
                 } 
                 // ==========================================
-                // ==========================================
-                // CASO B: USUARIO NUEVO (CORREGIDO PRO)
+                // CASO B: USUARIO NUEVO (LIMPIO Y EFICIENTE)
                 // ==========================================
                 else {
                     console.log("🆕 Usuario Nuevo detectado. Start Param Original:", startParam);
                     
                     let referrerId = null;
 
-                    // 🔥 SOLUCIÓN: Pasamos el código EXACTO. Solo limpiamos si trae "ref_" de algún formato viejo.
-                    // Ya NO hacemos split por "_" porque destruye los códigos como "Allieeee_a21e".
+                    // Si el link trae "ref_Secreets1_ed6d", le quitamos el "ref_" y mandamos el código exacto a Supabase
                     if (startParam && startParam.trim() !== '') { 
                         referrerId = startParam.replace('ref_', ''); 
                         console.log("🎯 Código a enviar a Supabase:", referrerId);
@@ -207,7 +152,7 @@ export default function App() {
                     });
                     
                     if (!insertError) {
-                        // Si entró con referido, le damos 5000 pts. Si entró solo, 0 pts.
+                        // Si entró con referido, le damos 5000 pts en pantalla de inmediato. Si entró solo, 0 pts.
                         const initialScore = referrerId ? 5000 : 0;
                         setScore(initialScore); 
                         scoreRef.current = initialScore;
