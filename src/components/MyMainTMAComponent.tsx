@@ -251,8 +251,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
     return (
         // 🔥 CORRECCIÓN AQUI: Cambié overflow: 'hidden' a overflowY: 'auto', añadí padding bottom extra, y la clase no-scrollbar
-        <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center', gap: '20px', height: 'calc(100dvh - 135px)', padding: '15px 0 20px 0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflowY: 'auto', overflowX: 'hidden' }}>
-            
+            <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center', gap: '20px', height: 'calc(100dvh - 135px)', padding: '15px 0 100px 0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflowY: 'auto', overflowX: 'hidden' }}>            
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, width: '100%', position: 'relative' }}>
                 
                 {/* BOTÓN DEL RIG (Ranking) */}
