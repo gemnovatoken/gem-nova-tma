@@ -63,6 +63,7 @@ const PATH_STEPS = [
 ];
 
 const STATIC_TYPES = ['wealth', 'ticket', 'staking', 'level', 'level_static', 'streak', 'checkin', 'buy', 'roulette'];
+
 export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClose }) => {
     const { user } = useAuth();
     const [tonConnectUI] = useTonConnectUI();
@@ -105,11 +106,14 @@ export const MillionPath: React.FC<MillionPathProps> = ({ setGlobalScore, onClos
             const { data: userData, error } = await supabase.rpc('get_user_full_stats_for_path', { p_user_id: user.id });
             
             // 🔥 2. SOLUCIÓN: Vamos a la tabla CORRECTA a buscar los giros de hoy
-            const { data: wheelData } = await supabase
+            const { data: wheelData, error: wheelError } = await supabase
                 .from('wheel_analytics')
                 .select('spins_today')
                 .eq('user_id', user.id)
                 .single();
+            
+            // 🕵️‍♂️ EL DETECTIVE (Micrófono oculto sin romper el código)
+            console.log("🕵️‍♂️ REPORTE RULETA -> Datos:", wheelData, "| Error:", wheelError);
 
             // Extraemos los giros de forma segura
             const actualSpinsToday = wheelData?.spins_today || 0;
