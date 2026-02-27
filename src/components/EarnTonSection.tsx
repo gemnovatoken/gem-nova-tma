@@ -113,9 +113,17 @@ const styles = `
 
 interface EarnTonSectionProps { userId: string; }
 interface MissionData { raw: number; tickets: number; }
-interface AllStats { ads: MissionData; bulk: MissionData; staking: MissionData; level: MissionData; social: MissionData; referral: MissionData; }
+// 🔥 Actualizado para incluir roulette
+interface AllStats { 
+  ads: MissionData; 
+  bulk: MissionData; 
+  staking: MissionData; 
+  level: MissionData; 
+  social: MissionData; 
+  referral: MissionData; 
+  roulette: MissionData; 
+}
 
-// Definimos interfaz para evitar el error de 'any'
 interface WithdrawResponse {
   success: boolean;
   message?: string;
@@ -132,18 +140,20 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
     level: { raw: 1, tickets: 0 },
     social: { raw: 0, tickets: 0 },
     referral: { raw: 0, tickets: 0 },
+    roulette: { raw: 0, tickets: 0 }, // 🔥 Inicialización de roulette
   });
 
   const [withdrawStep, setWithdrawStep] = useState<number>(1);
   const [walletAddress, setWalletAddress] = useState<string>('');
 
-  // TARGETS y CAPS envueltos en useMemo para corregir error de dependencias exhaustivas
+  // 🔥 TARGETS actualizados
   const TARGETS = useMemo(() => ({
-    ads: 25, bulk: 500000, staking: 1000000, level: 1, referral: 1, social: 1 
+    ads: 25, bulk: 500000, staking: 1000000, level: 1, referral: 1, social: 1, roulette: 1
   }), []);
 
+  // 🔥 CAPS actualizados: Referidos baja a 6, Ruleta se añade en 3
   const CAPS = useMemo(() => ({
-    ads: 3, bulk: 3, staking: 3, level: 8, referral: 8
+    ads: 3, bulk: 3, staking: 3, level: 8, referral: 6, roulette: 3
   }), []);
 
   const TOTAL_TICKETS_GOAL = 20;
@@ -152,9 +162,34 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
     const fetchTicketStats = async () => {
       try {
         setLoading(true);
+        // 1. Obtener stats normales del RPC
         const { data, error } = await supabase.rpc('get_mission_stats', { target_user_id: userId });
         if (error) throw error;
 
+        // 2. 🔥 Obtener el conteo de Golden Vouchers de la ruleta
+        let goldVouchersCount = 0;
+        
+        // Obtenemos el username para buscar en wheel_winners
+        const { data: userScoreData } = await supabase
+            .from('user_score')
+            .select('username')
+            .eq('user_id', userId)
+            .single();
+
+        if (userScoreData?.username) {
+            // Buscamos cuántas veces ha ganado '1 GOLD VOUCHER'
+            const { count, error: wheelError } = await supabase
+                .from('wheel_winners')
+                .select('*', { count: 'exact', head: true })
+                .eq('username', userScoreData.username)
+                .eq('prize', '1 GOLD VOUCHER');
+            
+            if (!wheelError && count) {
+                goldVouchersCount = count;
+            }
+        }
+
+        // 3. Unir todos los datos
         if (data && data.length > 0) {
           const r = data[0];
           setStats({
@@ -162,8 +197,9 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
             bulk: { raw: r.raw_bulk, tickets: Math.min(r.tickets_bulk, CAPS.bulk) },
             staking: { raw: r.raw_staking, tickets: Math.min(r.tickets_staking, CAPS.staking) },
             level: { raw: r.raw_level, tickets: Math.min(r.tickets_level, CAPS.level) },
-            referral: { raw: r.raw_referrals, tickets: Math.min(r.tickets_referral, CAPS.referral) },
+            referral: { raw: r.raw_referrals, tickets: Math.min(r.tickets_referral, CAPS.referral) }, // Se aplica el nuevo cap de 6 automáticamente
             social: { raw: r.tickets_social, tickets: r.tickets_social },
+            roulette: { raw: goldVouchersCount, tickets: Math.min(goldVouchersCount, CAPS.roulette) } // 🔥 Se inyecta la ruleta
           });
         }
       } catch (error) {
@@ -249,6 +285,9 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
                   {loading ? <div style={{textAlign:'center', color:'#666'}}>Loading...</div> : (
                     <div>
                       <MissionBar label="Referrals" icon="👥" raw={stats.referral.raw} ticketGoal={TARGETS.referral} ticketsEarned={stats.referral.tickets} maxTickets={CAPS.referral} desc="1 Voucher per Friend invited" />
+                      {/* 🔥 NUEVA BARRA DE RULETA */}
+                      <MissionBar label="Lucky Wheel" icon="🎰" raw={stats.roulette.raw} ticketGoal={TARGETS.roulette} ticketsEarned={stats.roulette.tickets} maxTickets={CAPS.roulette} desc="Win Golden Vouchers spinning" />
+                      
                       <MissionBar label="Watch Ads" icon="📺" raw={stats.ads.raw} ticketGoal={TARGETS.ads} ticketsEarned={stats.ads.tickets} maxTickets={CAPS.ads} desc="1 Voucher every 25 videos" />
                       <MissionBar label="Staking Volume" icon="🏦" raw={stats.staking.raw} ticketGoal={TARGETS.staking} ticketsEarned={stats.staking.tickets} maxTickets={CAPS.staking} desc="1 Voucher every 1M pts staked" isCurrency />
                       <MissionBar label="Bulk Store" icon="🛒" raw={stats.bulk.raw} ticketGoal={TARGETS.bulk} ticketsEarned={stats.bulk.tickets} maxTickets={CAPS.bulk} desc="1 Voucher every 500k pts spent" isCurrency />
