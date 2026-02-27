@@ -86,7 +86,7 @@ const styles = `
     z-index: 3; pointer-events: none; letter-spacing: 0.5px;
   }
 
-  .mission-desc { font-size: 10px; color: #888; margin-top: 6px; display: flex; justify-content: space-between; }
+  .mission-desc { font-size: 10px; color: #888; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; }
 
   .action-btn {
     width: 100%; padding: 16px; border-radius: 14px; border: none;
@@ -113,7 +113,6 @@ const styles = `
 
 interface EarnTonSectionProps { userId: string; }
 interface MissionData { raw: number; tickets: number; }
-// 🔥 Actualizado para incluir roulette
 interface AllStats { 
   ads: MissionData; 
   bulk: MissionData; 
@@ -122,6 +121,7 @@ interface AllStats {
   social: MissionData; 
   referral: MissionData; 
   roulette: MissionData; 
+  burn: MissionData; // 🔥 NUEVO ESTATUS PARA QUEMA
 }
 
 interface WithdrawResponse {
@@ -133,6 +133,9 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   
+  // 🔥 Nuevo estado para saber cuántos tickets tiene el usuario disponibles para quemar
+  const [availableLuckyTickets, setAvailableLuckyTickets] = useState(0);
+
   const [stats, setStats] = useState<AllStats>({
     ads: { raw: 0, tickets: 0 },
     bulk: { raw: 0, tickets: 0 },
@@ -140,77 +143,128 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
     level: { raw: 1, tickets: 0 },
     social: { raw: 0, tickets: 0 },
     referral: { raw: 0, tickets: 0 },
-    roulette: { raw: 0, tickets: 0 }, // 🔥 Inicialización de roulette
+    roulette: { raw: 0, tickets: 0 },
+    burn: { raw: 0, tickets: 0 } // 🔥 Inicialización
   });
 
   const [withdrawStep, setWithdrawStep] = useState<number>(1);
   const [walletAddress, setWalletAddress] = useState<string>('');
 
-  // 🔥 TARGETS actualizados
+  // 🔥 TARGETS: El Burn necesita 10 tickets quemados para dar 1 Voucher
   const TARGETS = useMemo(() => ({
-    ads: 25, bulk: 500000, staking: 1000000, level: 1, referral: 1, social: 1, roulette: 1
+    ads: 25, bulk: 500000, staking: 1000000, level: 1, referral: 1, social: 1, roulette: 1, burn: 10
   }), []);
 
-  // 🔥 CAPS actualizados: Referidos baja a 6, Ruleta se añade en 3
+  // 🔥 CAPS: Referidos baja a 5. Burn = 2 (requiere quemar 20 en total)
   const CAPS = useMemo(() => ({
-    ads: 3, bulk: 3, staking: 3, level: 8, referral: 6, roulette: 3
+    ads: 3, bulk: 3, staking: 3, level: 8, referral: 5, roulette: 3, burn: 2
   }), []);
 
   const TOTAL_TICKETS_GOAL = 20;
 
-  useEffect(() => {
-    const fetchTicketStats = async () => {
-      try {
-        setLoading(true);
-        // 1. Obtener stats normales del RPC
-        const { data, error } = await supabase.rpc('get_mission_stats', { target_user_id: userId });
-        if (error) throw error;
+  const fetchTicketStats = async () => {
+    try {
+      setLoading(true);
+      // 1. Obtener stats normales del RPC
+      const { data, error } = await supabase.rpc('get_mission_stats', { target_user_id: userId });
+      if (error) throw error;
 
-        // 2. 🔥 Obtener el conteo de Golden Vouchers de la ruleta
-        let goldVouchersCount = 0;
-        
-        // Obtenemos el username para buscar en wheel_winners
-        const { data: userScoreData } = await supabase
-            .from('user_score')
-            .select('username')
-            .eq('user_id', userId)
-            .single();
+      // 2. Obtener datos de la ruleta y los tickets quemados
+      let goldVouchersCount = 0;
+      let burnedTickets = 0;
+      let currentLuckyTickets = 0;
+      
+      const { data: userScoreData } = await supabase
+          .from('user_score')
+          .select('username, lucky_tickets, burned_lucky_tickets')
+          .eq('user_id', userId)
+          .single();
 
-        if (userScoreData?.username) {
-            // Buscamos cuántas veces ha ganado '1 GOLD VOUCHER'
-            const { count, error: wheelError } = await supabase
-                .from('wheel_winners')
-                .select('*', { count: 'exact', head: true })
-                .eq('username', userScoreData.username)
-                .eq('prize', '1 GOLD VOUCHER');
-            
-            if (!wheelError && count) {
-                goldVouchersCount = count;
-            }
-        }
+      if (userScoreData) {
+          currentLuckyTickets = userScoreData.lucky_tickets || 0;
+          burnedTickets = userScoreData.burned_lucky_tickets || 0;
+          setAvailableLuckyTickets(currentLuckyTickets);
 
-        // 3. Unir todos los datos
-        if (data && data.length > 0) {
-          const r = data[0];
-          setStats({
-            ads: { raw: r.raw_ads, tickets: Math.min(r.tickets_ads, CAPS.ads) },
-            bulk: { raw: r.raw_bulk, tickets: Math.min(r.tickets_bulk, CAPS.bulk) },
-            staking: { raw: r.raw_staking, tickets: Math.min(r.tickets_staking, CAPS.staking) },
-            level: { raw: r.raw_level, tickets: Math.min(r.tickets_level, CAPS.level) },
-            referral: { raw: r.raw_referrals, tickets: Math.min(r.tickets_referral, CAPS.referral) }, // Se aplica el nuevo cap de 6 automáticamente
-            social: { raw: r.tickets_social, tickets: r.tickets_social },
-            roulette: { raw: goldVouchersCount, tickets: Math.min(goldVouchersCount, CAPS.roulette) } // 🔥 Se inyecta la ruleta
-          });
-        }
-      } catch (error) {
-        console.error('Error stats:', error);
-      } finally {
-        setLoading(false);
+          if (userScoreData.username) {
+              const { count, error: wheelError } = await supabase
+                  .from('wheel_winners')
+                  .select('*', { count: 'exact', head: true })
+                  .eq('username', userScoreData.username)
+                  .eq('prize', '1 GOLD VOUCHER');
+              
+              if (!wheelError && count) goldVouchersCount = count;
+          }
       }
-    };
 
+      // 3. Unir todos los datos
+      if (data && data.length > 0) {
+        const r = data[0];
+        setStats({
+          ads: { raw: r.raw_ads, tickets: Math.min(r.tickets_ads, CAPS.ads) },
+          bulk: { raw: r.raw_bulk, tickets: Math.min(r.tickets_bulk, CAPS.bulk) },
+          staking: { raw: r.raw_staking, tickets: Math.min(r.tickets_staking, CAPS.staking) },
+          level: { raw: r.raw_level, tickets: Math.min(r.tickets_level, CAPS.level) },
+          referral: { raw: r.raw_referrals, tickets: Math.min(r.tickets_referral, CAPS.referral) },
+          social: { raw: r.tickets_social, tickets: r.tickets_social },
+          roulette: { raw: goldVouchersCount, tickets: Math.min(goldVouchersCount, CAPS.roulette) },
+          burn: { raw: burnedTickets, tickets: Math.min(Math.floor(burnedTickets / 10), CAPS.burn) } // 🔥 Stats de la quema
+        });
+      }
+    } catch (error) {
+      console.error('Error stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     if (userId) fetchTicketStats();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, showModal, CAPS]);
+
+  // 🔥 Función para Quemar Tickets
+  const handleBurnTickets = async () => {
+    const maxBurnableTotal = 20; // 2 Vouchers * 10 tickets
+    const remainingToBurn = maxBurnableTotal - stats.burn.raw;
+
+    if (remainingToBurn <= 0) {
+        alert("You have reached the maximum allowed for the Smelter (2 Vouchers)!");
+        return;
+    }
+    
+    if (availableLuckyTickets <= 0) {
+        alert("You don't have any Lucky Tickets to burn right now.\n\nTip: Watch Ads or invite friends to get more!");
+        return;
+    }
+
+    // Calculamos cuánto quemar: Lo que tenga el usuario O lo que le falte para llenar la barra (lo que sea menor)
+    const amountToBurn = Math.min(availableLuckyTickets, remainingToBurn);
+
+    const confirmMsg = `🔥 IGNITE SMELTER 🔥\n\nYou are about to burn ${amountToBurn} Lucky Tickets to fuel your Golden Voucher progress.\n\nThis action cannot be undone. Proceed?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setLoading(true);
+    try {
+        const { data, error } = await supabase.rpc('burn_lucky_tickets', { 
+            p_user_id: userId, 
+            p_amount: amountToBurn 
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = data as any;
+
+        if (!error && result.success) {
+            alert(`🔥 SUCCESS!\n\n${amountToBurn} Tickets Burned. Smelter progress updated!`);
+            await fetchTicketStats(); // Recargamos para que la barrita avance
+        } else {
+            alert("Error: " + (result?.message || error?.message));
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Transaction failed.");
+    }
+    setLoading(false);
+  };
 
   const totalTickets = Object.values(stats).reduce((acc, curr) => acc + curr.tickets, 0);
   const progressPercent = Math.min((totalTickets / TOTAL_TICKETS_GOAL) * 100, 100);
@@ -219,21 +273,15 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
     if (!walletAddress || walletAddress.length < 20) {
         return alert("Please enter a valid TON wallet address.");
     }
-    
     try {
       const { data, error } = await supabase.rpc('request_ton_withdrawal', {
           p_user_id: userId, 
           p_wallet: walletAddress
       });
-
       if (error) throw error;
       const res = data as WithdrawResponse;
-      
-      if (res.success) {
-          setWithdrawStep(3);
-      } else {
-          alert("Error: " + res.message);
-      }
+      if (res.success) setWithdrawStep(3);
+      else alert("Error: " + res.message);
     } catch (error) {
         console.error("Withdraw error:", error);
         alert("Error sending request. Please try again.");
@@ -285,9 +333,30 @@ const EarnTonSection: React.FC<EarnTonSectionProps> = ({ userId }) => {
                   {loading ? <div style={{textAlign:'center', color:'#666'}}>Loading...</div> : (
                     <div>
                       <MissionBar label="Referrals" icon="👥" raw={stats.referral.raw} ticketGoal={TARGETS.referral} ticketsEarned={stats.referral.tickets} maxTickets={CAPS.referral} desc="1 Voucher per Friend invited" />
-                      {/* 🔥 NUEVA BARRA DE RULETA */}
-                      <MissionBar label="Lucky Wheel" icon="🎰" raw={stats.roulette.raw} ticketGoal={TARGETS.roulette} ticketsEarned={stats.roulette.tickets} maxTickets={CAPS.roulette} desc="Win Golden Vouchers spinning" />
                       
+                      {/* 🔥 NUEVO: BARRA DEL QUEMADOR CON BOTÓN INCORPORADO */}
+                      <MissionBar 
+                        label="Ticket Smelter" icon="🔥" raw={stats.burn.raw} ticketGoal={TARGETS.burn} ticketsEarned={stats.burn.tickets} maxTickets={CAPS.burn} 
+                        desc="Burn 10 Lucky Tickets = 1 Voucher"
+                        actionBtn={
+                            <button 
+                                onClick={handleBurnTickets}
+                                disabled={stats.burn.raw >= 20 || availableLuckyTickets <= 0}
+                                style={{
+                                    marginTop: '8px', width: '100%', padding: '6px', fontSize: '10px', fontWeight: 'bold',
+                                    borderRadius: '6px', border: '1px solid #FF512F', 
+                                    background: (stats.burn.raw >= 20 || availableLuckyTickets <= 0) ? '#333' : 'rgba(255, 81, 47, 0.1)', 
+                                    color: (stats.burn.raw >= 20 || availableLuckyTickets <= 0) ? '#666' : '#FF512F',
+                                    cursor: (stats.burn.raw >= 20 || availableLuckyTickets <= 0) ? 'not-allowed' : 'pointer',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                {stats.burn.raw >= 20 ? 'SMELTER MAXED' : `BURN TICKETS (You have ${availableLuckyTickets})`}
+                            </button>
+                        }
+                      />
+
+                      <MissionBar label="Lucky Wheel" icon="🎰" raw={stats.roulette.raw} ticketGoal={TARGETS.roulette} ticketsEarned={stats.roulette.tickets} maxTickets={CAPS.roulette} desc="Win Golden Vouchers spinning" />
                       <MissionBar label="Watch Ads" icon="📺" raw={stats.ads.raw} ticketGoal={TARGETS.ads} ticketsEarned={stats.ads.tickets} maxTickets={CAPS.ads} desc="1 Voucher every 25 videos" />
                       <MissionBar label="Staking Volume" icon="🏦" raw={stats.staking.raw} ticketGoal={TARGETS.staking} ticketsEarned={stats.staking.tickets} maxTickets={CAPS.staking} desc="1 Voucher every 1M pts staked" isCurrency />
                       <MissionBar label="Bulk Store" icon="🛒" raw={stats.bulk.raw} ticketGoal={TARGETS.bulk} ticketsEarned={stats.bulk.tickets} maxTickets={CAPS.bulk} desc="1 Voucher every 500k pts spent" isCurrency />
@@ -353,10 +422,12 @@ interface MissionBarProps {
   desc: string; 
   maxTickets: number; 
   isCurrency?: boolean;
+  actionBtn?: React.ReactNode; // 🔥 NUEVO: Permite inyectar un botón dentro de la tarjeta
 }
 
-const MissionBar: React.FC<MissionBarProps> = ({ label, icon, raw, ticketGoal, ticketsEarned, desc, maxTickets, isCurrency }) => {
+const MissionBar: React.FC<MissionBarProps> = ({ label, icon, raw, ticketGoal, ticketsEarned, desc, maxTickets, isCurrency, actionBtn }) => {
   const isCompleted = ticketsEarned >= maxTickets;
+  // Modificado para que no reinicie el contador visual a 0 si completó el nivel final (ejemplo 20/20)
   const currentProgressInCycle = isCompleted ? ticketGoal : (raw % ticketGoal);
   const percentage = (currentProgressInCycle / ticketGoal) * 100;
   
@@ -379,9 +450,14 @@ const MissionBar: React.FC<MissionBarProps> = ({ label, icon, raw, ticketGoal, t
           {isCompleted ? 'MAX REACHED' : `${formatNum(currentProgressInCycle)} / ${formatNum(ticketGoal)}`}
         </div>
       </div>
-      <div className="mission-desc">
-        <span>{desc}</span>
-        <span style={{color:'#fff'}}>Total: {isCurrency ? formatNum(raw) : raw}</span>
+      
+      {/* Contenedor de Descripción y Botón */}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="mission-desc">
+          <span>{desc}</span>
+          <span style={{color:'#fff'}}>Total: {isCurrency ? formatNum(raw) : raw}</span>
+        </div>
+        {actionBtn}
       </div>
     </div>
   );
