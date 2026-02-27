@@ -254,7 +254,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '15px', height: 'calc(100dvh - 135px)', padding: '0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
             
             {/* 🔥 CONTENEDOR SUPERIOR - SE AUMENTÓ EL MARGEN NEGATIVO PARA ELIMINAR ESPACIO ROJO 🔥 */}
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-50px', width: '100%', position: 'relative' }}>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, marginTop:'-40px', width: '100%', position: 'relative' }}>
                 
                 {/* BOTÓN DEL RIG (Ranking) - Centrado arriba */}
                 <div onClick={() => setShowRanking(true)} className="glass-card" style={{ padding: '6px 16px', borderRadius:'20px', display:'flex', gap:'6px', alignItems:'center', background: 'rgba(20, 20, 30, 0.8)', border: '1px solid #333', cursor:'pointer', marginBottom: '8px' }}>
