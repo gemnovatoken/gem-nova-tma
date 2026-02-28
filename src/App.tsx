@@ -69,6 +69,7 @@ export default function App() {
     }, [user, canSave]);
 
     // 1. CARGA INICIAL (Aquí ocurre la magia del referido de forma limpia)
+    // 1. CARGA INICIAL (Blindado contra usuarios fantasma)
     useEffect(() => {
         if (user && !authLoading) {
             const fetchInitialData = async () => {
@@ -78,14 +79,35 @@ export default function App() {
                 const startParam = tg?.initDataUnsafe?.start_param; 
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
+                // Limpiamos el código del link si es que existe
+                let referrerId = null;
+                if (startParam && startParam.trim() !== '') { 
+                    referrerId = startParam.replace('ref_', ''); 
+                }
+
+                // 🔥 AÑADIMOS 'referred_by' AL SELECT PARA SABER SI YA FUE INVITADO
                 const { data: userData } = await supabase
                     .from('user_score')
-                    .select('score, energy, limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date, overclock_active_until') 
+                    .select('score, energy, limit_level, speed_level, multitap_level, bot_active_until, bot_ads_watched_today, last_bot_ad_date, overclock_active_until, referred_by') 
                     .eq('user_id', user.id)
                     .single();
                 
+                // ==========================================
                 // CASO A: USUARIO EXISTE
+                // ==========================================
                 if (userData) {
+                    
+                    // 🔥 DEFENSA ACTIVA: Si el usuario existe pero NO tiene referido, y entró con un link, lo forzamos.
+                    if (!userData.referred_by && referrerId && referrerId !== user.id) {
+                        console.log("🛠️ Registrando referido atrasado:", referrerId);
+                        await supabase.rpc('register_new_user', {
+                            p_user_id: user.id,
+                            p_username: username,
+                            p_referral_code_text: referrerId 
+                        });
+                        userData.score += 5000; // Le damos los 5K puntos localmente al instante
+                    }
+
                     setScore(userData.score);
                     setEnergy(userData.energy);
                     
@@ -110,7 +132,6 @@ export default function App() {
                     const today = new Date().toISOString().split('T')[0];
                     setAdsWatched(userData.last_bot_ad_date !== today ? 0 : (userData.bot_ads_watched_today || 0));
 
-                    // Sincronizar offline
                     const mySpeed = GAME_CONFIG.speed.values[Math.max(0, (userData.limit_level || 1) - 1)];
                     const myLimit = GAME_CONFIG.limit.values[Math.max(0, (userData.limit_level || 1) - 1)];
                     const { data: syncData } = await supabase.rpc('sync_energy_on_load', { 
@@ -131,20 +152,11 @@ export default function App() {
 
                 } 
                 // ==========================================
-                // CASO B: USUARIO NUEVO (LIMPIO Y EFICIENTE)
+                // CASO B: USUARIO TOTALMENTE NUEVO
                 // ==========================================
                 else {
-                    console.log("🆕 Usuario Nuevo detectado. Start Param Original:", startParam);
+                    console.log("🆕 Usuario Nuevo detectado. Start Param:", startParam);
                     
-                    let referrerId = null;
-
-                    // Si el link trae "ref_Secreets1_ed6d", le quitamos el "ref_" y mandamos el código exacto a Supabase
-                    if (startParam && startParam.trim() !== '') { 
-                        referrerId = startParam.replace('ref_', ''); 
-                        console.log("🎯 Código a enviar a Supabase:", referrerId);
-                    }
-
-                    // Hacemos UNA SOLA llamada a la base de datos con el código íntegro
                     const { error: insertError } = await supabase.rpc('register_new_user', {
                         p_user_id: user.id,
                         p_username: username,
@@ -152,7 +164,6 @@ export default function App() {
                     });
                     
                     if (!insertError) {
-                        // Si entró con referido, le damos 5000 pts en pantalla de inmediato. Si entró solo, 0 pts.
                         const initialScore = referrerId ? 5000 : 0;
                         setScore(initialScore); 
                         scoreRef.current = initialScore;
@@ -161,9 +172,6 @@ export default function App() {
                         energyRef.current = 1000;
                         
                         setCanSave(true);
-                        console.log("✅ Usuario registrado exitosamente. Referido:", referrerId || "Ninguno");
-                    } else {
-                        console.error("❌ Error registrando usuario:", insertError);
                     }
                 }
             };
