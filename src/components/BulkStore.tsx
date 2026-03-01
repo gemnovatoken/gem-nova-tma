@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { StakingBank } from './StakingBank';
+import { VIPAuctionZone } from './VIPAuctionZone'; // <-- NUEVO: Importación del Exchange VIP
 import { TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
 import { Zap, Cpu, Shield, Rocket, Hexagon, Crown, History, X, ExternalLink, CheckCircle2 } from 'lucide-react';
 
@@ -55,6 +56,9 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     const [showHistory, setShowHistory] = useState(false);
     const [historyData, setHistoryData] = useState<PurchaseRecord[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+
+    // --- NUEVO: ESTADO PARA LA SUBASTA VIP ---
+    const [showAuction, setShowAuction] = useState(false);
 
     // Función para cargar historial
     const fetchHistory = async () => {
@@ -168,7 +172,7 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
     };
 
     return (
-        <div className="cyber-bg" style={{ minHeight: '100%', paddingBottom: '120px', paddingTop: '20px' }}>
+        <div className="cyber-bg" style={{ minHeight: '100%', paddingBottom: '120px', paddingTop: '20px', position: 'relative' }}>
             
             <div className="data-stream"></div>
 
@@ -343,7 +347,50 @@ export const BulkStore: React.FC<BulkStoreProps> = ({ onPurchaseSuccess, score, 
                 <div style={{textAlign:'center', color:'#E040FB', fontSize:'10px', marginTop:'10px', letterSpacing:'2px'}}>SECURE VAULT ACCESS</div>
             </div>
             
-            <style>{`@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }`}</style>
+            {/* --- NUEVO: BOTÓN FLOTANTE EXCHANGE VIP --- */}
+            <button 
+                onClick={() => setShowAuction(true)}
+                style={{
+                    position: 'fixed',
+                    bottom: '85px', /* Justo por encima de tu BottomNav */
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                    color: '#000',
+                    border: 'none',
+                    borderRadius: '30px',
+                    padding: '12px 30px',
+                    fontWeight: '900',
+                    boxShadow: '0 0 15px rgba(255, 215, 0, 0.4)',
+                    zIndex: 50,
+                    animation: 'pulse 2s infinite',
+                    cursor: 'pointer',
+                    fontFamily: 'monospace',
+                    letterSpacing: '1px'
+                }}
+            >
+                🔥 VIP EXCHANGE
+            </button>
+
+            {/* --- NUEVO: RENDERIZADO DEL MODAL --- */}
+            {showAuction && user &&(
+                <VIPAuctionZone 
+                    user={user} 
+                    score={score} 
+                    userLevel={userLevel} 
+                    onClose={() => setShowAuction(false)} 
+                />
+            )}
+
+            {/* Añado la animación pulse al style que ya tenías */}
+            <style>{`
+                @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+                @keyframes pulse { 
+                    0% { transform: translateX(-50%) scale(1); } 
+                    50% { transform: translateX(-50%) scale(1.05); } 
+                    100% { transform: translateX(-50%) scale(1); } 
+                }
+            `}</style>
         </div>
     );
 };
