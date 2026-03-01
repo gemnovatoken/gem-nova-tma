@@ -171,7 +171,8 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
                     </button>
 
                     <p style={{ fontSize: '11px', color: '#888', textAlign: 'center', marginTop: '10px' }}>
-                        Level 7 Entry Fee: <strong>{activeAuction.lvl7_entry_fee} TON</strong> | 5% Burn if you lose.
+                        Lvl 7 Entry Fee: <strong>{activeAuction.lvl7_entry_fee} TON</strong>.<br/>
+                        <span style={{ color: '#FF4444' }}>⚠️ 5% BURN FOR ALL LOSING BIDS.</span>
                     </p>
                 </div>
             </div>
