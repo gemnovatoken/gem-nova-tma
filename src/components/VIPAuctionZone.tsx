@@ -8,7 +8,6 @@ interface AuctionProps {
     onClose: () => void;
 }
 
-// Interface to map SQL data
 interface AuctionData {
     id: number;
     title: string;
@@ -18,7 +17,7 @@ interface AuctionData {
     lvl7_entry_fee: number;
     highest_bid: number;
     status: string;
-    end_time: string; // AGREGADO: Para calcular el reloj
+    end_time: string; 
 }
 
 export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel, onClose }) => {
@@ -29,14 +28,12 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
     const [targetBid, setTargetBid] = useState(0); 
     const [isBidding, setIsBidding] = useState(false);
     
-    // NUEVOS ESTADOS: Reloj, Liquidación y Contador VIP
     const [timeLeft, setTimeLeft] = useState("00:00:00");
     const [isFinished, setIsFinished] = useState(false);
     const [isClaiming, setIsClaiming] = useState(false);
     const [vipCount, setVipCount] = useState(0);
     const targetVips = 20;
 
-    // Fetch auctions from DB
     const fetchAuctions = async () => {
         const { data, error } = await supabase.from('auctions').select('*').order('id', { ascending: true });
         if (!error && data) {
@@ -47,7 +44,6 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
             }
         }
 
-        // Retrieve user vault for selected auction
         const { data: vaultData } = await supabase
             .from('auction_vault')
             .select('escrowed_points')
@@ -58,13 +54,15 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
         if (vaultData) setMyEscrow(vaultData.escrowed_points);
         else setMyEscrow(0);
 
-        // Fetch VIP count para la barra
         const { data: vips } = await supabase.rpc('get_vip_user_count');
         if (vips !== null) setVipCount(Number(vips));
     };
 
+    // Actualizar periódicamente para atrapar cambios de tiempo (Anti-Sniper)
     useEffect(() => {
         fetchAuctions();
+        const interval = setInterval(fetchAuctions, 5000); // Refresca cada 5s en background
+        return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedId]);
 
@@ -99,9 +97,8 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [activeAuction]);
+    }, [activeAuction]); // Se re-ejecuta si activeAuction cambia (ej. por el Anti-Sniper)
     
-    // Liquidity Math
     const liquidityNeeded = Math.max(0, targetBid - myEscrow);
     const hasEnoughFunds = score >= liquidityNeeded;
 
@@ -127,7 +124,7 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
             if (error) throw error;
             
             alert("Bid accepted! You are the current leader.");
-            fetchAuctions(); // Refresh data
+            fetchAuctions(); 
             
         } catch (error: unknown) {
             alert((error as Error).message || "Error placing bid");
@@ -136,7 +133,6 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
         }
     };
 
-    // NUEVA FUNCIÓN: CLAIM REWARD
     const handleClaim = async () => {
         setIsClaiming(true);
         try {
@@ -147,8 +143,8 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
 
             if (error) throw error;
             
-            alert(data); // Shows "WINNER..." or "LOSER..." message
-            fetchAuctions(); // Refresh to show 0 in vault
+            alert(data); 
+            fetchAuctions(); 
             
         } catch (error: unknown) {
             alert((error as Error).message || "Error claiming vault");
@@ -188,7 +184,7 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
                     {activeAuction.title}
                 </h2>
                 
-                {/* NUEVO: BARRA DE PROGRESO INTERNA (Reemplaza al candado rojo) */}
+                {/* BARRA DE PROGRESO INTERNA */}
                 {activeAuction.status === 'locked' && (
                     <div style={{ background: '#1A1A1A', padding: '15px', borderRadius: '12px', textAlign: 'center', marginBottom: '15px', border: '1px solid #FFD700' }}>
                         <p style={{ margin: '0 0 10px 0', fontSize: '12px', color: '#aaa', textTransform: 'uppercase' }}>
@@ -290,7 +286,6 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
 
 // ==========================================================
 // HYPE METER COMPONENT (Top Bar)
-// Import this in your App.tsx or MarketDashboard
 // ==========================================================
 export const VIPUnlockProgressBar = () => {
     const [vipCount, setVipCount] = useState(0);
@@ -326,7 +321,6 @@ export const VIPUnlockProgressBar = () => {
     );
 };
 
-// --- Styles ---
 const styles = {
     overlay: { position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)' },
     modal: { background: '#121212', border: '1px solid #333', borderRadius: '20px', padding: '25px', width: '90%', maxWidth: '400px', position: 'relative' as const, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' },
