@@ -300,7 +300,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             return;
         }
 
-        const confirmBuy = window.confirm(`💎 BUY 75,000 POINTS FOR ${EXTRA_SPINS_PRICE_TON} TON?\n\n🎁 BONUS: You will also receive 3 VIP Free Spins!`);
+        const confirmBuy = window.confirm(`💎 BUY 50,000 POINTS FOR ${EXTRA_SPINS_PRICE_TON} TON?\n\n🎁 BONUS: You will also receive 3 VIP Free Spins!`);
         if(!confirmBuy) return;
 
         try {
@@ -323,18 +323,18 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 });
                 if (vipError) throw vipError;
 
-                // 2. 🔥 INYECCIÓN DE PUNTOS: Sumamos los 75k puntos prometidos
+                // 2. 🔥 INYECCIÓN DE PUNTOS: Sumamos los 50k puntos prometidos
                 const { error: pointsError } = await supabase.rpc('increment_score', { 
                     p_user_id: user.id, 
-                    p_amount: 75000 
+                    p_amount: 50000 
                 });
                 if (pointsError) throw pointsError;
 
                 // 3. Actualización Visual
                 setPremiumSpins(prev => prev + 3);
-                onUpdateScore(prev => prev + 75000); 
+                onUpdateScore(prev => prev + 50000); 
 
-                alert("🎉 SUCCESS!\n\n+75,000 Points have been added to your balance.\n+3 VIP Spins are ready to use!");
+                alert("🎉 SUCCESS!\n\n+50,000 Points have been added to your balance.\n+3 VIP Spins are ready to use!");
                 try { 
                     confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } }); 
                 } catch {
@@ -482,7 +482,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     }}
                 >
                     <span style={{display: 'flex', alignItems: 'center', gap: '5px', fontSize: '16px'}}>
-                        <Zap size={18} /> GET 75K PTS + 3 VIP SPINS
+                        <Zap size={18} /> GET 50K PTS + 3 VIP SPINS
                     </span>
                     <span style={{fontSize: '11px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '4px', color: '#fff'}}>
                         PAY {EXTRA_SPINS_PRICE_TON} TON
