@@ -2,8 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useTonConnectUI } from '@tonconnect/ui-react';
-import { X, Ticket, Diamond, RefreshCw, Video, Trophy, Clock, CheckCircle2, Send, Star } from 'lucide-react';
+import { X, Ticket, Diamond, Video, Trophy, Clock, CheckCircle2, Send, Star, Zap } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
+
+// Si instalaste 'canvas-confetti', descomenta esta línea. 
+// Si no, el código abajo tiene un try/catch para que no falle.
+import confetti from 'canvas-confetti'; 
 
 interface LuckyWheelProps {
     onClose: () => void;
@@ -21,6 +25,8 @@ const SPIN_COST = 25000;
 const MAX_DAILY_SPINS = 2; 
 const MAX_AD_SPINS = 3;    
 const EXTRA_SPINS_PRICE_TON = 0.10; 
+
+const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
 const WHEEL_ITEMS = [
     { value: '5TON',   label: "5 TON",  sub: "GRAND",  color: "#FF0055", textCol: "#fff" }, 
@@ -97,7 +103,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             .from('wheel_winners')
             .select('username, prize, status')
             .order('created_at', { ascending: false })
-            .limit(50); // 🔥 Aumentado a 50 para que no se borren tan rápido
+            .limit(50); 
             
         if (!error && data) {
             setWinnersList(data as WheelWinner[]);
@@ -106,6 +112,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
     useEffect(() => {
         fetchWinners();
+    /// eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const registerPointWinner = async (prizeLabel: string) => {
@@ -205,7 +212,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
                 else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
 
-                // MANEJO DE PREMIOS
                 if (typeof wonAmount === 'string') {
                     if (wonAmount === '1GOLD') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
@@ -222,7 +228,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     onUpdateScore(s => s + wonAmount);
                     if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
                     
-                    // 🔥 CORRECCIÓN: Ahora registra los puntos grandes para CUALQUIER tipo de tiro
                     if (wonAmount >= 50000) {
                         registerPointWinner(`${(wonAmount/1000).toFixed(0)}K PTS`);
                     }
@@ -287,6 +292,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         setIsSubmittingWallet(false);
     };
 
+    // 🔥 LA MAGIA OCURRE AQUÍ: CAMBIO LEGAL Y DE ECONOMÍA 🔥
     const handleBuyMoreSpins = async () => {
         if (!user) return; 
         if (!tonConnectUI.account) {
@@ -294,10 +300,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             return;
         }
 
-        const confirmBuy = window.confirm(`💳 PAY ${EXTRA_SPINS_PRICE_TON} TON?\n\nGet 3 VIP Tickets.\n(VIP spins cost 0 Points to use!).`);
+        const confirmBuy = window.confirm(`💎 BUY 75,000 POINTS FOR ${EXTRA_SPINS_PRICE_TON} TON?\n\n🎁 BONUS: You will also receive 3 VIP Free Spins!`);
         if(!confirmBuy) return;
-
-        const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
         try {
             const transaction = {
@@ -310,17 +314,33 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 const { data: scoreData } = await supabase.from('user_score').select('username').eq('user_id', user.id).single();
                 const exactUsername = scoreData?.username || "HiddenUser";
 
-                const { error } = await supabase.rpc('buy_vip_tickets', { 
+                // 1. Asignar los giros VIP
+                const { error: vipError } = await supabase.rpc('buy_vip_tickets', { 
                     user_id_in: user.id, 
                     ton_amount: EXTRA_SPINS_PRICE_TON, 
                     tickets_qty: 3,
                     username_in: exactUsername 
                 });
-                
-                if (error) throw error;
+                if (vipError) throw vipError;
 
+                // 2. 🔥 INYECCIÓN DE PUNTOS: Sumamos los 75k puntos prometidos
+                const { error: pointsError } = await supabase.rpc('increment_score', { 
+                    p_user_id: user.id, 
+                    p_amount: 75000 
+                });
+                if (pointsError) throw pointsError;
+
+                // 3. Actualización Visual
                 setPremiumSpins(prev => prev + 3);
-                alert("🎉 SUCCESS! 3 VIP Tickets added to your account!");
+                onUpdateScore(prev => prev + 75000); 
+
+                alert("🎉 SUCCESS!\n\n+75,000 Points have been added to your balance.\n+3 VIP Spins are ready to use!");
+                try { 
+                    confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } }); 
+                } catch {
+                    // Silenciamos el error si no carga confetti
+                    console.log("Confetti animation skipped");
+                }
             }
         } catch (err: unknown) {
             console.error(err);
@@ -448,11 +468,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
             <div style={{width: '85%', display: 'flex', flexDirection: 'column', gap: '10px'}}>
                 {renderMainButton()}
+                
                 <button 
                     className="btn-neon"
                     onClick={handleBuyMoreSpins}
                     style={{
-                        width: '100%', padding: '15px', fontSize: '14px', 
+                        width: '100%', padding: '12px', fontSize: '14px', 
                         background: 'linear-gradient(180deg, #FFD700 0%, #B8860B 100%)', 
                         color: '#000', border: '1px solid #FFF', 
                         fontWeight:'900', borderRadius:'12px',
@@ -460,9 +481,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                         boxShadow: '0 0 20px rgba(255, 215, 0, 0.4)'
                     }}
                 >
-                    <span style={{display: 'flex', alignItems: 'center', gap: '5px'}}><RefreshCw size={16} /> BUY 3 VIP TICKETS</span>
-                    <span style={{fontSize: '10px', background: 'rgba(0,0,0,0.2)', padding: '2px 8px', borderRadius: '4px', color: '#fff'}}>
-                        PAY {EXTRA_SPINS_PRICE_TON} TON (NO POINT COST)
+                    <span style={{display: 'flex', alignItems: 'center', gap: '5px', fontSize: '16px'}}>
+                        <Zap size={18} /> GET 75K PTS + 3 VIP SPINS
+                    </span>
+                    <span style={{fontSize: '11px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '4px', color: '#fff'}}>
+                        PAY {EXTRA_SPINS_PRICE_TON} TON
                     </span>
                 </button>
             </div>
