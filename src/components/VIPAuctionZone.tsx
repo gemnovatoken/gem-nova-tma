@@ -8,7 +8,7 @@ interface AuctionProps {
     onClose: () => void;
 }
 
-// Interfaz para mapear los datos que vienen de SQL
+// Interface to map SQL data
 interface AuctionData {
     id: number;
     title: string;
@@ -22,25 +22,25 @@ interface AuctionData {
 
 export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel, onClose }) => {
     const [auctions, setAuctions] = useState<AuctionData[]>([]);
-    const [selectedId, setSelectedId] = useState<number>(1); // Empieza mostrando la de 5 TON
+    const [selectedId, setSelectedId] = useState<number>(1); // Starts showing the 5 TON auction
     
     const [myEscrow, setMyEscrow] = useState(0); 
     const [targetBid, setTargetBid] = useState(0); 
     const [isBidding, setIsBidding] = useState(false);
 
-    // Cargar las subastas desde DB
+    // Fetch auctions from DB
     const fetchAuctions = async () => {
         const { data, error } = await supabase.from('auctions').select('*').order('id', { ascending: true });
         if (!error && data) {
             setAuctions(data);
-            // Configurar la puja inicial si no se ha tocado
+            // Set initial bid if untouched
             const activeAuction = data.find(a => a.id === selectedId);
             if (activeAuction && targetBid === 0) {
                 setTargetBid(activeAuction.highest_bid + activeAuction.min_increment);
             }
         }
 
-        // Recuperar la bóveda del usuario para la subasta seleccionada
+        // Retrieve user vault for selected auction
         const { data: vaultData } = await supabase
             .from('auction_vault')
             .select('escrowed_points')
@@ -59,22 +59,22 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
 
     const activeAuction = auctions.find(a => a.id === selectedId);
     
-    // Matemáticas de liquidez
+    // Liquidity Math
     const liquidityNeeded = Math.max(0, targetBid - myEscrow);
     const hasEnoughFunds = score >= liquidityNeeded;
 
     const handlePlaceBid = async () => {
         if (userLevel < 7) {
-            alert("Acceso denegado: Requiere Nivel 7.");
+            alert("Access Denied: Level 7 Required.");
             return;
         }
 
         if (activeAuction?.status === 'locked') {
-            alert("Subasta bloqueada. Alcanza la meta de la comunidad primero.");
+            alert("Auction locked. Reach the community milestone first.");
             return;
         }
 
-        // AQUI IRÍA LA LÓGICA DE TONCONNECT PARA COBRAR EL FEE (0.10 o 0.15 TON)
+        // TONCONNECT LOGIC GOES HERE FOR FEE PROCESSING (0.10 or 0.15 TON)
 
         setIsBidding(true);
         try {
@@ -86,24 +86,24 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
 
             if (error) throw error;
             
-            alert("¡Puja aceptada! Eres el líder actual.");
-            fetchAuctions(); // Refrescar datos
+            alert("Bid accepted! You are the current leader.");
+            fetchAuctions(); // Refresh data
             
         } catch (error: unknown) {
-            alert((error as Error).message || "Error al pujar");
+            alert((error as Error).message || "Error placing bid");
         } finally {
             setIsBidding(false);
         }
     };
 
-    if (!activeAuction) return <div style={styles.overlay}><p>Cargando Bóvedas...</p></div>;
+    if (!activeAuction) return <div style={styles.overlay}><p>Loading Vaults...</p></div>;
 
     return (
         <div style={styles.overlay}>
             <div style={styles.modal}>
                 <button onClick={onClose} style={styles.closeBtn}>✕</button>
                 
-                {/* Selector de Subastas */}
+                {/* Auction Selector */}
                 <div style={{ display: 'flex', gap: '5px', marginBottom: '15px' }}>
                     {auctions.map(a => (
                         <button 
@@ -127,31 +127,31 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
                 
                 {activeAuction.status === 'locked' && (
                     <div style={{ background: '#FF4444', color: '#FFF', padding: '5px', borderRadius: '5px', fontSize: '12px', textAlign: 'center', marginBottom: '10px' }}>
-                        🔒 BLOQUEADA: Esperando a 20 VIPs
+                        🔒 LOCKED: Waiting for 20 VIPs
                     </div>
                 )}
 
                 <div style={styles.statsGrid}>
                     <div style={styles.statCard}>
-                        <span style={styles.statLabel}>Puja Máxima</span>
+                        <span style={styles.statLabel}>Highest Bid</span>
                         <span style={styles.statValue}>{activeAuction.highest_bid.toLocaleString()}</span>
                     </div>
                     <div style={styles.statCard}>
-                        <span style={styles.statLabel}>Tu Bóveda</span>
+                        <span style={styles.statLabel}>Your Vault</span>
                         <span style={{...styles.statValue, color: '#4CAF50'}}>{myEscrow.toLocaleString()}</span>
                     </div>
                 </div>
 
-                {/* Panel de Operaciones */}
+                {/* Trading Panel */}
                 <div style={styles.tradingPanel}>
-                    <label style={{ color: '#aaa', fontSize: '12px' }}>Nueva Puja (Sube de {activeAuction.min_increment / 1000}k):</label>
+                    <label style={{ color: '#aaa', fontSize: '12px' }}>New Bid (+{activeAuction.min_increment / 1000}k):</label>
                     <div style={{ display: 'flex', gap: '5px', marginTop: '10px' }}>
                         <button onClick={() => setTargetBid(activeAuction.highest_bid + activeAuction.min_increment)} style={styles.quickBidBtn}>+{activeAuction.min_increment / 1000}k</button>
                         <button onClick={() => setTargetBid(activeAuction.highest_bid + (activeAuction.min_increment * 2))} style={styles.quickBidBtn}>+{(activeAuction.min_increment * 2) / 1000}k</button>
                     </div>
                     
                     <div style={styles.liquidityBox}>
-                        <span>Liquidez requerida ahora:</span>
+                        <span>Liquidity required now:</span>
                         <strong style={{ color: hasEnoughFunds ? '#FFF' : '#FF4444' }}>
                             {liquidityNeeded.toLocaleString()} Pts
                         </strong>
@@ -167,11 +167,11 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
                             color: userLevel === 8 ? '#000' : '#FFF'
                         }}
                     >
-                        {isBidding ? 'PROCESANDO...' : `CONFIRMAR PUJA`}
+                        {isBidding ? 'PROCESSING...' : `CONFIRM BID`}
                     </button>
 
                     <p style={{ fontSize: '11px', color: '#888', textAlign: 'center', marginTop: '10px' }}>
-                        Nivel 7 Entry Fee: <strong>{activeAuction.lvl7_entry_fee} TON</strong> | 5% Burn si pierdes.
+                        Level 7 Entry Fee: <strong>{activeAuction.lvl7_entry_fee} TON</strong> | 5% Burn if you lose.
                     </p>
                 </div>
             </div>
@@ -180,8 +180,8 @@ export const VIPAuctionZone: React.FC<AuctionProps> = ({ user, score, userLevel,
 };
 
 // ==========================================================
-// COMPONENTE: HYPE METER (Barra Superior)
-// Importa esto en tu App.tsx o MarketDashboard
+// HYPE METER COMPONENT (Top Bar)
+// Import this in your App.tsx or MarketDashboard
 // ==========================================================
 export const VIPUnlockProgressBar = () => {
     const [vipCount, setVipCount] = useState(0);
@@ -202,10 +202,10 @@ export const VIPUnlockProgressBar = () => {
     return (
         <div style={{ background: '#111', borderBottom: '2px solid #FFD700', padding: '15px', textAlign: 'center' }}>
             <h4 style={{ color: '#FFF', margin: '0 0 5px 0', fontSize: '14px', textTransform: 'uppercase' }}>
-                {vipCount >= targetVips ? '🔥 BÓVEDAS VIP ACTIVAS 🔥' : '🔒 Desbloqueo de Subastas VIP'}
+                {vipCount >= targetVips ? '🔥 VIP VAULTS ACTIVE 🔥' : '🔒 VIP Auctions Unlock'}
             </h4>
             <p style={{ color: '#aaa', fontSize: '11px', margin: '0 0 10px 0' }}>
-                1x 10 TON | 1x 5 TON. Meta: 20 Inversores (Nivel 7+).
+                1x 10 TON | 1x 5 TON. Goal: 20 Investors (Level 7+).
             </p>
             <div style={{ width: '100%', maxWidth: '300px', margin: '0 auto', background: '#333', borderRadius: '10px', height: '18px', position: 'relative' }}>
                 <div style={{ width: `${progressPercent}%`, height: '100%', background: 'linear-gradient(90deg, #FF8C00 0%, #FFD700 100%)', borderRadius: '10px' }}></div>
@@ -217,7 +217,7 @@ export const VIPUnlockProgressBar = () => {
     );
 };
 
-// --- Estilos ---
+// --- Styles ---
 const styles = {
     overlay: { position: 'fixed' as const, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', zIndex: 999, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)' },
     modal: { background: '#121212', border: '1px solid #333', borderRadius: '20px', padding: '25px', width: '90%', maxWidth: '400px', position: 'relative' as const, boxShadow: '0 10px 30px rgba(0,0,0,0.5)' },
