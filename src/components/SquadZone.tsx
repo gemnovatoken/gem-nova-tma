@@ -38,12 +38,6 @@ interface SquadZoneProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
 
-// ✅ INTERFAZ PARA RESPUESTA DE VIDEO
-interface AdResponse {
-    success: boolean;
-    progress: number;
-    rewarded: boolean;
-}
 
 // --- COMPONENTE: TICKET EMPIRE (SINCRONIZADO CON MISSION ZONE) ---
 const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
@@ -97,26 +91,6 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         };
         fetchUserData();
     }, [user]);
-
-    const handleWatchAd = async () => {
-        if (loading || !user) return;
-        const confirmWatch = window.confirm("📺 WATCH AD BOOSTER:\n\nWatch an ad to speed up your progress towards the next Ticket?\n\n(Tip: Ads watched in Shop & Arcade also count!)");
-        if (!confirmWatch) return;
-
-        setLoading(true);
-        setTimeout(async () => {
-            const { data, error } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
-            if (!error && data) {
-                const result = data as AdResponse;
-                setVideoProgress(result.progress);
-                if (result.rewarded) {
-                    alert("🎉 MILESTONE REACHED!\n\nYou earned +1 LUCKY TICKET!");
-                    setLuckyTickets((prev: number) => prev + 1);
-                }
-            }
-            setLoading(false);
-        }, 2000);
-    };
 
     // 🔥 FUNCIÓN DE CHECK-IN SINCRONIZADA 🔥
     const handleDailyCheckIn = async () => {
@@ -206,7 +180,7 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
             {/* SECCIÓN DE MISIONES */}
             <div style={{ display: 'flex', gap: '10px' }}>
                 
-                {/* 1. AD MILESTONE */}
+                {/* 1. AD MILESTONE (Totalmente visual, sin botón funcional) */}
                 <div className="glass-card" style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.03)', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <div style={{ background: '#FF512F', padding: '6px', borderRadius: '6px' }}><Tv size={14} color="#fff" /></div>
@@ -224,9 +198,16 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                             <div style={{ width: `${(videoProgress / 20) * 100}%`, height: '100%', background: '#00F2FE', borderRadius: '2px', transition: 'width 0.3s' }}></div>
                         </div>
                     </div>
-                    <button onClick={handleWatchAd} disabled={loading} className="btn-cyber" style={{ width: '100%', padding: '6px', fontSize: '10px', background: loading ? '#333' : 'transparent', border: '1px solid #FF512F', color: '#FF512F' }}>
-                        {loading ? '...' : 'WATCH AD NOW'}
-                    </button>
+                    {/* 🔥 CAMBIO REALIZADO AQUÍ: Botón convertido en Div decorativo */}
+                    <div 
+                        className="btn-cyber" 
+                        style={{ 
+                            width: '100%', padding: '6px', fontSize: '10px', background: 'transparent', 
+                            border: '1px solid #FF512F', color: '#FF512F', textAlign: 'center', 
+                            borderRadius: '4px', cursor: 'default' 
+                        }}>
+                        WATCH AD NOW
+                    </div>
                 </div>
 
                 {/* 2. DAILY STREAK (AHORA SINCRONIZADO) */}
