@@ -166,6 +166,14 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             else if (data && data[0].success) {
                 if (setOverclockTime) setOverclockTime(180); 
                 alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 3 minutes.\nUses today: ${data[0].new_count}/3`);
+            
+                // 🔥 CÓDIGO FALTANTE: Registrar en el contador global de 20 🔥
+                const { data: adData } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
+                const adResult = adData as { rewarded: boolean; progress: number };
+                if (adResult && adResult.rewarded) {
+                    window.dispatchEvent(new CustomEvent('addLuckyTickets', { detail: 1 }));
+                    setTimeout(() => alert("🎉 AD MILESTONE REACHED!\n\nYou earned +1 LUCKY TICKET from watching ads!"), 500);
+                }
             } else alert(data?.[0]?.message || "Limit reached");
         } 
     }, [user, setOverclockTime]);
@@ -237,6 +245,15 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             await supabase.rpc('activate_bot', { user_id_in: user.id, duration_seconds: durationSeconds });
             alert(`✅ Ad Verified! Bot active for ${hours} Hours.`);
             setShowManager(false);
+            
+            // 🔥 CÓDIGO FALTANTE: Registrar en el contador global de 20 🔥
+            const { data: adData } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
+            const adResult = adData as { rewarded: boolean; progress: number };
+            if (adResult && adResult.rewarded) {
+                window.dispatchEvent(new CustomEvent('addLuckyTickets', { detail: 1 }));
+                setTimeout(() => alert("🎉 AD MILESTONE REACHED!\n\nYou earned +1 LUCKY TICKET from watching ads!"), 500);
+            }
+
         } else alert(error?.message || data?.[0]?.message || "Error watching ad.");
         setLoading(false);
     };
