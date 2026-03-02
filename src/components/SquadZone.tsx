@@ -3,7 +3,9 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 // IMPORTAMOS EL COMPONENTE DE LOTERÍA 
 import { LotteryModal } from './GemLottery'; 
-import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Calendar, Tv, Trophy, Lock } from 'lucide-react';
+// 🔥 IMPORTAMOS EL MERCADO NEGRO 🔥
+import { SwapTerminal } from './SwapTerminal';
+import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Calendar, Tv, Trophy, Lock, RefreshCcw } from 'lucide-react';
 
 // --- INTERFACES ---
 interface RewardCardProps {
@@ -268,6 +270,9 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const [loadingList, setLoadingList] = useState(false);
     const [referralCode, setReferralCode] = useState<string | null>(null);
 
+    // 🔥 ESTADO PARA CONTROLAR EL MODAL DEL MERCADO NEGRO 🔥
+    const [showBlackMarket, setShowBlackMarket] = useState(false);
+
     const pointsQueue = useRef(0);
     const BOT_USERNAME = "Gnovatoken_bot"; 
 
@@ -410,7 +415,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     };
 
     return (
-        <div style={{ padding: '0 15px', paddingBottom: '100px', height: '100%', overflowY: 'auto' }}>
+        <div style={{ position: 'relative', padding: '0 15px', paddingBottom: '100px', height: '100%', overflowY: 'auto' }}>
             
             {/* TICKET EMPIRE CON EL NUEVO BOTÓN DE LOTERÍA */}
             <TicketEmpire setGlobalScore={setGlobalScore} />
@@ -543,6 +548,35 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                     </div>
                 </div>
             )}
+
+            {/* 🔥 EL BOTÓN FLOTANTE DEL MERCADO NEGRO 🔥 */}
+            <button 
+                onClick={() => setShowBlackMarket(true)}
+                style={{
+                    position: 'fixed',
+                    bottom: '85px', // Suficientemente arriba para no tapar el menú inferior
+                    right: '20px',
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #111, #2a0845)',
+                    border: '2px solid #E040FB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 0 15px rgba(224, 64, 251, 0.5)',
+                    zIndex: 1000,
+                    cursor: 'pointer'
+                }}
+            >
+                <RefreshCcw color="#E040FB" size={28} />
+            </button>
+
+            {/* 🔥 EL MODAL DEL MERCADO NEGRO (Se muestra cuando showBlackMarket es true) 🔥 */}
+            {showBlackMarket && (
+                <SwapTerminal onClose={() => setShowBlackMarket(false)} />
+            )}
+
         </div>
     );
 };
