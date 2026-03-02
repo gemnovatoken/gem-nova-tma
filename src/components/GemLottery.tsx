@@ -1,47 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
-// 🔥 IMPORTANTE: Hook para pagos reales
-import { useTonConnectUI } from '@tonconnect/ui-react'; 
-import { X, Trophy, Timer, History, AlertCircle, CheckCircle2, Hash, Ticket, Wallet, Save, Crown, Frown } from 'lucide-react';
+import { X, Trophy, Timer, History, AlertCircle, CheckCircle2, Hash, Wallet, Save, Crown, Frown } from 'lucide-react';
 
 // Si instalaste 'canvas-confetti', descomenta esta línea. 
 // Si no, el código abajo tiene un try/catch para que no falle.
 import confetti from 'canvas-confetti'; 
 
-// --- CONFIGURACIÓN DE LA WALLET DEL ADMIN (PARA RECIBIR PAGOS) ---
-const ADMIN_WALLET = "UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q"; 
-
 // --- INTERFACES ---
 interface MyTicket {
     code: string;
-    date: string;
+    slot_number: number;
 }
 
 interface LotteryInfo {
     sold: number;
     max: number;
     status: 'active' | 'completed';
-    winnerCode: string | null;
+    winnerCodes: string[];
 }
 
 interface LotteryModalProps {
     onClose: () => void;
     luckyTickets: number;
     setLuckyTickets: React.Dispatch<React.SetStateAction<number>>;
+    // Si tienes acceso a la función que actualiza el score global en tu componente padre,
+    // puedes pasarla aquí para que se reste visualmente al instante. Si no, la recarga en background lo hará.
+    onUpdateScore?: (amountToSubtract: number) => void; 
 }
 
 // --- COMPONENTE: MODAL DE LOTERÍA ---
-export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTickets, setLuckyTickets }) => {
+export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTickets, setLuckyTickets, onUpdateScore }) => {
     const { user } = useAuth();
-    // Hook para interactuar con la wallet
-    const [tonConnectUI] = useTonConnectUI();
     
     const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
     
     const [myTickets, setMyTickets] = useState<MyTicket[]>([]); 
     const [soldTotal, setSoldTotal] = useState(0); 
-    const [lotteryInfo, setLotteryInfo] = useState<LotteryInfo>({ sold: 0, max: 50, status: 'active', winnerCode: null });
+    const [lotteryInfo, setLotteryInfo] = useState<LotteryInfo>({ sold: 0, max: 75, status: 'active', winnerCodes: [] });
     const [loading, setLoading] = useState(false);
 
     // --- ESTADOS PARA LUCKY WALLET ---
@@ -49,8 +45,9 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     const [savedLuckyWallet, setSavedLuckyWallet] = useState<string | null>(null);
     const [isSavingWallet, setIsSavingWallet] = useState(false);
 
-    const MAX_TICKETS_GLOBAL = 50;
-    const PRIZE_POOL = 15; 
+    // 🔥 NUEVOS LÍMITES Y PREMIOS 🔥
+    const MAX_TICKETS_GLOBAL = 75; 
+    const PRIZE_POOL = 10; 
 
     // 🔥 FUNCIÓN DE CARGA DE DATOS
     const fetchLotteryData = async () => {
@@ -64,7 +61,7 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
             setMyTickets((userTickets as any).tickets);
         }
 
-        // 2. Obtener el total vendido y estado (Usando la función corregida)
+        // 2. Obtener el total vendido y estado
         const { data: statusData, error } = await supabase.rpc('get_lottery_status', { p_round: 1 });
         
         if (error) console.error("Error status:", error);
@@ -76,9 +73,9 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
             setSoldTotal(status.sold || 0); // Actualiza la barra
             setLotteryInfo({
                 sold: status.sold || 0,
-                max: 50,
+                max: MAX_TICKETS_GLOBAL,
                 status: status.status || 'active',
-                winnerCode: status.winner || null
+                winnerCodes: status.winners || (status.winner ? [status.winner] : []) // Soporte para múltiples ganadores
             });
         }
 
@@ -103,12 +100,12 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user]);
 
-    // Efecto Confeti
+    // Efecto Confeti (Ajustado para buscar en array de ganadores)
     useEffect(() => {
-        const didIWin = myTickets.some(t => t.code === lotteryInfo.winnerCode);
+        const didIWin = myTickets.some(t => lotteryInfo.winnerCodes.includes(t.code));
         if (lotteryInfo.status === 'completed' && didIWin && activeTab === 'active') {
             try { 
-                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } }); 
+                confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } }); 
             } catch(e) {
                 console.warn("Confetti effect failed or library missing", e);
             }
@@ -132,14 +129,14 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
             setSavedLuckyWallet(luckyWalletInput);
             alert("✅ Reward Wallet Saved Successfully!");
         } else {
-            console.error("Save wallet error:", error); // Log para evitar 'unused var'
+            console.error("Save wallet error:", error); 
             alert("Error saving wallet.");
         }
         setIsSavingWallet(false);
     };
 
-    // 🔥 LÓGICA DE COMPRA CON PAGO REAL 🔥
-    const handleBuyTicket = async (ticketSlot: number) => {
+    // 🔥 NUEVA LÓGICA DE COMPRA HÍBRIDA 🔥
+    const handleBuyTicket = async (ticketSlot: number, ticketCost: number, pointsCost: number) => {
         if (!user || loading) return;
         
         if (soldTotal >= MAX_TICKETS_GLOBAL) {
@@ -147,136 +144,64 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
             return;
         }
 
-        // Validación: Necesitamos una wallet para enviar el premio si gana
-        const walletToSend = savedLuckyWallet || tonConnectUI.wallet?.account.address;
-        if (!walletToSend) {
-            alert("⚠️ Please connect your wallet OR save your Reward Wallet address below first!");
+        // Validación: Necesitamos una wallet guardada para enviar el premio
+        if (!savedLuckyWallet) {
+            alert("⚠️ Please save your Reward Wallet address below first so we can send your prize!");
             return;
         }
+
+        // Validación Local de Tickets (Los puntos se validan en el SQL, pero puedes añadir una prop 'score' para validarlo aquí también)
+        if (luckyTickets < ticketCost) {
+            alert(`❌ You need ${ticketCost} Lucky Tickets for this entry.\nWatch ads or invite friends to get more!`);
+            return;
+        }
+
+        const confirmPurchase = window.confirm(`💸 CONFIRM ENTRY\n\nBuy Ticket #${ticketSlot}?\n\nCost:\n- ${ticketCost} Lucky Tickets 🎟️\n- ${pointsCost.toLocaleString()} Points 🪙`);
+        if (!confirmPurchase) return;
 
         setLoading(true);
 
         try {
-            let costType = 'ton';
-            let costAmount = 0; // Costo en Lucky Tickets
-            let burnAmount = 0; // Descuento en Lucky Tickets
-            let tonAmount = 0;  // Costo en TON real
-            let txHash = null;  // Recibo de la transacción
-
-            if (ticketSlot === 1) {
-                // TICKET 1: Paga con Lucky Ticket (Gratis en TON)
-                costType = 'lucky_ticket';
-                costAmount = 1;
-                
-                if (luckyTickets < 1) {
-                    alert("❌ Insufficient Lucky Tickets! Watch ads to earn more.");
-                    setLoading(false);
-                    return;
-                }
-            } else {
-                // TICKET 2 y 3: Paga con TON Real
-                costType = 'ton'; 
-                const basePrice = 0.50;
-                const discountPrice = 0.25;
-                const ticketsNeededForDiscount = 2;
-
-                let finalPrice = basePrice;
-                let userWantsDiscount = false;
-
-                // Ofrecer descuento si tiene tickets
-                if (luckyTickets >= ticketsNeededForDiscount) {
-                    userWantsDiscount = window.confirm(
-                        `🔥 DISCOUNT AVAILABLE!\n\nPay only ${discountPrice} TON instead of ${basePrice} TON?\n\nCost: Burn ${ticketsNeededForDiscount} Lucky Tickets.`
-                    );
-                    if (userWantsDiscount) {
-                        finalPrice = discountPrice;
-                        burnAmount = ticketsNeededForDiscount; 
-                    }
-                }
-
-                const confirmPurchase = window.confirm(`💸 CONFIRM PURCHASE\n\nBuy Ticket #${ticketSlot} for ${finalPrice} TON?`);
-                if (!confirmPurchase) {
-                    setLoading(false);
-                    return;
-                }
-                
-                tonAmount = finalPrice; // Definimos cuánto cobrar
-            }
-
-            // --- PROCESAR PAGO EN TON (Si aplica) ---
-            if (tonAmount > 0) {
-                if (!tonConnectUI.connected) {
-                    alert("👛 Please connect your wallet to pay.");
-                    setLoading(false);
-                    return;
-                }
-
-                // 1 TON = 1,000,000,000 NanoTON
-                const nanoTonAmount = (tonAmount * 1000000000).toFixed(0);
-
-                const transaction = {
-                    validUntil: Math.floor(Date.now() / 1000) + 600, // 10 min validez
-                    messages: [
-                        {
-                            address: ADMIN_WALLET,
-                            amount: nanoTonAmount,
-                        },
-                    ],
-                };
-
-                try {
-                    // Enviamos la transacción a la wallet del usuario
-                    const result = await tonConnectUI.sendTransaction(transaction);
-                    
-                    // Si llegamos aquí, el usuario firmó y envió. Guardamos el Hash (boc).
-                    txHash = result.boc;
-                } catch (txError) {
-                    console.error("Payment failed/cancelled", txError);
-                    alert("❌ Payment Cancelled.");
-                    setLoading(false);
-                    return; // Detenemos todo si no pagó
-                }
-            }
-
-            // --- REGISTRAR EN BASE DE DATOS ---
-            // Enviamos el hash (p_tx_hash) para verificación
-            const { data, error } = await supabase.rpc('buy_lottery_ticket', { 
+            // Llamamos a la nueva función maestra en Supabase
+            const { data, error } = await supabase.rpc('buy_hybrid_lottery_ticket', { 
                 p_user_id: user.id, 
-                p_cost_type: costType, 
-                p_cost_amount: costAmount,
-                p_burn_amount: burnAmount,
-                p_wallet_address: walletToSend,
-                p_tx_hash: txHash, // Enviamos el recibo
-                p_ton_amount: tonAmount // 🔥 AQUÍ AGREGAMOS EL MONTO (0, 0.25 o 0.50)
+                p_ticket_slot: ticketSlot,
+                p_wallet_address: savedLuckyWallet
             });
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const result = data as any;
 
             if (!error && result.success) {
-                // Actualizar visualmente los tickets gastados
-                const totalTicketsSpent = costAmount + burnAmount;
-                if (totalTicketsSpent > 0) {
-                    setLuckyTickets((prev: number) => Math.max(0, prev - totalTicketsSpent));
-                }
+                // Descontar visualmente los tickets en el frontend
+                setLuckyTickets(prev => Math.max(0, prev - ticketCost));
                 
+                // Si pasaste la función para actualizar el score desde el padre, la llamamos aquí
+                if (onUpdateScore) {
+                    onUpdateScore(pointsCost);
+                }
+
                 await fetchLotteryData(); 
                 alert(`🎟️ SUCCESS!\n\nTicket Assigned: ${result.ticket_code}\nGood luck!`);
             } else {
-                alert("❌ Database Error: " + (result?.message || error?.message || "Transaction failed"));
+                alert("❌ Transaction Failed: " + (result?.message || error?.message || "Insufficient balance or already owned."));
             }
 
         } catch (e) {
             console.error(e);
-            alert("Unexpected error");
+            alert("Unexpected error processing ticket.");
         }
         setLoading(false);
     };
 
-    const myEntriesCount = myTickets.length;
     const isCompleted = lotteryInfo.status === 'completed';
-    const winningTicket = lotteryInfo.winnerCode;
-    const iWon = isCompleted && myTickets.some(t => t.code === winningTicket);
+    // Para simplificar la visualización si el usuario ganó (solo tomamos el primer código que coincida)
+    const winningTicket = myTickets.find(t => lotteryInfo.winnerCodes.includes(t.code))?.code;
+    const iWon = isCompleted && !!winningTicket;
+
+    // Funciones auxiliares para saber si ya compramos ese slot
+    const ownsSlot = (slot: number) => myTickets.some(t => t.slot_number === slot);
+    const getCodeForSlot = (slot: number) => myTickets.find(t => t.slot_number === slot)?.code;
 
     return (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px' }}>
@@ -306,7 +231,7 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                                         <div className="winner-animation">
                                             <Crown size={60} color="#FFD700" style={{marginBottom:'10px', filter:'drop-shadow(0 0 10px gold)'}}/>
                                             <h2 style={{color:'#FFD700', fontSize:'28px', margin:'0 0 10px 0'}}>YOU WON!</h2>
-                                            <p style={{color:'#fff', marginBottom:'20px'}}>Congratulations! Prize sent to your wallet within 48h.</p>
+                                            <p style={{color:'#fff', marginBottom:'20px'}}>Congratulations! 5 TON sent to your wallet within 48h.</p>
                                             <div style={{background:'rgba(255,215,0,0.2)', padding:'15px', borderRadius:'10px', border:'1px solid #FFD700', display:'inline-block'}}>
                                                 Winning Ticket: <span style={{fontWeight:'bold', fontSize:'18px'}}>{winningTicket}</span>
                                             </div>
@@ -316,9 +241,6 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                                             <Frown size={50} color="#555" style={{marginBottom:'10px'}}/>
                                             <h2 style={{color:'#fff', fontSize:'22px', margin:'0 0 5px 0'}}>ROUND ENDED</h2>
                                             <p style={{color:'#aaa', fontSize:'12px', marginBottom:'20px'}}>Unfortunately, you didn't win this time.</p>
-                                            <div style={{background:'rgba(255,255,255,0.05)', padding:'10px', borderRadius:'10px', marginBottom:'20px'}}>
-                                                Winning Ticket: <span style={{color:'#FFD700', fontWeight:'bold'}}>{winningTicket}</span>
-                                            </div>
                                             <p style={{color:'#4CAF50', fontSize:'12px'}}>Better luck in Round #2!</p>
                                         </div>
                                     )}
@@ -327,11 +249,12 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                                 <>
                                     {/* PRIZE CARD */}
                                     <div style={{ textAlign: 'center', marginBottom: '25px' }}>
-                                        <div style={{ fontSize: '12px', color: '#aaa', letterSpacing: '2px', marginBottom: '5px' }}>ROUND #1 PRIZE POOL</div>
+                                        <div style={{ fontSize: '12px', color: '#aaa', letterSpacing: '2px', marginBottom: '5px' }}>ROUND PRIZE POOL</div>
                                         <div style={{ fontSize: '42px', fontWeight: '900', color: '#fff', textShadow: '0 0 20px #FFD700' }}>{PRIZE_POOL} TON</div>
+                                        <div style={{ color: '#FFD700', fontSize: '12px', fontWeight: 'bold', marginTop: '4px' }}>2 WINNERS OF 5 TON EACH</div>
                                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: '#333', padding: '4px 10px', borderRadius: '15px', marginTop: '10px' }}>
                                             <Timer size={12} color="#aaa" />
-                                            <span style={{ fontSize: '10px', color: '#fff' }}>Ends when 50 tickets sold</span>
+                                            <span style={{ fontSize: '10px', color: '#fff' }}>Ends when 75 tickets sold</span>
                                         </div>
                                     </div>
 
@@ -344,76 +267,47 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                                         <div style={{ width: '100%', height: '8px', background: '#222', borderRadius: '4px', overflow: 'hidden' }}>
                                             <div style={{ width: `${(soldTotal / MAX_TICKETS_GLOBAL) * 100}%`, height: '100%', background: 'linear-gradient(90deg, #FFD700, #FFA500)' }}></div>
                                         </div>
-                                        {soldTotal >= 45 && <div style={{ fontSize: '10px', color: '#FF512F', marginTop: '5px', display:'flex', alignItems:'center', gap:'4px' }}><AlertCircle size={10}/> ALMOST SOLD OUT!</div>}
+                                        {soldTotal >= 65 && <div style={{ fontSize: '10px', color: '#FF512F', marginTop: '5px', display:'flex', alignItems:'center', gap:'4px' }}><AlertCircle size={10}/> ALMOST SOLD OUT!</div>}
                                     </div>
 
                                     {/* BUY SECTION */}
-                                    <h4 style={{ color: '#fff', marginBottom: '15px' }}>YOUR ENTRIES ({myEntriesCount}/3)</h4>
+                                    <h4 style={{ color: '#fff', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
+                                        YOUR ENTRIES ({myTickets.length}/3)
+                                        <span style={{color: '#00F2FE', fontSize: '12px'}}>🎟️ {luckyTickets} Avail.</span>
+                                    </h4>
                                     
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        <TicketRow number={1} priceLabel="1 Lucky Ticket" priceColor="#00F2FE" isOwned={myEntriesCount >= 1} ticketCode={myTickets[0]?.code} onBuy={() => handleBuyTicket(1)} disabled={loading} />
-                                        <TicketRow number={2} priceLabel="0.50 TON" priceColor="#FFD700" isOwned={myEntriesCount >= 2} ticketCode={myTickets[1]?.code} onBuy={() => handleBuyTicket(2)} disabled={loading || myEntriesCount < 1} />
-                                        <TicketRow number={3} priceLabel="0.50 TON" priceColor="#FFD700" isOwned={myEntriesCount >= 3} ticketCode={myTickets[2]?.code} onBuy={() => handleBuyTicket(3)} disabled={loading || myEntriesCount < 2} />
+                                        <TicketRow number={1} ticketsReq={2} pointsReq={100000} isOwned={ownsSlot(1)} ticketCode={getCodeForSlot(1)} onBuy={() => handleBuyTicket(1, 2, 100000)} disabled={loading} />
+                                        <TicketRow number={2} ticketsReq={3} pointsReq={150000} isOwned={ownsSlot(2)} ticketCode={getCodeForSlot(2)} onBuy={() => handleBuyTicket(2, 3, 150000)} disabled={loading || !ownsSlot(1)} />
+                                        <TicketRow number={3} ticketsReq={4} pointsReq={200000} isOwned={ownsSlot(3)} ticketCode={getCodeForSlot(3)} onBuy={() => handleBuyTicket(3, 4, 200000)} disabled={loading || !ownsSlot(2)} />
                                     </div>
 
                                     {/* LUCKY WALLET REWARD */}
                                     <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px solid #333' }}>
                                         <div style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'10px'}}>
                                             <Wallet size={16} color="#E040FB" />
-                                            <span style={{fontSize:'12px', fontWeight:'bold', color:'#fff'}}>REWARD WALLET</span>
+                                            <span style={{fontSize:'12px', fontWeight:'bold', color:'#fff'}}>REWARD WALLET (REQUIRED)</span>
                                         </div>
-                                        <p style={{fontSize:'10px', color:'#aaa', marginBottom:'10px'}}>
-                                            Add your TON wallet address here to receive the prize if you win! 
-                                        </p>
-                                        
                                         <div style={{display:'flex', gap:'5px'}}>
                                             <input 
                                                 type="text" 
-                                                placeholder="Paste your UQ... wallet address"
+                                                placeholder="Paste your TON wallet address"
                                                 value={luckyWalletInput}
                                                 onChange={(e) => setLuckyWalletInput(e.target.value)}
-                                                style={{
-                                                    flex: 1, padding: '10px', borderRadius: '8px', 
-                                                    border: '1px solid #333', background: '#222', color: '#fff', fontSize: '11px', outline:'none'
-                                                }}
+                                                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #333', background: '#222', color: '#fff', fontSize: '11px', outline:'none' }}
                                             />
-                                            <button 
-                                                onClick={handleSaveWallet}
-                                                disabled={isSavingWallet}
-                                                className="btn-cyber"
-                                                style={{padding:'0 15px', color:'#E040FB', borderColor:'#E040FB', background: savedLuckyWallet === luckyWalletInput && savedLuckyWallet !== '' ? 'rgba(224, 64, 251, 0.1)' : 'transparent'}}
-                                            >
+                                            <button onClick={handleSaveWallet} disabled={isSavingWallet} className="btn-cyber" style={{padding:'0 15px', color:'#E040FB', borderColor:'#E040FB', background: savedLuckyWallet === luckyWalletInput && savedLuckyWallet !== '' ? 'rgba(224, 64, 251, 0.1)' : 'transparent'}}>
                                                 {isSavingWallet ? '...' : (savedLuckyWallet === luckyWalletInput && savedLuckyWallet !== '' ? <CheckCircle2 size={16}/> : <Save size={16}/>)}
                                             </button>
                                         </div>
-                                        {savedLuckyWallet && (
-                                            <div style={{fontSize:'9px', color:'#4CAF50', marginTop:'5px', display:'flex', alignItems:'center', gap:'4px'}}>
-                                                <CheckCircle2 size={10}/> Wallet saved securely for rewards.
-                                            </div>
-                                        )}
                                     </div>
                                 </>
                             )}
                         </>
                     ) : (
                         <div style={{ textAlign: 'center', color: '#555', marginTop: '20px' }}>
-                            <div style={{background: 'rgba(255,255,255,0.05)', padding:'15px', borderRadius:'10px', marginBottom:'20px', border:'1px solid #333'}}>
-                                <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
-                                    <span style={{color:'#aaa', fontSize:'12px'}}>ROUND #0 (Demo)</span>
-                                    <span style={{color:'#FF512F', fontSize:'12px', fontWeight:'bold'}}>EXPIRED</span>
-                                </div>
-                                <div style={{display:'flex', alignItems:'center', gap:'10px', opacity:0.6}}>
-                                    <Ticket size={20} color="#555"/>
-                                    <span style={{color:'#fff', fontWeight:'bold'}}>#T-000</span>
-                                </div>
-                                <div style={{marginTop:'10px', fontSize:'12px', color:'#aaa'}}>
-                                    Result: Not Winning
-                                </div>
-                            </div>
-                            <div style={{color:'#888', fontSize:'14px', fontStyle:'italic'}}>
-                                <History size={16} style={{ verticalAlign: 'middle', marginRight: '4px' }}/>
-                                "Good luck next time! 🍀"
-                            </div>
+                            <History size={40} style={{margin:'0 auto', marginBottom:'10px', opacity:0.5}} />
+                            <div>Past rounds will appear here.</div>
                         </div>
                     )}
                 </div>
@@ -422,8 +316,8 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     );
 };
 
-// Componente auxiliar local
-const TicketRow = ({ number, priceLabel, priceColor, isOwned, ticketCode, onBuy, disabled }: { number: number, priceLabel: string, priceColor: string, isOwned: boolean, ticketCode?: string, onBuy: () => void, disabled: boolean }) => (
+// Componente auxiliar rediseñado para la Doble Moneda
+const TicketRow = ({ number, ticketsReq, pointsReq, isOwned, ticketCode, onBuy, disabled }: { number: number, ticketsReq: number, pointsReq: number, isOwned: boolean, ticketCode?: string, onBuy: () => void, disabled: boolean }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: isOwned ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255,255,255,0.05)', borderRadius: '10px', border: isOwned ? '1px solid #4CAF50' : '1px solid #333', opacity: disabled && !isOwned ? 0.5 : 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: '24px', height: '24px', borderRadius: '50%', background: isOwned ? '#4CAF50' : '#333', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 'bold' }}>{number}</div>
@@ -431,20 +325,23 @@ const TicketRow = ({ number, priceLabel, priceColor, isOwned, ticketCode, onBuy,
                 <div style={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}>
                     {isOwned ? <span style={{color:'#4CAF50'}}>ACTIVE TICKET</span> : `Entry Ticket #${number}`}
                 </div>
-                <div style={{ color: '#aaa', fontSize: '10px' }}>
+                <div style={{ color: '#aaa', fontSize: '10px', marginTop: '4px' }}>
                     {isOwned ? (
                         <span style={{display:'flex', alignItems:'center', gap:'4px', color:'#fff'}}>
                             <Hash size={10}/> Code: <span style={{color:'#FFD700', fontWeight:'bold', fontSize:'14px'}}>{ticketCode || "Generating..."}</span>
                         </span>
                     ) : (
-                        <>Cost: <span style={{ color: priceColor }}>{priceLabel}</span></>
+                        <div style={{display:'flex', gap:'8px'}}>
+                            <span style={{ color: '#00F2FE', fontWeight:'bold', background: 'rgba(0, 242, 254, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>🎟️ {ticketsReq}</span>
+                            <span style={{ color: '#FFD700', fontWeight:'bold', background: 'rgba(255, 215, 0, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>🪙 {(pointsReq/1000).toFixed(0)}k</span>
+                        </div>
                     )}
                 </div>
             </div>
         </div>
         {isOwned ? <CheckCircle2 color="#4CAF50" size={20} /> : (
-            <button onClick={onBuy} disabled={disabled} style={{ background: disabled ? '#555' : priceColor === '#FFD700' ? '#FFD700' : '#00F2FE', border: 'none', borderRadius: '5px', padding: '6px 12px', fontSize: '10px', fontWeight: 'bold', cursor: disabled ? 'not-allowed' : 'pointer', color:'#000' }}>
-                {disabled ? '...' : 'BUY'}
+            <button onClick={onBuy} disabled={disabled} style={{ background: disabled ? '#555' : '#00F2FE', border: 'none', borderRadius: '5px', padding: '10px 15px', fontSize: '12px', fontWeight: 'bold', cursor: disabled ? 'not-allowed' : 'pointer', color:'#000' }}>
+                {disabled ? 'LOCKED' : 'BUY'}
             </button>
         )}
     </div>
