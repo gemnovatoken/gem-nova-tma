@@ -148,7 +148,14 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     return (
         <div style={{ marginBottom: '20px' }}>
             {/* Modal de Lotería */}
-            {showLottery && <LotteryModal onClose={() => setShowLottery(false)} luckyTickets={luckyTickets} setLuckyTickets={setLuckyTickets} />}
+            {showLottery && (
+    <LotteryModal 
+        onClose={() => setShowLottery(false)} 
+        luckyTickets={luckyTickets} 
+        setLuckyTickets={setLuckyTickets}
+        onUpdateScore={(amountToSubtract) => setGlobalScore(prev => prev - amountToSubtract)} 
+    />
+        )}
 
             {/* ENCABEZADO: TOTAL TICKETS + BOTÓN DE LOTERÍA */}
             <div className="cyber-card" style={{ 
