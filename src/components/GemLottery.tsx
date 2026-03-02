@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { X, Trophy, Timer, History, AlertCircle, CheckCircle2, Hash, Wallet, Save, Crown, Frown } from 'lucide-react';
@@ -9,8 +9,8 @@ import confetti from 'canvas-confetti';
 
 // --- INTERFACES ---
 interface MyTicket {
-    code: string;
-    slot_number: number;
+    code?: string; // Mantenemos ambas por si tu RPC devuelve 'code'
+    ticket_code?: string; // Y agregamos la columna real de la base de datos
 }
 
 interface LotteryInfo {
@@ -24,8 +24,6 @@ interface LotteryModalProps {
     onClose: () => void;
     luckyTickets: number;
     setLuckyTickets: React.Dispatch<React.SetStateAction<number>>;
-    // Si tienes acceso a la función que actualiza el score global en tu componente padre,
-    // puedes pasarla aquí para que se reste visualmente al instante. Si no, la recarga en background lo hará.
     onUpdateScore?: (amountToSubtract: number) => void; 
 }
 
@@ -49,8 +47,8 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     const MAX_TICKETS_GLOBAL = 75; 
     const PRIZE_POOL = 10; 
 
-    // 🔥 FUNCIÓN DE CARGA DE DATOS
-    const fetchLotteryData = async () => {
+    // 🔥 FUNCIÓN DE CARGA DE DATOS (Memorizada para evitar errores de linting)
+    const fetchLotteryData = useCallback(async () => {
         if (!user) return;
         
         // 1. Obtener MIS boletos
@@ -90,19 +88,28 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
             setSavedLuckyWallet(userData.lucky_wallet);
             setLuckyWalletInput(userData.lucky_wallet); 
         }
-    };
+    }, [user]);
 
     // Carga inicial y Polling
     useEffect(() => {
-        fetchLotteryData();
-        const interval = setInterval(fetchLotteryData, 5000); 
+        // Envolver en una función asíncrona dentro del useEffect soluciona el error
+        const initFetch = async () => {
+            await fetchLotteryData();
+        };
+        
+        initFetch();
+        
+        const interval = setInterval(() => {
+            fetchLotteryData();
+        }, 5000); 
+        
         return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user]);
-
-    // Efecto Confeti (Ajustado para buscar en array de ganadores)
+    }, [fetchLotteryData]);
+    
+    // Efecto Confeti
     useEffect(() => {
-        const didIWin = myTickets.some(t => lotteryInfo.winnerCodes.includes(t.code));
+        // Adaptado para buscar tanto ticket_code como code
+        const didIWin = myTickets.some(t => lotteryInfo.winnerCodes.includes(t.ticket_code || t.code || ''));
         if (lotteryInfo.status === 'completed' && didIWin && activeTab === 'active') {
             try { 
                 confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } }); 
@@ -135,8 +142,8 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
         setIsSavingWallet(false);
     };
 
-    // 🔥 NUEVA LÓGICA DE COMPRA HÍBRIDA 🔥
-    const handleBuyTicket = async (ticketSlot: number, ticketCost: number, pointsCost: number) => {
+    // 🔥 LÓGICA DE COMPRA ACTUALIZADA A LA NUEVA BD 🔥
+    const handleBuyTicket = async (ticketType: number, ticketCost: number, pointsCost: number) => {
         if (!user || loading) return;
         
         if (soldTotal >= MAX_TICKETS_GLOBAL) {
@@ -144,45 +151,41 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
             return;
         }
 
-        // Validación: Necesitamos una wallet guardada para enviar el premio
         if (!savedLuckyWallet) {
             alert("⚠️ Please save your Reward Wallet address below first so we can send your prize!");
             return;
         }
 
-        // Validación Local de Tickets (Los puntos se validan en el SQL, pero puedes añadir una prop 'score' para validarlo aquí también)
         if (luckyTickets < ticketCost) {
             alert(`❌ You need ${ticketCost} Lucky Tickets for this entry.\nWatch ads or invite friends to get more!`);
             return;
         }
 
-        const confirmPurchase = window.confirm(`💸 CONFIRM ENTRY\n\nBuy Ticket #${ticketSlot}?\n\nCost:\n- ${ticketCost} Lucky Tickets 🎟️\n- ${pointsCost.toLocaleString()} Points 🪙`);
+        const confirmPurchase = window.confirm(`💸 CONFIRM ENTRY\n\nBuy Ticket T-0${ticketType}?\n\nCost:\n- ${ticketCost} Lucky Tickets 🎟️\n- ${pointsCost.toLocaleString()} Points 🪙`);
         if (!confirmPurchase) return;
 
         setLoading(true);
 
         try {
-            // Llamamos a la nueva función maestra en Supabase
-            const { data, error } = await supabase.rpc('buy_hybrid_lottery_ticket', { 
+            // 🔥 LAMAMOS A TU FUNCIÓN SQL ACTUALIZADA 🔥
+            const { data, error } = await supabase.rpc('buy_lottery_ticket', { 
                 p_user_id: user.id, 
-                p_ticket_slot: ticketSlot,
-                p_wallet_address: savedLuckyWallet
+                p_ticket_type: ticketType, // <-- CORREGIDO: Usando comentarios de JS (//)
+                p_round_number: 1          // <-- CORREGIDO: Usando comentarios de JS (//)
             });
 
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const result = data as any;
 
             if (!error && result.success) {
-                // Descontar visualmente los tickets en el frontend
                 setLuckyTickets(prev => Math.max(0, prev - ticketCost));
                 
-                // Si pasaste la función para actualizar el score desde el padre, la llamamos aquí
                 if (onUpdateScore) {
                     onUpdateScore(pointsCost);
                 }
 
                 await fetchLotteryData(); 
-                alert(`🎟️ SUCCESS!\n\nTicket Assigned: ${result.ticket_code}\nGood luck!`);
+                alert(`🎟️ SUCCESS!\n\nTicket Assigned!\nGood luck!`);
             } else {
                 alert("❌ Transaction Failed: " + (result?.message || error?.message || "Insufficient balance or already owned."));
             }
@@ -195,13 +198,13 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
     };
 
     const isCompleted = lotteryInfo.status === 'completed';
-    // Para simplificar la visualización si el usuario ganó (solo tomamos el primer código que coincida)
-    const winningTicket = myTickets.find(t => lotteryInfo.winnerCodes.includes(t.code))?.code;
+    // Buscar si tenemos el ticket ganador
+    const winningTicketObj = myTickets.find(t => lotteryInfo.winnerCodes.includes(t.ticket_code || t.code || ''));
+    const winningTicket = winningTicketObj?.ticket_code || winningTicketObj?.code;
     const iWon = isCompleted && !!winningTicket;
 
-    // Funciones auxiliares para saber si ya compramos ese slot
-    const ownsSlot = (slot: number) => myTickets.some(t => t.slot_number === slot);
-    const getCodeForSlot = (slot: number) => myTickets.find(t => t.slot_number === slot)?.code;
+    // 🔥 FUNCIONES AUXILIARES ACTUALIZADAS (Usando códigos reales de tu BD) 🔥
+    const ownsTicket = (code: string) => myTickets.some(t => t.ticket_code === code || t.code === code);
 
     return (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '15px' }}>
@@ -270,16 +273,16 @@ export const LotteryModal: React.FC<LotteryModalProps> = ({ onClose, luckyTicket
                                         {soldTotal >= 65 && <div style={{ fontSize: '10px', color: '#FF512F', marginTop: '5px', display:'flex', alignItems:'center', gap:'4px' }}><AlertCircle size={10}/> ALMOST SOLD OUT!</div>}
                                     </div>
 
-                                    {/* BUY SECTION */}
+                                    {/* BUY SECTION (Usando los códigos T-01, T-02, T-03) */}
                                     <h4 style={{ color: '#fff', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
                                         YOUR ENTRIES ({myTickets.length}/3)
                                         <span style={{color: '#00F2FE', fontSize: '12px'}}>🎟️ {luckyTickets} Avail.</span>
                                     </h4>
                                     
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        <TicketRow number={1} ticketsReq={2} pointsReq={100000} isOwned={ownsSlot(1)} ticketCode={getCodeForSlot(1)} onBuy={() => handleBuyTicket(1, 2, 100000)} disabled={loading} />
-                                        <TicketRow number={2} ticketsReq={3} pointsReq={150000} isOwned={ownsSlot(2)} ticketCode={getCodeForSlot(2)} onBuy={() => handleBuyTicket(2, 3, 150000)} disabled={loading || !ownsSlot(1)} />
-                                        <TicketRow number={3} ticketsReq={4} pointsReq={200000} isOwned={ownsSlot(3)} ticketCode={getCodeForSlot(3)} onBuy={() => handleBuyTicket(3, 4, 200000)} disabled={loading || !ownsSlot(2)} />
+                                        <TicketRow number={1} ticketsReq={2} pointsReq={100000} isOwned={ownsTicket('T-01')} ticketCode={'T-01'} onBuy={() => handleBuyTicket(1, 2, 100000)} disabled={loading} />
+                                        <TicketRow number={2} ticketsReq={3} pointsReq={150000} isOwned={ownsTicket('T-02')} ticketCode={'T-02'} onBuy={() => handleBuyTicket(2, 3, 150000)} disabled={loading || !ownsTicket('T-01')} />
+                                        <TicketRow number={3} ticketsReq={4} pointsReq={200000} isOwned={ownsTicket('T-03')} ticketCode={'T-03'} onBuy={() => handleBuyTicket(3, 4, 200000)} disabled={loading || !ownsTicket('T-02')} />
                                     </div>
 
                                     {/* LUCKY WALLET REWARD */}
@@ -328,7 +331,7 @@ const TicketRow = ({ number, ticketsReq, pointsReq, isOwned, ticketCode, onBuy, 
                 <div style={{ color: '#aaa', fontSize: '10px', marginTop: '4px' }}>
                     {isOwned ? (
                         <span style={{display:'flex', alignItems:'center', gap:'4px', color:'#fff'}}>
-                            <Hash size={10}/> Code: <span style={{color:'#FFD700', fontWeight:'bold', fontSize:'14px'}}>{ticketCode || "Generating..."}</span>
+                            <Hash size={10}/> Code: <span style={{color:'#FFD700', fontWeight:'bold', fontSize:'14px'}}>{ticketCode}</span>
                         </span>
                     ) : (
                         <div style={{display:'flex', gap:'8px'}}>
