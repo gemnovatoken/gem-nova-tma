@@ -198,12 +198,14 @@ export const WalletRoadmap: React.FC = () => {
             const fetchData = async () => {
                 const { data } = await supabase
                     .from('user_score')
-                    .select('referral_ton_earnings, referral_count, multitap_level, limit_level, speed_level, whitepaper_claimed')
+                    // 🔥 MODIFICADO: Ahora llamamos a la columna correcta (ton_referral_balance)
+                    .select('ton_referral_balance, referral_count, multitap_level, limit_level, speed_level, whitepaper_claimed')
                     .eq('user_id', user.id)
                     .single();
                 
                 if (data) {
-                    setTonEarnings(data.referral_ton_earnings || 0);
+                    // 🔥 MODIFICADO: Seteamos la variable con la data de la columna correcta
+                    setTonEarnings(data.ton_referral_balance || 0);
                     setReferralCount(data.referral_count || 0);
                     setUserLevel(Math.min(data.multitap_level, data.limit_level, data.speed_level));
                     setWpClaimed(data.whitepaper_claimed || false);
@@ -213,9 +215,18 @@ export const WalletRoadmap: React.FC = () => {
         }
     }, [user]);
 
+    // 🔥 MODIFICADO: Movimos la lógica de retiro aquí arriba para que handleWithdraw sepa qué hacer
+    const minWithdraw = userLevel >= 5 ? 0 : 1.0;
+    const canWithdraw = tonEarnings > 0 && tonEarnings >= minWithdraw;
+
     const handleWithdraw = async () => {
-        if (tonEarnings < 2) {
-            alert("⚠️ Minimum withdrawal is 2 TON.");
+        // 🔥 MODIFICADO: Ahora usa la variable minWithdraw y verifica si hay saldo
+        if (tonEarnings < minWithdraw) {
+            alert(`⚠️ Minimum withdrawal is ${minWithdraw} TON for your level.`);
+            return;
+        }
+        if (tonEarnings <= 0) {
+            alert("⚠️ You don't have enough TON to withdraw yet.");
             return;
         }
         if (!userFriendlyAddress) {
@@ -246,10 +257,6 @@ export const WalletRoadmap: React.FC = () => {
         }
         setClaimingWp(false);
     };
-
-    // LÓGICA DE RETIRO
-    const minWithdraw = userLevel >= 5 ? 0 : 1.0;
-    const canWithdraw = tonEarnings > 0 && tonEarnings >= minWithdraw;
 
     return (
         <div style={{ padding: '20px', paddingBottom: '120px' }}>
