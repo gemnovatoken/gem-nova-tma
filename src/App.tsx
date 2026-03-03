@@ -68,7 +68,6 @@ export default function App() {
         if (error) console.error("Save Error:", error);
     }, [user, canSave]);
 
-    // 1. CARGA INICIAL (Aquí ocurre la magia del referido de forma limpia)
     // 1. CARGA INICIAL (Blindado contra usuarios fantasma)
     useEffect(() => {
         if (user && !authLoading) {
@@ -76,12 +75,21 @@ export default function App() {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
-                const startParam = tg?.initDataUnsafe?.start_param; 
+                
+                // 🔥 EXTRACCIÓN BLINDADA Y SIN NULLS:
+                let startParam: string = tg?.initDataUnsafe?.start_param || "";
+                if (!startParam) {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const hashParams = new URLSearchParams(window.location.hash.slice(1));
+                    // Aseguramos que el resultado sea siempre un string (o vacío), nunca null.
+                    startParam = urlParams.get('tgWebAppStartParam') || hashParams.get('tgWebAppStartParam') || "";
+                }
+
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
-                // Limpiamos el código del link si es que existe
-                let referrerId = null;
-                if (startParam && startParam.trim() !== '') { 
+                let referrerId: string = "";
+                // Como startParam ahora está garantizado como string, el trim() no fallará
+                if (startParam.trim() !== '') { 
                     referrerId = startParam.replace('ref_', ''); 
                 }
 
@@ -98,7 +106,7 @@ export default function App() {
                 if (userData) {
                     
                     // 🔥 DEFENSA ACTIVA: Si el usuario existe pero NO tiene referido, y entró con un link, lo forzamos.
-                    if (!userData.referred_by && referrerId && referrerId !== user.id) {
+                    if (!userData.referred_by && referrerId !== "" && referrerId !== user.id) {
                         console.log("🛠️ Registrando referido atrasado:", referrerId);
                         await supabase.rpc('register_new_user', {
                             p_user_id: user.id,
@@ -164,7 +172,8 @@ export default function App() {
                     });
                     
                     if (!insertError) {
-                        const initialScore = referrerId ? 5000 : 0;
+                        // Verificamos si realmente traía un código para darle los 5000 iniciales
+                        const initialScore = referrerId !== "" ? 5000 : 0;
                         setScore(initialScore); 
                         scoreRef.current = initialScore;
                         
