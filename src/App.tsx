@@ -125,11 +125,17 @@ export default function App() {
                         speed: userData.speed_level || 1 
                     });
 
-                    if (userData.bot_active_until) {
-                        const botExpiry = new Date(userData.bot_active_until).getTime();
+                    // Si existe la fecha del bot
+                if (userData.bot_active_until) {
+                    // Reemplazar espacios por "T" y agregar "Z" para que Safari no se asuste
+                    const safeDateStr = String(userData.bot_active_until).replace(' ', 'T');
+                    const botExpiry = new Date(safeDateStr).getTime();
+    
+                    if (!isNaN(botExpiry)) { // Solo ejecutamos si Safari logró leerla bien
                         const now = new Date().getTime();
                         setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
                     }
+                }   
                     
                     if (userData.overclock_active_until) {
                         const turboExpiry = new Date(userData.overclock_active_until).getTime();
