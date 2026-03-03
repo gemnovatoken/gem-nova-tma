@@ -207,7 +207,7 @@ export const WalletRoadmap: React.FC = () => {
                     // 🔥 MODIFICADO: Seteamos la variable con la data de la columna correcta
                     setTonEarnings(data.ton_referral_balance || 0);
                     setReferralCount(data.referral_count || 0);
-                    setUserLevel(Math.max(data.limit_level, data.speed_level));
+                    setUserLevel(Math.min(data.multitap_level, data.limit_level, data.speed_level));
                     setWpClaimed(data.whitepaper_claimed || false);
                 }
             };
