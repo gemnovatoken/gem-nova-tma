@@ -93,6 +93,11 @@ export default function App() {
                     referrerId = startParam.replace('ref_', ''); 
                 }
 
+                // 🚨 DETECTOR 1: ¿React logró atrapar la palabra clave del link?
+                if (referrerId !== "") {
+                    alert(`🕵️ DETECTOR 1:\nCódigo extraído del link:\n[${referrerId}]`);
+                }
+
                 // 🔥 AÑADIMOS 'referred_by' AL SELECT PARA SABER SI YA FUE INVITADO
                 const { data: userData } = await supabase
                     .from('user_score')
@@ -108,11 +113,17 @@ export default function App() {
                     // 🔥 DEFENSA ACTIVA: Si el usuario existe pero NO tiene referido, y entró con un link, lo forzamos.
                     if (!userData.referred_by && referrerId !== "" && referrerId !== user.id) {
                         console.log("🛠️ Registrando referido atrasado:", referrerId);
-                        await supabase.rpc('register_new_user', {
+                        
+                        // 🚨 Ajuste para atrapar la respuesta de la BD
+                        const { data: rpcData, error: rpcError } = await supabase.rpc('register_new_user', {
                             p_user_id: user.id,
                             p_username: username,
                             p_referral_code_text: referrerId 
                         });
+
+                        // 🚨 DETECTOR 2: ¿Qué respondió la base de datos para este usuario atrasado?
+                        alert(`🕵️ DETECTOR BD (Atrasado):\n¿Encontró al padrino en la tabla?: ${rpcData?.referrer_found ? "SÍ ✅" : "NO ❌"}\nError interno: ${rpcError ? rpcError.message : "Ninguno"}`);
+
                         userData.score += 5000; // Le damos los 5K puntos localmente al instante
                     }
 
@@ -126,16 +137,16 @@ export default function App() {
                     });
 
                     // Si existe la fecha del bot
-                if (userData.bot_active_until) {
-                    // Reemplazar espacios por "T" y agregar "Z" para que Safari no se asuste
-                    const safeDateStr = String(userData.bot_active_until).replace(' ', 'T');
-                    const botExpiry = new Date(safeDateStr).getTime();
-    
-                    if (!isNaN(botExpiry)) { // Solo ejecutamos si Safari logró leerla bien
-                        const now = new Date().getTime();
-                        setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
-                    }
-                }   
+                    if (userData.bot_active_until) {
+                        // Reemplazar espacios por "T" y agregar "Z" para que Safari no se asuste
+                        const safeDateStr = String(userData.bot_active_until).replace(' ', 'T');
+                        const botExpiry = new Date(safeDateStr).getTime();
+        
+                        if (!isNaN(botExpiry)) { // Solo ejecutamos si Safari logró leerla bien
+                            const now = new Date().getTime();
+                            setBotTime(Math.max(0, Math.floor((botExpiry - now) / 1000)));
+                        }
+                    }   
                     
                     if (userData.overclock_active_until) {
                         const turboExpiry = new Date(userData.overclock_active_until).getTime();
@@ -171,11 +182,17 @@ export default function App() {
                 else {
                     console.log("🆕 Usuario Nuevo detectado. Start Param:", startParam);
                     
-                    const { error: insertError } = await supabase.rpc('register_new_user', {
+                    // 🚨 Ajuste para atrapar la respuesta de la BD
+                    const { data: rpcData, error: insertError } = await supabase.rpc('register_new_user', {
                         p_user_id: user.id,
                         p_username: username,
                         p_referral_code_text: referrerId 
                     });
+
+                    // 🚨 DETECTOR 3: ¿Qué respondió la base de datos para este usuario nuevo?
+                    if (referrerId !== "") {
+                        alert(`🕵️ DETECTOR BD (Nuevo):\n¿Encontró al padrino en la tabla?: ${rpcData?.referrer_found ? "SÍ ✅" : "NO ❌"}\nError interno: ${insertError ? insertError.message : "Ninguno"}`);
+                    }
                     
                     if (!insertError) {
                         // Verificamos si realmente traía un código para darle los 5000 iniciales
