@@ -75,10 +75,6 @@ export default function App() {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
-
-                // ☢️ ALERTA NUCLEAR: Esto saltará SÍ o SÍ. 
-                // Nos mostrará el paquete completo que envía Telegram.
-                alert("DATOS DE TELEGRAM: " + JSON.stringify(tg?.initDataUnsafe));
                 
                 // 🔥 EXTRACCIÓN BLINDADA Y SIN NULLS:
                 let startParam: string = tg?.initDataUnsafe?.start_param || "";
@@ -97,11 +93,6 @@ export default function App() {
                     referrerId = startParam.replace('ref_', ''); 
                 }
 
-                // 🚨 DETECTOR 1: ¿React logró atrapar la palabra clave del link?
-                if (referrerId !== "") {
-                    alert(`🕵️ DETECTOR 1:\nCódigo extraído del link:\n[${referrerId}]`);
-                }
-
                 // 🔥 AÑADIMOS 'referred_by' AL SELECT PARA SABER SI YA FUE INVITADO
                 const { data: userData } = await supabase
                     .from('user_score')
@@ -118,15 +109,11 @@ export default function App() {
                     if (!userData.referred_by && referrerId !== "" && referrerId !== user.id) {
                         console.log("🛠️ Registrando referido atrasado:", referrerId);
                         
-                        // 🚨 Ajuste para atrapar la respuesta de la BD
-                        const { data: rpcData, error: rpcError } = await supabase.rpc('register_new_user', {
+                        await supabase.rpc('register_new_user', {
                             p_user_id: user.id,
                             p_username: username,
                             p_referral_code_text: referrerId 
                         });
-
-                        // 🚨 DETECTOR 2: ¿Qué respondió la base de datos para este usuario atrasado?
-                        alert(`🕵️ DETECTOR BD (Atrasado):\n¿Encontró al padrino en la tabla?: ${rpcData?.referrer_found ? "SÍ ✅" : "NO ❌"}\nError interno: ${rpcError ? rpcError.message : "Ninguno"}`);
 
                         userData.score += 5000; // Le damos los 5K puntos localmente al instante
                     }
@@ -186,17 +173,11 @@ export default function App() {
                 else {
                     console.log("🆕 Usuario Nuevo detectado. Start Param:", startParam);
                     
-                    // 🚨 Ajuste para atrapar la respuesta de la BD
-                    const { data: rpcData, error: insertError } = await supabase.rpc('register_new_user', {
+                    const { error: insertError } = await supabase.rpc('register_new_user', {
                         p_user_id: user.id,
                         p_username: username,
                         p_referral_code_text: referrerId 
                     });
-
-                    // 🚨 DETECTOR 3: ¿Qué respondió la base de datos para este usuario nuevo?
-                    if (referrerId !== "") {
-                        alert(`🕵️ DETECTOR BD (Nuevo):\n¿Encontró al padrino en la tabla?: ${rpcData?.referrer_found ? "SÍ ✅" : "NO ❌"}\nError interno: ${insertError ? insertError.message : "Ninguno"}`);
-                    }
                     
                     if (!insertError) {
                         // Verificamos si realmente traía un código para darle los 5000 iniciales
