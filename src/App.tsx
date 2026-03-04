@@ -75,6 +75,10 @@ export default function App() {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const tg = (window as any).Telegram?.WebApp as TelegramWebApp;
                 const tgUser = tg?.initDataUnsafe?.user;
+
+                // ☢️ ALERTA NUCLEAR: Esto saltará SÍ o SÍ. 
+                // Nos mostrará el paquete completo que envía Telegram.
+                alert("DATOS DE TELEGRAM: " + JSON.stringify(tg?.initDataUnsafe));
                 
                 // 🔥 EXTRACCIÓN BLINDADA Y SIN NULLS:
                 let startParam: string = tg?.initDataUnsafe?.start_param || "";
