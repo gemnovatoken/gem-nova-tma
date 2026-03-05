@@ -8,6 +8,15 @@ import { useTonConnectUI } from '@tonconnect/ui-react';
 import { Zap, Gamepad2, Rocket, Bot, Video, Server, X, BatteryCharging, ShieldCheck, Clock } from 'lucide-react';
 import type { SetStateAction, Dispatch } from 'react';
 
+// 🔥 LA SOLUCIÓN: Le decimos a TypeScript oficialmente qué es Adsgram 🔥
+declare global {
+    interface Window {
+        Adsgram: {
+            init: (config: { blockId: string }) => { show: () => Promise<void> };
+        };
+    }
+}
+
 interface GameProps {
     score: number; setScore: Dispatch<SetStateAction<number>>;
     energy: number; setEnergy: Dispatch<SetStateAction<number>>;
@@ -58,7 +67,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const isEliteMode = globalLevel >= 6 && globalLevel < 8; 
     const isBasicMode = globalLevel < 6; 
 
-    // 🔥 Sincronización Segura y Transferencia al Balance 🔥
     const syncMiningData = useCallback(async () => {
         if (!user || claiming) return;
         
@@ -94,7 +102,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
     }, [user, syncMiningData]);
 
-    // Reducir el timer del bot visualmente cada segundo
     useEffect(() => {
         if (botTime > 0) {
             const timer = setInterval(() => {
@@ -116,7 +123,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         return `${m}m ${s}s`;
     };
 
-    // --- FUNCIÓN DE COBRO (CLAIM) ORIGINAL ---
     const handleClaim = useCallback(async () => {
         if (!user || energy < 1 || claiming) return;
         setClaiming(true);
@@ -167,7 +173,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 if (setOverclockTime) setOverclockTime(180); 
                 alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 3 minutes.\nUses today: ${data[0].new_count}/3`);
             
-                // 🔥 CÓDIGO FALTANTE: Registrar en el contador global de 20 🔥
                 const { data: adData } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
                 const adResult = adData as { rewarded: boolean; progress: number };
                 if (adResult && adResult.rewarded) {
@@ -237,25 +242,40 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
 
         setLoading(true);
-        const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
-        if (!error && data && data[0].success) {
-            setAdsWatched(data[0].new_count); 
-            const durationSeconds = hours * 3600;
-            setBotTime(prev => prev + durationSeconds);
-            await supabase.rpc('activate_bot', { user_id_in: user.id, duration_seconds: durationSeconds });
-            alert(`✅ Ad Verified! Bot active for ${hours} Hours.`);
-            setShowManager(false);
+        
+        try {
+            // 🔥 AHORA USAMOS WINDOW.ADSGRAM SIN EL "ANY" PORQUE YA ESTÁ REGISTRADO 🔥
+            const AdController = window.Adsgram.init({ blockId: "24363" });
+
+            await AdController.show();
+
+            const { data, error } = await supabase.rpc('watch_bot_ad', { user_id_in: user.id });
             
-            // 🔥 CÓDIGO FALTANTE: Registrar en el contador global de 20 🔥
-            const { data: adData } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
-            const adResult = adData as { rewarded: boolean; progress: number };
-            if (adResult && adResult.rewarded) {
-                window.dispatchEvent(new CustomEvent('addLuckyTickets', { detail: 1 }));
-                setTimeout(() => alert("🎉 AD MILESTONE REACHED!\n\nYou earned +1 LUCKY TICKET from watching ads!"), 500);
+            if (!error && data && data[0].success) {
+                setAdsWatched(data[0].new_count); 
+                const durationSeconds = hours * 3600;
+                setBotTime(prev => prev + durationSeconds);
+                await supabase.rpc('activate_bot', { user_id_in: user.id, duration_seconds: durationSeconds });
+                alert(`✅ Ad Verified! Bot active for ${hours} Hours.`);
+                setShowManager(false);
+                
+                const { data: adData } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
+                const adResult = adData as { rewarded: boolean; progress: number };
+                if (adResult && adResult.rewarded) {
+                    window.dispatchEvent(new CustomEvent('addLuckyTickets', { detail: 1 }));
+                    setTimeout(() => alert("🎉 AD MILESTONE REACHED!\n\nYou earned +1 LUCKY TICKET from watching ads!"), 500);
+                }
+
+            } else {
+                alert(error?.message || data?.[0]?.message || "Error saving reward to database.");
             }
 
-        } else alert(error?.message || data?.[0]?.message || "Error watching ad.");
-        setLoading(false);
+        } catch (error) {
+            console.log("Ad dismissed or failed to load", error);
+            alert("⚠️ You must watch the full video to activate the Bot!");
+        } finally {
+            setLoading(false); 
+        }
     };
 
     const radius = 100; 
@@ -267,7 +287,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
     const getBotColor = () => botTime > 0 ? "#4CAF50" : "#FF512F";
 
     return (
-        // 🔥 CORRECCIÓN AQUI: Cambié overflow: 'hidden' a overflowY: 'auto', añadí padding bottom extra, y la clase no-scrollbar
             <div className="no-scrollbar" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center', gap: '20px', height: 'calc(100dvh - 135px)', padding: '15px 0 100px 0', maxWidth: '500px', margin: '0 auto', position: 'relative', overflowY: 'auto', overflowX: 'hidden' }}>            
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', zIndex:10, width: '100%', position: 'relative' }}>
                 
