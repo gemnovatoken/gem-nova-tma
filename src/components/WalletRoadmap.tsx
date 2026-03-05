@@ -284,7 +284,6 @@ export const WalletRoadmap: React.FC = () => {
                         <div style={{fontSize:'22px', fontWeight:'900', color:'#fff', lineHeight:1.2}}>
                             {tonEarnings.toFixed(2)} <span style={{fontSize:'10px'}}>TON</span>
                         </div>
-                        <div style={{fontSize:'9px', color:'#666'}}>≈ ${(tonEarnings * 5.40).toFixed(2)}</div>
                     </div>
 
                     <div>
@@ -424,4 +423,4 @@ const InfoRow: React.FC<InfoRowProps> = ({ icon, title, desc }) => (
             <div style={{fontSize:'10px', color:'#aaa', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden'}}>{desc}</div>
         </div>
     </div>
-);
+); 
