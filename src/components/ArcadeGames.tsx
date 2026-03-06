@@ -15,22 +15,40 @@ interface GameProps {
     onFinish: (won: boolean, score: number) => void;
 }
 
-// Helper para registrar videos DENTRO del juego (Revivir/Tiempo Extra)
-const registerAdView = async (userId: string) => {
+// 🔥 FUNCIÓN MAESTRA DE VIDEO ACTUALIZADA CON ADSGRAM 🔥
+const registerAdView = async (userId: string): Promise<void> => {
     try {
-        console.log("🎬 Registering In-Game Ad View...");
+        console.log("🎬 Initiating In-Game Ad View...");
+        
+        // 1. Inicializamos Adsgram con el Block ID de Arcade
+        const AdController = window.Adsgram.init({ blockId: "24434" });
+
+        // 2. Mostramos el video y pausamos la ejecución
+        await AdController.show();
+
+        // 3. Si llega aquí, significa que vio el video completo. Ahora sí guardamos en la BD.
+        console.log("🎬 Ad finished successfully. Registering to database...");
         const { data, error } = await supabase.rpc('register_ad_view', { p_user_id: userId });
         
-        // Corrección de tipo
         const result = data as AdResponse;
 
-        if (!error && result?.rewarded) {
-            // Lógica interna si ganó ticket (opcional)
+        if (error) {
+            console.error("Database Error:", error);
+            throw new Error("Failed to save reward to database.");
+        }
+
+        if (result?.rewarded) {
+            // Se le suma progreso al usuario en su contador global (Lucky Tickets)
+            window.dispatchEvent(new CustomEvent('addLuckyTickets', { detail: 1 }));
+            // El juego lo detectará como exitoso y le dará la vida extra/tiempo extra
         }
     } catch (e) {
-        console.error("Ad Error:", e);
+        console.error("Ad Error / Dismissed:", e);
+        // Lanzamos el error hacia arriba para que el juego sepa que NO debe darle la segunda oportunidad
+        throw e; 
     }
 };
+// 🔥 FIN DE LA FUNCIÓN ACTUALIZADA 🔥
 
 // Estilo compartido
 const GameOverlay: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -79,7 +97,6 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
 
             if (newSelected.length === pattern.length) {
                 if (round >= 3) {
-                    // 🔥 Lógica de Victoria 🔥
                     if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
                     setTimeout(() => onFinish(true, 1500), 500);
                 } else {
@@ -93,14 +110,19 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
             if (!hasRevived && user) {
                 const wantRevive = window.confirm("🧠 MEMORY FAILED!\n\nWatch Ad to Retry this round?");
                 if (wantRevive) {
-                    await registerAdView(user.id);
-                    setHasRevived(true);
-                    setSelected([]);
-                    alert("🔁 Retrying Round...");
-                    return;
+                    try {
+                        // Intentamos ver el video
+                        await registerAdView(user.id);
+                        setHasRevived(true);
+                        setSelected([]);
+                        alert("🔁 Retrying Round...");
+                        return;
+                    } catch {
+                        // 🔥 ESLINT CORREGIDO: Borramos la palabra 'error' del catch 🔥
+                        alert("⚠️ You must watch the full video to retry!");
+                    }
                 }
             }
-            // 🔥 Lógica de Derrota 🔥
             if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
             onFinish(false, 0);
         }
@@ -158,14 +180,19 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
         if (!hasRevivedRef.current && user) {
             const wantMoreTime = window.confirm("⏳ TIME UP!\n\nWatch Ad for +10 seconds?");
             if (wantMoreTime) {
-                await registerAdView(user.id);
-                setHasRevived(true);
-                hasRevivedRef.current = true;
-                setTimeLeft(10);
-                return;
+                try {
+                    // Intentamos ver el video
+                    await registerAdView(user.id);
+                    setHasRevived(true);
+                    hasRevivedRef.current = true;
+                    setTimeLeft(10);
+                    return;
+                } catch {
+                    // 🔥 ESLINT CORREGIDO: Borramos la palabra 'error' del catch 🔥
+                    alert("⚠️ You must watch the full video to get more time!");
+                }
             }
         }
-        // 🔥 Lógica de Terminar Juego 🔥
         if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
         onFinish(true, scoreRef.current * 100);
     };
@@ -247,7 +274,6 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
     const handleLock = async () => {
         if (Math.abs(posRef.current - targetZone) < 10) {
             if (level >= 3) {
-                // 🔥 Lógica de Victoria 🔥
                 if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
                 onFinish(true, 1500);
             } else { 
@@ -260,14 +286,20 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                 cancelAnimationFrame(requestRef.current);
                 const wantRetry = window.confirm("🔐 BREACH DETECTED!\n\nWatch Ad to bypass security and retry level?");
                 if (wantRetry) {
-                    await registerAdView(user.id);
-                    setHasRevived(true);
-                    posRef.current = 0;
-                    alert("🛡️ SYSTEM BYPASSED. Retrying...");
-                    return;
+                    try {
+                        // Intentamos ver el video
+                        await registerAdView(user.id);
+                        setHasRevived(true);
+                        posRef.current = 0;
+                        alert("🛡️ SYSTEM BYPASSED. Retrying...");
+                        requestRef.current = requestAnimationFrame(() => {}); // Re-start animation logic indirectly
+                        return;
+                    } catch {
+                        // 🔥 ESLINT CORREGIDO: Borramos la palabra 'error' del catch 🔥
+                        alert("⚠️ You must watch the full video to retry!");
+                    }
                 }
             }
-            // 🔥 Lógica de Derrota 🔥
             if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
             onFinish(false, 0);
         }
