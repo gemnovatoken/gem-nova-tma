@@ -30,7 +30,6 @@ interface WheelWinner {
     status: string;
 }
 
-const SPIN_COST = 25000;
 const MAX_DAILY_SPINS = 2; 
 const MAX_AD_SPINS = 3;    
 const EXTRA_SPINS_PRICE_TON = 0.10; 
@@ -67,6 +66,42 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     
     const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
     const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
+
+    // 🔥 ESTADO Y LÓGICA DEL CRONÓMETRO DE DESCUENTO 🔥
+    const [timeLeftPromo, setTimeLeftPromo] = useState<string | null>(null);
+    const [SPIN_COST, setSpinCost] = useState(25000); // Empieza en 25k por defecto
+
+    useEffect(() => {
+        const calculatePromo = () => {
+            // Fechas en formato UTC estricto. "Z" al final significa UTC.
+            const PROMO_START = new Date('2026-03-06T13:00:00Z').getTime(); // Empieza MAÑANA (6 de Marzo) a la 1PM UTC
+            const PROMO_END = new Date('2026-03-11T13:00:00Z').getTime();   // Termina en 5 días (11 de Marzo) a la 1PM UTC
+            const NOW = new Date().getTime();
+
+            // Si estamos DENTRO de la ventana de promoción
+            if (NOW >= PROMO_START && NOW < PROMO_END) {
+                setSpinCost(20000); // 💥 Aplicamos el descuento
+                
+                const difference = PROMO_END - NOW;
+                const d = Math.floor(difference / (1000 * 60 * 60 * 24));
+                const h = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const m = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+                const s = Math.floor((difference % (1000 * 60)) / 1000);
+                
+                setTimeLeftPromo(`${d}d ${h}h ${m}m ${s}s`);
+            } else {
+                // Si la promo no ha empezado o ya terminó
+                setSpinCost(25000); 
+                setTimeLeftPromo(null);
+            }
+        };
+
+        calculatePromo(); // Calcular inmediatamente
+        const timer = setInterval(calculatePromo, 1000); // Actualizar cada segundo
+        
+        return () => clearInterval(timer);
+    }, []);
+    // 🔥 FIN DE LÓGICA DE CRONÓMETRO 🔥
 
     useEffect(() => {
         if (user) {
@@ -142,7 +177,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
     };
 
-    // 🔥 FUNCIÓN DE GIRO ACTUALIZADA CON ADSGRAM 🔥
     const executeSpin = async (spinType: 'premium' | 'daily' | 'ad') => {
         if (spinning || !user?.id) return;
 
@@ -159,13 +193,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 if(!confirmAd) return;
                 
                 try {
-                    // Llamamos al anuncio para la Ruleta
                     const AdController = window.Adsgram.init({ blockId: "24433" });
                     await AdController.show();
-                    // Si pasa de aquí, vio el video y puede girar.
                 } catch {
                     alert("⚠️ You must watch the full video to spin the wheel!");
-                    return; // Abortamos el giro si no vio el video
+                    return; 
                 }
             } else {
                 const confirmDaily = window.confirm(`🪙 DEDUCT ${SPIN_COST.toLocaleString()} POINTS?\n\nAre you feeling lucky?`);
@@ -253,8 +285,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     if (spinType === 'premium') {
                         alert(`🎉 VIP WIN! +${wonAmount.toLocaleString()} Pts added to balance!`);
                     } else {
+                        // 🎉 MODIFICACIÓN PARA QUE AHORA GANE PUNTOS SI EL COSTO ES 20K Y GANA 25K
                         if (wonAmount > SPIN_COST) {
-                            alert(`🎉 BIG WIN! +${wonAmount.toLocaleString()} Pts!`);
+                            const profit = wonAmount - SPIN_COST;
+                            alert(`🎉 BIG WIN! You profited +${profit.toLocaleString()} Pts!`);
                         } else if (wonAmount === SPIN_COST) {
                             alert(`⚖️ Phew! You got your ${wonAmount.toLocaleString()} points back.`);
                         } else {
@@ -280,7 +314,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             setSpinning(false);
         }
     };
-    // 🔥 FIN DE LA FUNCIÓN DE GIRO 🔥
 
     const handleSubmitWallet = async () => {
         if (!user || !wonTonPrize) return;
@@ -332,7 +365,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 const { data: scoreData } = await supabase.from('user_score').select('username').eq('user_id', user.id).single();
                 const exactUsername = scoreData?.username || "HiddenUser";
 
-                // 1. Asignar los giros VIP
                 const { error: vipError } = await supabase.rpc('buy_vip_tickets', { 
                     user_id_in: user.id, 
                     ton_amount: EXTRA_SPINS_PRICE_TON, 
@@ -341,14 +373,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 });
                 if (vipError) throw vipError;
 
-                // 2. 🔥 INYECCIÓN DE PUNTOS: Sumamos los 50k puntos prometidos
                 const { error: pointsError } = await supabase.rpc('increment_score', { 
                     p_user_id: user.id, 
                     p_amount: 50000 
                 });
                 if (pointsError) throw pointsError;
 
-                // 3. Actualización Visual
                 setPremiumSpins(prev => prev + 3);
                 onUpdateScore(prev => prev + 50000); 
 
@@ -483,6 +513,18 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             </div>
 
+            {/* 🔥 RECUADRO DEL RELOJ DE DESCUENTO (SOLO APARECE SI HAY TIEMPO) 🔥 */}
+            {timeLeftPromo && (
+                <div style={{
+                    background: 'rgba(255, 0, 85, 0.1)', border: '1px solid #FF0055', color: '#FF0055',
+                    padding: '8px 15px', borderRadius: '10px', fontWeight: 'bold', fontSize: '12px',
+                    marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px',
+                    boxShadow: '0 0 10px rgba(255, 0, 85, 0.3)', animation: 'pulse-dot 2s infinite'
+                }}>
+                    <Clock size={16} /> FLASH SALE ENDS IN: {timeLeftPromo}
+                </div>
+            )}
+
             <div style={{width: '85%', display: 'flex', flexDirection: 'column', gap: '10px'}}>
                 {renderMainButton()}
                 
@@ -579,7 +621,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             )}
 
-            <style>{`@keyframes spinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+            <style>{`
+                @keyframes spinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                @keyframes pulse-dot { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
+            `}</style>
         </div>
     );
 };
