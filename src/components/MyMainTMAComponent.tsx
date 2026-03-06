@@ -163,25 +163,45 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         }
     }, [botTime, energy, maxEnergy, handleClaim]);
 
+    // 🔥 ESTA ES LA FUNCIÓN ACTUALIZADA DEL OVERCLOCK CON ADSGRAM 🔥
     const watchVideo = useCallback(async (type: 'turbo') => {
         if (!user) return; 
         if (type === 'turbo') {
             if(!window.confirm("📺 Watch Ad to DOUBLE mining speed (3 mins)?")) return;
-            const { data, error } = await supabase.rpc('watch_overclock_ad', { user_id_in: user.id });
-            if (error) alert("Error: " + error.message);
-            else if (data && data[0].success) {
-                if (setOverclockTime) setOverclockTime(180); 
-                alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 3 minutes.\nUses today: ${data[0].new_count}/3`);
             
-                const { data: adData } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
-                const adResult = adData as { rewarded: boolean; progress: number };
-                if (adResult && adResult.rewarded) {
-                    window.dispatchEvent(new CustomEvent('addLuckyTickets', { detail: 1 }));
-                    setTimeout(() => alert("🎉 AD MILESTONE REACHED!\n\nYou earned +1 LUCKY TICKET from watching ads!"), 500);
+            try {
+                // 1. Inicializamos Adsgram con tu nuevo Block ID para Overclock
+                const AdController = window.Adsgram.init({ blockId: "24432" });
+
+                // 2. Mostramos el anuncio y pausamos el código
+                await AdController.show();
+
+                // 3. Si llega aquí, vio el video. ¡Damos la recompensa!
+                const { data, error } = await supabase.rpc('watch_overclock_ad', { user_id_in: user.id });
+                if (error) {
+                    alert("Error: " + error.message);
+                } else if (data && data[0].success) {
+                    if (setOverclockTime) setOverclockTime(180); 
+                    alert(`🚀 OVERCLOCK ACTIVATED!\nSpeed x2 for 3 minutes.\nUses today: ${data[0].new_count}/3`);
+                
+                    const { data: adData } = await supabase.rpc('register_ad_view', { p_user_id: user.id });
+                    const adResult = adData as { rewarded: boolean; progress: number };
+                    if (adResult && adResult.rewarded) {
+                        window.dispatchEvent(new CustomEvent('addLuckyTickets', { detail: 1 }));
+                        setTimeout(() => alert("🎉 AD MILESTONE REACHED!\n\nYou earned +1 LUCKY TICKET from watching ads!"), 500);
+                    }
+                } else {
+                    alert(data?.[0]?.message || "Limit reached");
                 }
-            } else alert(data?.[0]?.message || "Limit reached");
+
+            } catch (error) {
+                // 4. Si cierra el anuncio antes de tiempo, entra aquí y no le da nada
+                console.log("Ad dismissed or failed to load", error);
+                alert("⚠️ You must watch the full video to activate the Overclock!");
+            }
         } 
     }, [user, setOverclockTime]);
+    // 🔥 FIN DE LA FUNCIÓN ACTUALIZADA 🔥
 
     const buyBoost = useCallback(async (type: 'multitap' | 'limit' | 'speed') => {
         if (loading || !user) return; setLoading(true);
@@ -244,7 +264,6 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
         setLoading(true);
         
         try {
-            // 🔥 AHORA USAMOS WINDOW.ADSGRAM SIN EL "ANY" PORQUE YA ESTÁ REGISTRADO 🔥
             const AdController = window.Adsgram.init({ blockId: "24363" });
 
             await AdController.show();
