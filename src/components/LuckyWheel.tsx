@@ -9,6 +9,15 @@ import type { Dispatch, SetStateAction } from 'react';
 // Si no, el código abajo tiene un try/catch para que no falle.
 import confetti from 'canvas-confetti'; 
 
+// 🔥 REGISTRAMOS ADSGRAM EN TYPESCRIPT PARA LA RULETA 🔥
+declare global {
+    interface Window {
+        Adsgram: {
+            init: (config: { blockId: string }) => { show: () => Promise<void> };
+        };
+    }
+}
+
 interface LuckyWheelProps {
     onClose: () => void;
     score: number; 
@@ -133,6 +142,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
     };
 
+    // 🔥 FUNCIÓN DE GIRO ACTUALIZADA CON ADSGRAM 🔥
     const executeSpin = async (spinType: 'premium' | 'daily' | 'ad') => {
         if (spinning || !user?.id) return;
 
@@ -148,7 +158,15 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 const confirmAd = window.confirm(`📺 WATCH AD TO UNLOCK SPIN?\n\nThis will still cost you ${SPIN_COST.toLocaleString()} points.`);
                 if(!confirmAd) return;
                 
-                await new Promise(r => setTimeout(r, 2000));
+                try {
+                    // Llamamos al anuncio para la Ruleta
+                    const AdController = window.Adsgram.init({ blockId: "24433" });
+                    await AdController.show();
+                    // Si pasa de aquí, vio el video y puede girar.
+                } catch {
+                    alert("⚠️ You must watch the full video to spin the wheel!");
+                    return; // Abortamos el giro si no vio el video
+                }
             } else {
                 const confirmDaily = window.confirm(`🪙 DEDUCT ${SPIN_COST.toLocaleString()} POINTS?\n\nAre you feeling lucky?`);
                 if(!confirmDaily) return;
@@ -262,6 +280,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             setSpinning(false);
         }
     };
+    // 🔥 FIN DE LA FUNCIÓN DE GIRO 🔥
 
     const handleSubmitWallet = async () => {
         if (!user || !wonTonPrize) return;
@@ -292,7 +311,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         setIsSubmittingWallet(false);
     };
 
-    // 🔥 LA MAGIA OCURRE AQUÍ: CAMBIO LEGAL Y DE ECONOMÍA 🔥
     const handleBuyMoreSpins = async () => {
         if (!user) return; 
         if (!tonConnectUI.account) {
@@ -338,7 +356,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 try { 
                     confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } }); 
                 } catch {
-                    // Silenciamos el error si no carga confetti
                     console.log("Confetti animation skipped");
                 }
             }
