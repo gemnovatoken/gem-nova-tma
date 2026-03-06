@@ -7,6 +7,15 @@ import { MillionPath } from './MillionPath';
 // 🔥 IMPORTAMOS EL NUEVO COMPONENTE
 import { DailyBounties } from './DailyBounties'; 
 
+// 🔥 REGISTRAMOS ADSGRAM EN TYPESCRIPT PARA ESTE ARCHIVO TAMBIÉN 🔥
+declare global {
+    interface Window {
+        Adsgram: {
+            init: (config: { blockId: string }) => { show: () => Promise<void> };
+        };
+    }
+}
+
 interface TransactionResponse {
     success: boolean;
     new_coins?: number;
@@ -85,23 +94,37 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
         }
     };
 
+    // 🔥 FUNCIÓN ACTUALIZADA: COBRAR 3 COINS CON VIDEO ADSGRAM 🔥
     const handleWatchAdForCoins = async () => {
         if (!user || loadingAd) return;
 
-        if(window.confirm("📺 WATCH AD for +2 COINS?\n\n(Bonus: This ad counts towards your Lucky Ticket!)")) {
+        if(window.confirm("📺 WATCH AD for +3 COINS?\n\n(Bonus: This ad counts towards your Lucky Ticket!)")) {
             setLoadingAd(true);
-            await new Promise(r => setTimeout(r, 2000));
+            
+            try {
+                // 1. Iniciamos el reproductor con tu Block ID de Arcade
+                const AdController = window.Adsgram.init({ blockId: "24434" });
 
-            const { data, error } = await supabase.rpc('refill_arcade_coins_with_ad', { p_user_id: user.id });
-            const result = data as TransactionResponse;
+                // 2. Mostramos el video y esperamos a que termine
+                await AdController.show();
 
-            if (!error && result.success) {
-                setCoins(result.new_coins || 0);
-                alert("✅ +2 COINS ADDED!\n🎟️ Lucky Ticket progress updated!");
-            } else {
-                alert("Error watching ad.");
+                // 3. Si llega aquí es porque el usuario vio el video completo
+                const { data, error } = await supabase.rpc('refill_arcade_coins_with_ad', { p_user_id: user.id });
+                const result = data as TransactionResponse;
+
+                if (!error && result.success) {
+                    setCoins(result.new_coins || 0);
+                    alert("✅ +3 COINS ADDED!\n🎟️ Lucky Ticket progress updated!");
+                } else {
+                    alert("Error saving coins to your account.");
+                }
+            } catch {
+                // 4. Si el usuario cierra el video antes de tiempo
+                console.log("Ad dismissed");
+                alert("⚠️ You must watch the full video to get the coins!");
+            } finally {
+                setLoadingAd(false);
             }
-            setLoadingAd(false);
         }
     };
 
