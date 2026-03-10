@@ -176,7 +176,7 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
         if (won && user) {
             await supabase.rpc('increment_score', { p_user_id: user.id, p_amount: score });
             setGlobalScore(prev => prev + score);
-            alert(`🏆 VICTORIA! Ganaste +${score} Puntos`);
+            alert(`🏆 MISSION ACCOMPLISHED! You earned +${score} Pts`);
         }
         loadData();
     };
