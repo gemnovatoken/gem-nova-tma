@@ -75,7 +75,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         const calculatePromo = () => {
             // Fechas en formato UTC estricto. "Z" al final significa UTC.
             const PROMO_START = new Date('2026-03-06T13:00:00Z').getTime(); // Empieza MAÑANA (6 de Marzo) a la 1PM UTC
-            const PROMO_END = new Date('2026-03-11T13:00:00Z').getTime();   // Termina en 5 días (11 de Marzo) a la 1PM UTC
+            const PROMO_END = new Date('2026-03-31T23:59:59Z').getTime();   // Termina a fin de mes (31 de Marzo) a las 23:59 UTC
             const NOW = new Date().getTime();
 
             // Si estamos DENTRO de la ventana de promoción
