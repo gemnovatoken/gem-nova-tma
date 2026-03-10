@@ -98,7 +98,8 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
             if (newSelected.length === pattern.length) {
                 if (round >= 3) {
                     if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
-                    setTimeout(() => onFinish(true, 1500), 500);
+                    // 🔥 HACK 3X: 1500 -> 4500 🔥
+                    setTimeout(() => onFinish(true, 4500), 500);
                 } else {
                     setTimeout(() => {
                         setRound(r => r + 1);
@@ -118,7 +119,6 @@ export const MemoryGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                         alert("🔁 Retrying Round...");
                         return;
                     } catch {
-                        // 🔥 ESLINT CORREGIDO: Borramos la palabra 'error' del catch 🔥
                         alert("⚠️ You must watch the full video to retry!");
                     }
                 }
@@ -188,13 +188,13 @@ export const AsteroidGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                     setTimeLeft(10);
                     return;
                 } catch {
-                    // 🔥 ESLINT CORREGIDO: Borramos la palabra 'error' del catch 🔥
                     alert("⚠️ You must watch the full video to get more time!");
                 }
             }
         }
         if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
-        onFinish(true, scoreRef.current * 100);
+        // 🔥 HACK 3X: Multiplica el score final por 3 🔥
+        onFinish(true, (scoreRef.current * 100) * 3);
     };
 
     useEffect(() => {
@@ -275,7 +275,8 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
         if (Math.abs(posRef.current - targetZone) < 10) {
             if (level >= 3) {
                 if (user) await supabase.rpc('record_arcade_game', { p_user_id: user.id });
-                onFinish(true, 1500);
+                // 🔥 HACK 3X: 1500 -> 4500 🔥
+                onFinish(true, 4500);
             } else { 
                 setLevel(l => l + 1); 
                 setTargetZone(Math.random() * 80 + 10); 
@@ -295,7 +296,6 @@ export const HackerGame: React.FC<GameProps> = ({ onClose, onFinish }) => {
                         requestRef.current = requestAnimationFrame(() => {}); // Re-start animation logic indirectly
                         return;
                     } catch {
-                        // 🔥 ESLINT CORREGIDO: Borramos la palabra 'error' del catch 🔥
                         alert("⚠️ You must watch the full video to retry!");
                     }
                 }
