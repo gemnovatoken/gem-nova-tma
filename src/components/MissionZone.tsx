@@ -26,6 +26,8 @@ interface GameCardProps {
     title: string;
     desc: string;
     reward: string | number;
+    oldReward?: string | number; // 🔥 NUEVO: Precio original para tachar
+    timeLeft?: string;           // 🔥 NUEVO: Tiempo restante del reloj
     icon: React.ReactNode;
     color: string;
     onPlay: () => void;
@@ -47,6 +49,31 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
     // Modales
     const [showPathModal, setShowPathModal] = useState(false);
     const [showBountiesModal, setShowBountiesModal] = useState(false); 
+
+    // 🔥 NUEVO: ESTADO DEL RELOJ DEL EVENTO 3X 🔥
+    const [timeLeft, setTimeLeft] = useState<string>('');
+
+    useEffect(() => {
+        // 🔥 EL EVENTO TERMINA EL 31 DE MARZO DE 2026 A LAS 23:59 UTC 🔥
+        const eventEnd = new Date('2026-03-31T23:59:59Z').getTime(); 
+        
+        const timer = setInterval(() => {
+            const now = new Date().getTime();
+            const difference = eventEnd - now;
+            
+            if (difference <= 0) {
+                setTimeLeft('ENDED');
+                clearInterval(timer);
+            } else {
+                const d = Math.floor(difference / (1000 * 60 * 60 * 24));
+                const h = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const m = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+                setTimeLeft(`${d}d ${h}h ${m}m`);
+            }
+        }, 1000);
+        
+        return () => clearInterval(timer);
+    }, []);
 
     const loadData = useCallback(async () => {
         if(!user) return;
@@ -347,30 +374,47 @@ export const MissionZone: React.FC<MissionZoneProps> = ({ setGlobalScore }) => {
                 </div>
             </div>
             
+            {/* 🔥 TARJETAS DE LOS JUEGOS MODIFICADAS CON 3X 🔥 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <GameCard title="Quantum Memory" desc="Pattern recognition" reward="1,500" icon={<Brain color="#E040FB" size={20}/>} color="#E040FB" onPlay={() => handlePlayGame('memory')} />
-                <GameCard title="Asteroid Field" desc="Reflex challenge" reward="~1,500" icon={<Shield color="#FF512F" size={20}/>} color="#FF512F" onPlay={() => handlePlayGame('asteroid')} />
-                <GameCard title="System Hacker" desc="Timing precision" reward="1,500" icon={<Rocket color="#00F2FE" size={20}/>} color="#00F2FE" onPlay={() => handlePlayGame('hacker')} />
+                <GameCard title="Quantum Memory" desc="Pattern recognition" oldReward="1,500" reward="4,500" timeLeft={timeLeft} icon={<Brain color="#E040FB" size={20}/>} color="#E040FB" onPlay={() => handlePlayGame('memory')} />
+                <GameCard title="Asteroid Field" desc="Reflex challenge" oldReward="~1,500" reward="~4,500" timeLeft={timeLeft} icon={<Shield color="#FF512F" size={20}/>} color="#FF512F" onPlay={() => handlePlayGame('asteroid')} />
+                <GameCard title="System Hacker" desc="Timing precision" oldReward="1,500" reward="4,500" timeLeft={timeLeft} icon={<Rocket color="#00F2FE" size={20}/>} color="#00F2FE" onPlay={() => handlePlayGame('hacker')} />
             </div>
 
+            {/* 🔥 ANIMACIÓN PULSE AÑADIDA AQUÍ 🔥 */}
             <style>{`
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                @keyframes pulse-fast { 
+                    0% { opacity: 1; } 
+                    50% { opacity: 0.5; background: rgba(255, 0, 85, 0.5); } 
+                    100% { opacity: 1; } 
+                }
             `}</style>
         </div>
     );
 };
 
-const GameCard: React.FC<GameCardProps> = ({ title, desc, reward, icon, color, onPlay }) => (
+// 🔥 COMPONENTE GAMECARD ACTUALIZADO PARA SOPORTAR EL DISEÑO TACHADO Y RELOJ 🔥
+const GameCard: React.FC<GameCardProps> = ({ title, desc, reward, oldReward, timeLeft, icon, color, onPlay }) => (
     <div className="glass-card" style={{ 
+        position: 'relative', overflow: 'hidden', 
         display:'flex', alignItems:'center', justifyContent:'space-between', padding:'15px', 
-        borderLeft:`4px solid ${color}`, transition: 'transform 0.1s', cursor:'pointer'
+        borderLeft:`4px solid ${color}`, transition: 'transform 0.1s', cursor:'pointer',
+        marginBottom: '5px'
     }}
     onClick={onPlay}
     onMouseDown={e => e.currentTarget.style.transform = 'scale(0.98)'}
     onMouseUp={e => e.currentTarget.style.transform = 'scale(1)'}
     >
-        <div style={{ display:'flex', alignItems:'center', gap:'15px' }}>
+        {/* 🔥 EL BANNER DEL RELOJ 🔥 */}
+        {timeLeft && timeLeft !== 'ENDED' && (
+            <div style={{ position: 'absolute', top: 0, right: 0, background: 'rgba(255, 0, 85, 0.2)', color: '#FF0055', padding: '3px 10px', fontSize: '9px', fontWeight: '900', borderBottomLeftRadius: '8px', border: '1px solid #FF0055', animation: 'pulse-fast 1.5s infinite', zIndex: 10 }}>
+                ⚡ 3X EVENT: {timeLeft}
+            </div>
+        )}
+
+        <div style={{ display:'flex', alignItems:'center', gap:'15px', marginTop: timeLeft ? '8px' : '0' }}>
             <div style={{ background:`rgba(${parseInt(color.slice(1,3),16)}, ${parseInt(color.slice(3,5),16)}, ${parseInt(color.slice(5,7),16)}, 0.1)`, padding:'12px', borderRadius:'12px' }}>
                 {icon}
             </div>
@@ -379,8 +423,18 @@ const GameCard: React.FC<GameCardProps> = ({ title, desc, reward, icon, color, o
                 <div style={{ fontSize:'11px', color:'#aaa' }}>{desc}</div>
             </div>
         </div>
-        <div style={{ textAlign:'right' }}>
-            <div style={{ fontSize:'14px', color:color, fontWeight:'900' }}>+{reward}</div>
+        <div style={{ textAlign:'right', marginTop: timeLeft ? '8px' : '0', zIndex: 2, position: 'relative' }}>
+            
+            {/* 🔥 EL PRECIO TACHADO 🔥 */}
+            {oldReward && timeLeft !== 'ENDED' && (
+                <div style={{ textDecoration: 'line-through', color: '#666', fontSize: '10px', marginBottom: '-2px', fontWeight: 'bold' }}>
+                    {oldReward}
+                </div>
+            )}
+            
+            <div style={{ fontSize:'14px', color:color, fontWeight:'900', textShadow: oldReward ? `0 0 10px ${color}80` : 'none' }}>
+                +{reward}
+            </div>
             <div style={{ fontSize:'9px', color:'#555', marginTop:'2px' }}>REWARD</div>
             <div style={{display:'none'}}><Play /></div> 
         </div>
