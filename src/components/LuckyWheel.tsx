@@ -31,7 +31,7 @@ interface WheelWinner {
 }
 
 const MAX_DAILY_SPINS = 2; 
-const MAX_AD_SPINS = Infinity;   ///ESTO SE CAMBIO TEMPORALMENTE//// 
+const MAX_AD_SPINS = 10;   ///ESTO SE CAMBIO TEMPORALMENTE//// 
 const EXTRA_SPINS_PRICE_TON = 0.10; 
 
 const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
