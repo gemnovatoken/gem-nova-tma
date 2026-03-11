@@ -67,41 +67,72 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
     const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
 
-    // 🔥 ESTADO Y LÓGICA DEL CRONÓMETRO DE DESCUENTO 🔥
+    // 🔥 ESTADO Y LÓGICA DEL CRONÓMETRO ESCALONADO (TIERS) 🔥
     const [timeLeftPromo, setTimeLeftPromo] = useState<string | null>(null);
-    const [SPIN_COST, setSpinCost] = useState(25000); // Empieza en 25k por defecto
+    const [SPIN_COST, setSpinCost] = useState(25000); 
 
     useEffect(() => {
         const calculatePromo = () => {
-            // Fechas en formato UTC estricto. "Z" al final significa UTC.
-            const PROMO_START = new Date('2026-03-06T13:00:00Z').getTime(); // Empieza MAÑANA (6 de Marzo) a la 1PM UTC
-            const PROMO_END = new Date('2026-03-31T23:59:59Z').getTime();   // Termina a fin de mes (31 de Marzo) a las 23:59 UTC
+            // 🔥 FECHA CERO: Puedes ajustar esta fecha a tu gusto.
+            // Actualmente está puesta para que hoy comience el Tier de 10k.
+            const START_PHASE_1 = new Date('2026-03-11T00:00:00Z').getTime(); 
+            
+            // Calculamos automáticamente los bloques de 10 días
+            const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000;
+            const START_PHASE_2 = START_PHASE_1 + TEN_DAYS_MS; // Día 10 al 20 (15k)
+            const START_PHASE_3 = START_PHASE_2 + TEN_DAYS_MS; // Día 20 al 30 (20k)
+            const NORMAL_PRICE_DATE = START_PHASE_3 + TEN_DAYS_MS; // Día 30+ (25k normal)
+            
             const NOW = new Date().getTime();
 
-            // Si estamos DENTRO de la ventana de promoción
-            if (NOW >= PROMO_START && NOW < PROMO_END) {
-                setSpinCost(20000); // 💥 Aplicamos el descuento
-                
-                const difference = PROMO_END - NOW;
+            let currentCost = 25000;
+            let nextDeadline = null;
+            let phaseName = "";
+
+            // Lógica de escalada automática
+            if (NOW < START_PHASE_1) {
+                currentCost = 20000; // Precio si entran ANTES de que empiece la fase 1
+                nextDeadline = START_PHASE_1;
+                phaseName = "CURRENT PROMO";
+            } else if (NOW >= START_PHASE_1 && NOW < START_PHASE_2) {
+                currentCost = 10000;
+                nextDeadline = START_PHASE_2;
+                phaseName = "TIER 1 (10K PTS)";
+            } else if (NOW >= START_PHASE_2 && NOW < START_PHASE_3) {
+                currentCost = 15000;
+                nextDeadline = START_PHASE_3;
+                phaseName = "TIER 2 (15K PTS)";
+            } else if (NOW >= START_PHASE_3 && NOW < NORMAL_PRICE_DATE) {
+                currentCost = 20000;
+                nextDeadline = NORMAL_PRICE_DATE;
+                phaseName = "FINAL TIER (20K PTS)";
+            } else {
+                currentCost = 25000; // Vuelve a la normalidad
+                nextDeadline = null; 
+            }
+
+            setSpinCost(currentCost);
+
+            // Actualización del reloj visual
+            if (nextDeadline) {
+                const difference = nextDeadline - NOW;
                 const d = Math.floor(difference / (1000 * 60 * 60 * 24));
                 const h = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                 const m = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
                 const s = Math.floor((difference % (1000 * 60)) / 1000);
                 
-                setTimeLeftPromo(`${d}d ${h}h ${m}m ${s}s`);
+                setTimeLeftPromo(`${phaseName} ENDS IN: ${d}d ${h}h ${m}m ${s}s`);
             } else {
-                // Si la promo no ha empezado o ya terminó
-                setSpinCost(25000); 
                 setTimeLeftPromo(null);
             }
         };
 
-        calculatePromo(); // Calcular inmediatamente
-        const timer = setInterval(calculatePromo, 1000); // Actualizar cada segundo
+        calculatePromo(); 
+        const timer = setInterval(calculatePromo, 1000); 
         
         return () => clearInterval(timer);
     }, []);
-    // 🔥 FIN DE LÓGICA DE CRONÓMETRO 🔥
+    // 🔥 FIN DE LÓGICA DE CRONÓMETRO ESCALONADO 🔥
 
     useEffect(() => {
         if (user) {
@@ -285,7 +316,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     if (spinType === 'premium') {
                         alert(`🎉 VIP WIN! +${wonAmount.toLocaleString()} Pts added to balance!`);
                     } else {
-                        // 🎉 MODIFICACIÓN PARA QUE AHORA GANE PUNTOS SI EL COSTO ES 20K Y GANA 25K
                         if (wonAmount > SPIN_COST) {
                             const profit = wonAmount - SPIN_COST;
                             alert(`🎉 BIG WIN! You profited +${profit.toLocaleString()} Pts!`);
@@ -521,7 +551,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px',
                     boxShadow: '0 0 10px rgba(255, 0, 85, 0.3)', animation: 'pulse-dot 2s infinite'
                 }}>
-                    <Clock size={16} /> FLASH SALE ENDS IN: {timeLeftPromo}
+                    <Clock size={16} /> {timeLeftPromo}
                 </div>
             )}
 
