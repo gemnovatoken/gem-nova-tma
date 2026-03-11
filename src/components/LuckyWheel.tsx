@@ -75,7 +75,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         const calculatePromo = () => {
             // 🔥 FECHA CERO: Puedes ajustar esta fecha a tu gusto.
             // Actualmente está puesta para que hoy comience el Tier de 10k.
-            const START_PHASE_1 = new Date('2026-03-11T00:00:00Z').getTime(); 
+            const START_PHASE_1 = new Date('2026-03-11T07:00:00Z').getTime(); 
             
             // Calculamos automáticamente los bloques de 10 días
             const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000;
