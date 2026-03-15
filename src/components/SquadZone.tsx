@@ -5,7 +5,9 @@ import { useAuth } from '../hooks/useAuth';
 import { LotteryModal } from './GemLottery'; 
 // 🔥 IMPORTAMOS EL MERCADO NEGRO 🔥
 import { SwapTerminal } from './SwapTerminal';
-import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Calendar, Tv, Trophy, Lock, RefreshCcw } from 'lucide-react';
+// 🔥 IMPORTAMOS EL NUEVO MODAL DE AGENTES 🔥
+import { AgentListModal } from './AgentListModal';
+import { Copy, Share2, Gift, Crown, Percent, CheckCircle2, X, ChevronRight, Zap, Users, DollarSign, Ticket, Calendar, Tv, Trophy, RefreshCcw } from 'lucide-react';
 
 // --- INTERFACES ---
 interface RewardCardProps {
@@ -21,14 +23,6 @@ interface MilestoneRowProps {
     reward: string;
     done: boolean;
     isBig?: boolean;
-}
-
-interface ReferralUser {
-    user_id: string;
-    username: string;
-    limit_level: number;
-    bonus_claimed_initial: boolean;
-    bonus_claimed_lvl4: boolean;
 }
 
 interface UserScoreData {
@@ -137,25 +131,21 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     };
 
     // Lógica visual para la barra de 7 días
-    // Calculamos qué día del ciclo (1 al 7) toca mostrar
     const currentCycleDay = streak % 7; 
-    // Si hoy ya reclamé, la barra de hoy debe estar llena. Si no, llena hasta ayer.
     const activeBars = checkedInToday ? (currentCycleDay === 0 ? 7 : currentCycleDay) : currentCycleDay;
-    
-    // Detectar si el siguiente botón es el premio gordo (Día 7)
     const isDay7Upcoming = (streak + 1) % 7 === 0;
 
     return (
         <div style={{ marginBottom: '20px' }}>
             {/* Modal de Lotería */}
             {showLottery && (
-    <LotteryModal 
-        onClose={() => setShowLottery(false)} 
-        luckyTickets={luckyTickets} 
-        setLuckyTickets={setLuckyTickets}
-        onUpdateScore={(amountToSubtract) => setGlobalScore(prev => prev - amountToSubtract)} 
-    />
-        )}
+                <LotteryModal 
+                    onClose={() => setShowLottery(false)} 
+                    luckyTickets={luckyTickets} 
+                    setLuckyTickets={setLuckyTickets}
+                    onUpdateScore={(amountToSubtract) => setGlobalScore(prev => prev - amountToSubtract)} 
+                />
+            )}
 
             {/* ENCABEZADO: TOTAL TICKETS + BOTÓN DE LOTERÍA */}
             <div className="cyber-card" style={{ 
@@ -188,8 +178,7 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
 
             {/* SECCIÓN DE MISIONES */}
             <div style={{ display: 'flex', gap: '10px' }}>
-                
-                {/* 1. AD MILESTONE (Totalmente visual, sin botón funcional) */}
+                {/* 1. AD MILESTONE */}
                 <div className="glass-card" style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.03)', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <div style={{ background: '#FF512F', padding: '6px', borderRadius: '6px' }}><Tv size={14} color="#fff" /></div>
@@ -207,7 +196,6 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                             <div style={{ width: `${(videoProgress / 20) * 100}%`, height: '100%', background: '#00F2FE', borderRadius: '2px', transition: 'width 0.3s' }}></div>
                         </div>
                     </div>
-                    {/* 🔥 CAMBIO REALIZADO AQUÍ: Botón convertido en Div decorativo */}
                     <div 
                         className="btn-cyber" 
                         style={{ 
@@ -219,7 +207,7 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                     </div>
                 </div>
 
-                {/* 2. DAILY STREAK (AHORA SINCRONIZADO) */}
+                {/* 2. DAILY STREAK */}
                 <div className="glass-card" style={{ flex: 1, padding: '10px', background: 'rgba(255,255,255,0.03)', display:'flex', flexDirection:'column', justifyContent:'space-between', border: isDay7Upcoming && !checkedInToday ? '1px solid #FFD700' : '1px solid #333' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <div style={{ background: '#4CAF50', padding: '6px', borderRadius: '6px' }}><Calendar size={14} color="#fff" /></div>
@@ -229,7 +217,6 @@ const TicketEmpire: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                         </div>
                     </div>
                     
-                    {/* Visualización de 7 días */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                         {[1, 2, 3, 4, 5, 6, 7].map(day => {
                             const isActive = day <= activeBars;
@@ -273,19 +260,13 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     const [showMilestones, setShowMilestones] = useState(false);
     const [tonEarnings, setTonEarnings] = useState(0);
     const [showReferralList, setShowReferralList] = useState(false);
-    const [referralList, setReferralList] = useState<ReferralUser[]>([]);
-    const [loadingList, setLoadingList] = useState(false);
     const [referralCode, setReferralCode] = useState<string | null>(null);
 
-    // 🔥 ESTADO PARA CONTROLAR EL MODAL DEL MERCADO NEGRO 🔥
     const [showBlackMarket, setShowBlackMarket] = useState(false);
 
     const pointsQueue = useRef(0);
     const BOT_USERNAME = "Gnovatoken_bot"; 
 
-    // 🔥 MODIFICAMOS EL LINK: Usamos el código si existe, si no, el ID
-    // ✅ EL LINK NUEVO (Abre la app directo e inyecta el código)
-// SUSTITUYE "app" POR EL SHORT NAME DE TU MINI APP EN BOTFATHER
     const inviteLink = user 
         ? `https://t.me/${BOT_USERNAME}/app?startapp=${referralCode || user.id}` 
         : "Loading...";
@@ -323,13 +304,10 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 const { data: count, error: rpcError } = await supabase.rpc('get_my_referrals', { my_id: user.id });
                 if (!rpcError) setReferrals(Number(count) || 0);
 
-                // 3. 🔥 OBTENER O CREAR CÓDIGO DE REFERIDO BONITO 🔥
+                // 3. Obtener Código de Referido
                 const { data: codeData } = await supabase.rpc('get_or_create_referral_code', { p_user_id: user.id });
                 // "@ts-expect-error"
-                if (codeData && codeData.code) {
-                    // "@ts-expect-error"
-                    setReferralCode(codeData.code);
-                }
+                if (codeData && codeData.code) setReferralCode(codeData.code);
 
             } catch (e) { console.error("Error crítico:", e); }
         };
@@ -338,7 +316,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         return () => clearInterval(interval);
     }, [user]);
 
-    // 🔥 LÓGICA NUEVA: ENTREGAR TICKETS RETROACTIVOS Y NUEVOS POR REFERIDO 🔥
+    // Sincronización de Tickets Retroactivos
     useEffect(() => {
         if (!user || referrals === 0) return;
         
@@ -346,11 +324,9 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
             const storedKey = `retro_tickets_synced_${user.id}`;
             const syncedCount = Number(localStorage.getItem(storedKey) || 0);
             
-            // Si tiene más referidos que los tickets que ya hemos procesado
             if (referrals > syncedCount) {
                 const ticketsToAdd = referrals - syncedCount;
                 
-                // Traemos sus tickets actuales de la BD para sumarle los nuevos
                 const { data, error } = await supabase
                     .from('user_score')
                     .select('lucky_tickets')
@@ -360,16 +336,13 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 if (!error && data) {
                     const newTotal = (data.lucky_tickets || 0) + ticketsToAdd;
                     
-                    // Guardamos el nuevo total en Supabase
                     const { error: updateError } = await supabase
                         .from('user_score')
                         .update({ lucky_tickets: newTotal })
                         .eq('user_id', user.id);
                         
                     if (!updateError) {
-                        // Marcamos localmente que ya le dimos estos tickets
                         localStorage.setItem(storedKey, String(referrals));
-                        // Disparamos el evento para que TicketEmpire se actualice visualmente al instante
                         window.dispatchEvent(new CustomEvent('addLuckyTickets', { detail: ticketsToAdd }));
                     }
                 }
@@ -378,42 +351,6 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
         
         syncReferralTickets();
     }, [user, referrals]);
-    // ==========================================
-
-    const fetchReferralList = async () => {
-        if(!user) return;
-        if (referralList.length === 0) setLoadingList(true);
-        const { data, error } = await supabase.rpc('get_my_referrals_list', { my_id: user.id });
-        if(error) console.error("Error loading list:", error);
-        else setReferralList(data as ReferralUser[]);
-        setLoadingList(false);
-    };
-
-    const handleOpenAgents = () => {
-        setShowReferralList(true);
-        fetchReferralList();
-    };
-
-    const handleClaimReward = async (targetId: string, type: 'initial' | 'lvl4') => {
-        if(!user) return;
-        setReferralList(prev => prev.map(u => {
-            if(u.user_id === targetId) {
-                return { ...u, bonus_claimed_initial: type === 'initial' ? true : u.bonus_claimed_initial, bonus_claimed_lvl4: type === 'lvl4' ? true : u.bonus_claimed_lvl4 };
-            }
-            return u;
-        }
-        ));
-        const { data, error } = await supabase.rpc('claim_referral_reward', { referral_user_id: targetId, reward_type: type, my_id: user.id });
-        if(error || !data) {
-            alert("Error claiming reward.");
-            fetchReferralList();
-        } else {
-            const amount = type === 'initial' ? 2500 : 5000;
-            if (setGlobalScore) setGlobalScore((prev: number) => prev + amount);
-            if(window.navigator.vibrate) window.navigator.vibrate(200);
-            setTimeout(() => { fetchReferralList(); }, 1000);
-        }
-    };
 
     const handleCopy = () => {
         if (!user) return; 
@@ -424,12 +361,11 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
     return (
         <div style={{ position: 'relative', padding: '0 15px', paddingBottom: '100px', height: '100%', overflowY: 'auto' }}>
             
-            {/* TICKET EMPIRE CON EL NUEVO BOTÓN DE LOTERÍA */}
             <TicketEmpire setGlobalScore={setGlobalScore} />
 
             {/* SQUAD DASHBOARD */}
             <div className="glass-card" style={{ padding: '10px', marginBottom: '10px', background: 'rgba(0, 242, 254, 0.05)', border: '1px solid rgba(0, 242, 254, 0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{display:'flex', gap:'15px', cursor:'pointer'}} onClick={handleOpenAgents}>
+                <div style={{display:'flex', gap:'15px', cursor:'pointer'}} onClick={() => setShowReferralList(true)}>
                     <div style={{textAlign:'center'}}>
                         <div style={{fontSize:'18px', fontWeight:'900', color:'#fff'}}>{referrals}</div>
                         <div style={{fontSize:'8px', color:'#aaa', display:'flex', alignItems:'center', gap:'2px', justifyContent:'center'}}>
@@ -486,59 +422,13 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 <ChevronRight size={14} color="#aaa" />
             </button>
 
-            {/* MODAL 1: AGENTS LIST */}
-            {showReferralList && (
-                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6000, background: 'rgba(0,0,0,0.95)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px' }}>
-                    <div className="glass-card" style={{ width: '100%', maxHeight: '80vh', overflowY: 'auto', border: '1px solid #00F2FE', position: 'relative', padding:'15px' }}>
-                        <button onClick={() => setShowReferralList(false)} style={{ position: 'absolute', top: 15, right: 15, background: 'none', border: 'none', color: '#fff' }}><X /></button>
-                        <h3 style={{ textAlign: 'center', color: '#00F2FE', marginTop: 0, display:'flex', alignItems:'center', justifyContent:'center', gap:'10px' }}>
-                            <Users size={20}/> YOUR AGENTS
-                        </h3>
-
-                        {loadingList && referralList.length === 0 ? (
-                            <p style={{textAlign:'center', color:'#aaa'}}>Scanning blockchain...</p>
-                        ) : referralList.length === 0 ? (
-                            <div style={{textAlign:'center', padding:'20px', color:'#666'}}>
-                                <p>No active agents found.</p>
-                                <p style={{fontSize:'12px'}}>Invite friends to start building your squad!</p>
-                            </div>
-                        ) : (
-                            <div style={{marginTop:'15px'}}>
-                                <div style={{display:'grid', gridTemplateColumns:'0.5fr 2fr 1fr 1fr', fontSize:'10px', color:'#666', marginBottom:'10px', paddingBottom:'5px', borderBottom:'1px solid #333'}}>
-                                    <div>#</div>
-                                    <div>AGENT</div>
-                                    <div style={{textAlign:'center'}}>INIT</div>
-                                    <div style={{textAlign:'center'}}>LVL 4</div>
-                                </div>
-                                {referralList.map((refUser, index) => (
-                                    <div key={refUser.user_id} style={{display:'grid', gridTemplateColumns:'0.5fr 2fr 1fr 1fr', alignItems:'center', marginBottom:'10px', fontSize:'12px'}}>
-                                        <div style={{color:'#aaa'}}>{index + 1}</div>
-                                        <div>
-                                            <div style={{color:'#fff', fontWeight:'bold'}}>{refUser.username || 'Unknown'}</div>
-                                            <div style={{fontSize:'9px', color:'#00F2FE'}}>Lvl {refUser.limit_level}</div>
-                                        </div>
-                                        <div style={{textAlign:'center'}}>
-                                            {refUser.bonus_claimed_initial ? (
-                                                <CheckCircle2 size={16} color="#4CAF50" style={{margin:'0 auto'}}/>
-                                            ) : (
-                                                <button onClick={() => handleClaimReward(refUser.user_id, 'initial')} style={{background:'#4CAF50', border:'none', borderRadius:'4px', color:'#000', fontSize:'9px', fontWeight:'bold', padding:'4px', cursor:'pointer', width:'100%'}}>GET</button>
-                                            )}
-                                        </div>
-                                        <div style={{textAlign:'center'}}>
-                                            {refUser.bonus_claimed_lvl4 ? (
-                                                <CheckCircle2 size={16} color="#E040FB" style={{margin:'0 auto'}}/>
-                                            ) : refUser.limit_level >= 4 ? (
-                                                <button onClick={() => handleClaimReward(refUser.user_id, 'lvl4')} style={{background:'#E040FB', border:'none', borderRadius:'4px', color:'#fff', fontSize:'9px', fontWeight:'bold', padding:'4px', cursor:'pointer', width:'100%'}}>5K</button>
-                                            ) : (
-                                                <Lock size={14} color="#444" style={{margin:'0 auto'}}/>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
+            {/* 🔥 MODAL 1: AGENTS LIST (NUEVO COMPONENTE) 🔥 */}
+            {showReferralList && user && (
+                <AgentListModal 
+                    userId={user.id} 
+                    onClose={() => setShowReferralList(false)} 
+                    onRewardClaimed={(amount) => setGlobalScore(prev => prev + amount)}
+                />
             )}
 
             {/* MODAL 2: MILESTONES */}
@@ -561,7 +451,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 onClick={() => setShowBlackMarket(true)}
                 style={{
                     position: 'fixed',
-                    bottom: '85px', // Suficientemente arriba para no tapar el menú inferior
+                    bottom: '85px',
                     right: '20px',
                     width: '60px',
                     height: '60px',
@@ -579,7 +469,7 @@ export const SquadZone: React.FC<SquadZoneProps> = ({ setGlobalScore }) => {
                 <RefreshCcw color="#E040FB" size={28} />
             </button>
 
-            {/* 🔥 EL MODAL DEL MERCADO NEGRO (Se muestra cuando showBlackMarket es true) 🔥 */}
+            {/* 🔥 EL MODAL DEL MERCADO NEGRO 🔥 */}
             {showBlackMarket && (
                 <SwapTerminal onClose={() => setShowBlackMarket(false)} />
             )}

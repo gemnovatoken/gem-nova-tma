@@ -100,9 +100,9 @@ export default function App() {
                     .eq('user_id', user.id)
                     .single();
                 
-                // ==========================================
+                // =====================================
                 // CASO A: USUARIO EXISTE
-                // ==========================================
+                // =====================================
                 if (userData) {
                     
                     // 🔥 DEFENSA ACTIVA: Si el usuario existe pero NO tiene referido, y entró con un link, lo forzamos.
