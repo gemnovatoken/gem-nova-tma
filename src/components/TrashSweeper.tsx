@@ -6,6 +6,7 @@ import { useWallet, ConnectionProvider, WalletProvider } from '@solana/wallet-ad
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { Connection, Transaction } from '@solana/web3.js';
 import '@solana/wallet-adapter-react-ui/styles.css'; 
+import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 
 import { Buffer } from 'buffer';
 
@@ -202,19 +203,20 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     );
 };
 
-// 2. 🔥 AQUÍ ESTÁ LA MAGIA: EL ENVOLTORIO QUE LE DA INTERNET Y BILLETERAS A TU PANTALLA 🔥
+/// 🔥 EL ENVOLTORIO ACTUALIZADO 🔥
 export const TrashSweeper: React.FC<TrashSweeperProps> = (props) => {
-    // Le decimos que se conecte a la Mainnet de Solana
     const endpoint = "https://api.mainnet-beta.solana.com";
     
-    // Las billeteras modernas (Phantom/Solflare) se autodetectan, así que un arreglo vacío es perfecto
-    const wallets = useMemo(() => [], []);
+    // AQUÍ LE DECIMOS EXPLÍCITAMENTE QUE ACTIVE LOS LINKS PARA PHANTOM Y SOLFLARE
+    const wallets = useMemo(() => [
+        new PhantomWalletAdapter(),
+        new SolflareWalletAdapter(),
+    ], []);
 
     return (
         <ConnectionProvider endpoint={endpoint}>
             <WalletProvider wallets={wallets} autoConnect>
                 <WalletModalProvider>
-                    {/* Y aquí adentro llamamos a tu pantalla original */}
                     <InnerTrashSweeper {...props} />
                 </WalletModalProvider>
             </WalletProvider>
