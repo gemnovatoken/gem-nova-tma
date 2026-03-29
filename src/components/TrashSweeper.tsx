@@ -201,12 +201,19 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                                             
                                             {/* TU IDEA: Link directo a Phantom por si siguen atrapados en Telegram */}
                                             <a 
-                                                href={`https://phantom.app/ul/browse/${encodeURIComponent("https://TU-LINK-DE-VERCEL.vercel.app")}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                style={{ display: 'block', marginTop: '10px', color: '#9945FF', fontSize: '11px', textDecoration: 'underline' }}
+                                                href="#"
+                                                onClick={(e) => {
+                                                e.preventDefault();
+                                                // 1. Agarramos tu URL real automáticamente (sin la basura que le mete Telegram)
+                                                const miUrlReal = window.location.origin + window.location.pathname;
+                                                // 2. Armamos el salto cuántico a Phantom
+                                                const linkPhantom = `https://phantom.app/ul/browse/${encodeURIComponent(miUrlReal)}`;
+                                                // 3. ¡Disparamos!
+                                                window.open(linkPhantom, '_blank');
+                                                }}
+                                                style={{ display: 'block', marginTop: '15px', color: '#00F2FE', fontSize: '13px', textDecoration: 'underline', fontWeight: 'bold' }}
                                             >
-                                                App not opening? Open in Phantom Browser
+                                                        🚀 PLAYING ON MOBILE? CLICK HERE TO OPEN IN PHANTOM APP
                                             </a>
                                         </div>
                                     ) : (
