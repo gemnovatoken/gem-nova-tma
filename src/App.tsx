@@ -10,6 +10,7 @@ import { supabase } from './services/supabase';
 import { useAuth } from './hooks/useAuth';
 import { MissionZone } from './components/MissionZone';
 
+
 const GAME_CONFIG = {
     limit: { values: [500, 1000, 1500, 2000, 4000, 6000, 8500, 12000] },
     speed: { values: [1, 2, 3, 4, 5, 6, 8, 10] }
@@ -292,7 +293,7 @@ export default function App() {
                         </div>
                     )}
                     
-                    {currentTab === 'wallet' && <div style={{ animation: 'fadeIn 0.3s' }}><WalletRoadmap /></div>}
+                    {currentTab === 'wallet' && <div style={{ animation: 'fadeIn 0.3s' }}><WalletRoadmap setGlobalScore={setScore} /></div>}
                 </div>
                 <div style={{ flexShrink: 0 }}>
                     <BottomNav activeTab={currentTab} setTab={setCurrentTab} />

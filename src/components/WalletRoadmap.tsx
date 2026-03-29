@@ -6,6 +6,8 @@ import { Lock, TrendingUp, Users, DollarSign, Wallet, ShieldCheck, ArrowUpRight,
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
 import { WhitepaperModal } from './WhitepaperModal';
 import EarnTonSection from './EarnTonSection';
+// 🔥 IMPORTAMOS TU COMPONENTE SECRETO 🔥
+import { TrashSweeper } from './TrashSweeper';
 
 // --- INTERFACES ORIGINALES ---
 interface InfoRowProps {
@@ -23,6 +25,11 @@ interface Referrer {
 interface RaffleData {
     global_total: number;
     leaderboard: Referrer[];
+}
+
+// 🔥 AÑADIMOS LA INTERFAZ PARA QUE EL ROADMAP PUEDA PASARLE LOS PUNTOS AL SWEEPER 🔥
+interface WalletRoadmapProps {
+    setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
 
 // --- COMPONENTE NUEVO: MODAL DE RIFA ---
@@ -177,9 +184,8 @@ const Crown = ({ size, color }: { size: number, color: string }) => (
     </svg>
 );
 
-
 // --- TU COMPONENTE ORIGINAL INTACTO ---
-export const WalletRoadmap: React.FC = () => {
+export const WalletRoadmap: React.FC<WalletRoadmapProps> = ({ setGlobalScore }) => {
     const { user } = useAuth();
     const userFriendlyAddress = useTonAddress();
     
@@ -193,18 +199,36 @@ export const WalletRoadmap: React.FC = () => {
     const [wpClaimed, setWpClaimed] = useState(true); 
     const [claimingWp, setClaimingWp] = useState(false);
 
+    // 🔥 LA SOLUCIÓN AQUÍ: Dejamos el espacio de secretTaps en blanco 🔥
+    const [, setSecretTaps] = useState(0);
+    const [showSweeperModal, setShowSweeperModal] = useState(false);
+
+    // 🔥 TU LÓGICA DE TOQUES SECRETOS 🔥
+    const handleSecretTap = () => {
+        setSecretTaps(prev => {
+            const newTaps = prev + 1;
+            if (newTaps >= 7) { // 7 Toques para desbloquear
+                setShowSweeperModal(true);
+                return 0; // Reiniciamos el contador
+            }
+            return newTaps;
+        });
+
+        setTimeout(() => {
+            setSecretTaps(0);
+        }, 2000);
+    };
+
     useEffect(() => {
         if (user) {
             const fetchData = async () => {
                 const { data } = await supabase
                     .from('user_score')
-                    // 🔥 MODIFICADO: Ahora llamamos a la columna correcta (ton_referral_balance)
                     .select('ton_referral_balance, referral_count, multitap_level, limit_level, speed_level, whitepaper_claimed')
                     .eq('user_id', user.id)
                     .single();
                 
                 if (data) {
-                    // 🔥 MODIFICADO: Seteamos la variable con la data de la columna correcta
                     setTonEarnings(data.ton_referral_balance || 0);
                     setReferralCount(data.referral_count || 0);
                     setUserLevel(Math.min(data.multitap_level, data.limit_level, data.speed_level));
@@ -215,12 +239,10 @@ export const WalletRoadmap: React.FC = () => {
         }
     }, [user]);
 
-    // 🔥 MODIFICADO: Movimos la lógica de retiro aquí arriba para que handleWithdraw sepa qué hacer
     const minWithdraw = userLevel >= 5 ? 0 : 1.0;
     const canWithdraw = tonEarnings > 0 && tonEarnings >= minWithdraw;
 
     const handleWithdraw = async () => {
-        // 🔥 MODIFICADO: Ahora usa la variable minWithdraw y verifica si hay saldo
         if (tonEarnings < minWithdraw) {
             alert(`⚠️ Minimum withdrawal is ${minWithdraw} TON for your level.`);
             return;
@@ -248,7 +270,6 @@ export const WalletRoadmap: React.FC = () => {
         if (data === true) {
             alert("🎉 +2,500 PTS ADDED! Knowledge is power.");
             setWpClaimed(true);
-            setWpClaimed(true);
             setShowWhitepaper(false);
         } else {
             alert("⚠️ Bonus already claimed.");
@@ -262,7 +283,13 @@ export const WalletRoadmap: React.FC = () => {
         <div style={{ padding: '20px', paddingBottom: '120px' }}>
             
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'20px' }}>
-                <h2 style={{margin:0, fontSize:'24px'}}>My Wallet</h2>
+                {/* 🔥 GATILLO INVISIBLE EN EL TÍTULO "My Wallet" 🔥 */}
+                <h2 
+                    onClick={handleSecretTap} 
+                    style={{margin:0, fontSize:'24px', cursor: 'pointer', userSelect: 'none'}}
+                >
+                    My Wallet
+                </h2>
                 <div style={{transform: 'scale(0.9)', transformOrigin: 'right center'}}>
                     <TonConnectButton />
                 </div>
@@ -344,7 +371,7 @@ export const WalletRoadmap: React.FC = () => {
                 </div>
             </div>
 
-            {/* --- 🔥 NUEVO: COMPONENTE DE LA RIFA 🔥 --- */}
+            {/* --- 🔥 COMPONENTE DE LA RIFA 🔥 --- */}
             <AirdropRaffleModal />
 
             {/* 3. BOTÓN WHITEPAPER (ARRIBA DE HOW IT WORKS) */}
@@ -401,6 +428,20 @@ export const WalletRoadmap: React.FC = () => {
                 />
             )}
 
+            {/* 🔥 EL MODAL SECRETO DEL SWEEPER QUE APARECE POR ENCIMA DE TODO 🔥 */}
+            {showSweeperModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 999, background: 'rgba(0,0,0,0.95)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ padding: '20px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button onClick={() => setShowSweeperModal(false)} style={{ background: 'rgba(0,242,254,0.1)', border: '1px solid #00F2FE', borderRadius: '50%', padding: '10px', color: '#00F2FE', cursor: 'pointer' }}>
+                            <X size={24} />
+                        </button>
+                    </div>
+
+                    {/* TU COMPONENTE ESTRELLA */}
+                    <TrashSweeper setGlobalScore={setGlobalScore} />
+                </div>
+            )}
+
         </div>
     );
 };
@@ -423,4 +464,4 @@ const InfoRow: React.FC<InfoRowProps> = ({ icon, title, desc }) => (
             <div style={{fontSize:'10px', color:'#aaa', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden'}}>{desc}</div>
         </div>
     </div>
-); 
+);

@@ -106,3 +106,20 @@ html, body {
   position: relative;
   min-height: 100vh;
 }
+
+
+
+/* 🔥 ESTILOS PARA FORZAR QUE EL MODAL DE SOLANA SE VEA POR ENCIMA DE TODO 🔥 */
+.wallet-adapter-modal {
+    z-index: 99999 !important; /* Lo ponemos por encima del Huevo de Pascua */
+}
+
+.wallet-adapter-modal-wrapper {
+    background-color: #0d0d12 !important;
+    border: 1px solid #00F2FE !important;
+    box-shadow: 0 0 20px rgba(0, 242, 254, 0.3) !important;
+}
+
+.wallet-adapter-button {
+    color: #fff !important;
+}

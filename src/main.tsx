@@ -1,3 +1,21 @@
+// 🔥 PARCHE PARA SOLANA EN VITE (VERSIÓN ELEGANTE PARA ESLINT) 🔥
+import { Buffer } from 'buffer';
+
+// Le avisamos formalmente a TypeScript que agregaremos estas propiedades
+declare global {
+    interface Window {
+        Buffer: typeof Buffer;
+        global: typeof window;
+    }
+}
+
+if (typeof window !== 'undefined') {
+    window.Buffer = Buffer;
+    window.global = window;
+}
+
+// ... aquí abajo ya sigue tu código normal (import React, ReactDOM, App, etc.)
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
