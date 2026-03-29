@@ -6,7 +6,7 @@ import { useWallet, ConnectionProvider, WalletProvider } from '@solana/wallet-ad
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { Connection, Transaction } from '@solana/web3.js';
 import '@solana/wallet-adapter-react-ui/styles.css'; 
-import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-wallets';
 
 import { Buffer } from 'buffer';
 
@@ -210,7 +210,6 @@ export const TrashSweeper: React.FC<TrashSweeperProps> = (props) => {
     // AQUÍ LE DECIMOS EXPLÍCITAMENTE QUE ACTIVE LOS LINKS PARA PHANTOM Y SOLFLARE
     const wallets = useMemo(() => [
         new PhantomWalletAdapter(),
-        new SolflareWalletAdapter(),
     ], []);
 
     return (
