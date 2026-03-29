@@ -189,49 +189,62 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                                     </button>
                                 </div>
                             ) : (
-                                /* ESTADO DESBLOQUEADO (AQUÍ APARECEN LAS WALLETS) */
-                                <div style={{ animation: 'fadeIn 0.5s' }}>
-                                    <div style={{ background: 'rgba(76, 175, 80, 0.1)', padding: '10px', borderRadius: '10px', border: '1px solid #4CAF50', marginBottom: '15px', color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>
-                                        ✅ Unlocked! Connect to clean:
-                                    </div>
-                                    
-                                    {!publicKey ? (
-                                        <div style={{ marginBottom: '15px' }}>
-                                            <WalletMultiButton style={{ background: 'linear-gradient(90deg, #9945FF, #14F195)', borderRadius: '30px', margin: '0 auto', width: '100%', justifyContent: 'center' }} />
-                                            
-                                            {/* TU IDEA: Link directo a Phantom por si siguen atrapados en Telegram */}
-                                            <a 
-                                                href="#"
-                                                onClick={(e) => {
-                                                e.preventDefault();
-                                                // 1. Agarramos tu URL real automáticamente (sin la basura que le mete Telegram)
-                                                const miUrlReal = window.location.origin + window.location.pathname;
-                                                // 2. Armamos el salto cuántico a Phantom
-                                                const linkPhantom = `https://phantom.app/ul/browse/${encodeURIComponent(miUrlReal)}`;
-                                                // 3. ¡Disparamos!
-                                                window.open(linkPhantom, '_blank');
-                                                }}
-                                                style={{ display: 'block', marginTop: '15px', color: '#00F2FE', fontSize: '13px', textDecoration: 'underline', fontWeight: 'bold' }}
-                                            >
-                                                        🚀 PLAYING ON MOBILE? CLICK HERE TO OPEN IN PHANTOM APP
-                                            </a>
-                                        </div>
-                                    ) : (
-                                        <button 
-                                            onClick={handleSweep}
-                                            disabled={loading}
-                                            style={{
-                                                width: '100%', padding: '15px', borderRadius: '30px', border: 'none',
-                                                background: loading ? '#555' : 'linear-gradient(90deg, #FF512F, #DD2476)', 
-                                                color: '#fff', fontWeight: '900', fontSize: '16px',
-                                                cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 20px rgba(255,81,47,0.5)',
-                                                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px'
-                                            }}
-                                        >
-                                            {loading ? "PROCESSING..." : <><Zap size={18} /> CONFIRM & CLEAN</>}
-                                        </button>
-                                    )}
-                                </div>
+                                /* ESTADO DESBLOQUEADO (AQUÍ APARECEN LAS WALLETS Y LOS LINKS MÓVILES) */
+<div style={{ animation: 'fadeIn 0.5s' }}>
+    <div style={{ background: 'rgba(76, 175, 80, 0.1)', padding: '10px', borderRadius: '10px', border: '1px solid #4CAF50', marginBottom: '15px', color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>
+        ✅ Unlocked! Connect to clean:
+    </div>
+    
+    {!publicKey ? (
+        <div style={{ marginBottom: '15px' }}>
+            {/* BOTÓN OFICIAL DE SOLANA (Funciona en PC) */}
+            <WalletMultiButton style={{ background: 'linear-gradient(90deg, #9945FF, #14F195)', borderRadius: '30px', margin: '0 auto', width: '100%', justifyContent: 'center' }} />
+            
+            <div style={{ margin: '20px 0 10px 0', borderBottom: '1px dashed #444' }}></div>
+            <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>Playing on Mobile? Use these links:</p>
+            
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                {/* 🚀 BOTÓN SALTO A PHANTOM 🚀 */}
+                <button 
+                    onClick={() => {
+                        // 🔥 PON TU LINK DE VERCEL EXACTO AQUÍ ADENTRO 🔥
+                        const MI_VERCEL = "https://gem-nova-tma.vercel.app/";
+                        window.open(`https://phantom.app/ul/browse/${encodeURIComponent(MI_VERCEL)}`, '_blank');
+                    }}
+                    style={{ background: '#551BF9', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}
+                >
+                    👻 PHANTOM
+                </button>
+
+                {/* 🚀 BOTÓN SALTO A SOLFLARE 🚀 */}
+                <button 
+                    onClick={() => {
+                        // 🔥 PON TU LINK DE VERCEL EXACTO AQUÍ ADENTRO 🔥
+                        const MI_VERCEL = "https://gem-nova-tma.vercel.app/";
+                        window.open(`https://solflare.com/ul/browser/${encodeURIComponent(MI_VERCEL)}`, '_blank');
+                    }}
+                    style={{ background: '#FC7A1E', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}
+                >
+                    🔥 SOLFLARE
+                </button>
+            </div>
+        </div>
+    ) : (
+        <button 
+            onClick={handleSweep}
+            disabled={loading}
+            style={{
+                width: '100%', padding: '15px', borderRadius: '30px', border: 'none',
+                background: loading ? '#555' : 'linear-gradient(90deg, #FF512F, #DD2476)', 
+                color: '#fff', fontWeight: '900', fontSize: '16px',
+                cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 20px rgba(255,81,47,0.5)',
+                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px'
+            }}
+        >
+            {loading ? "PROCESSING..." : <><Zap size={18} /> CONFIRM & CLEAN</>}
+        </button>
+    )}
+</div>
                             )}
                         </>
                     ) : (
