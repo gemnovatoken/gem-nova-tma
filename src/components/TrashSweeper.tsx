@@ -8,6 +8,8 @@ import { Connection, Transaction } from '@solana/web3.js';
 import '@solana/wallet-adapter-react-ui/styles.css'; 
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { Buffer } from 'buffer';
+import { createDefaultAddressSelector, createDefaultAuthorizationResultCache, SolanaMobileWalletAdapter } from '@solana-mobile/wallet-adapter-mobile';
+
 
 interface TrashSweeperProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
@@ -267,9 +269,26 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     );
 };
 
+// 🔥 2. ACTUALIZA EL ENVOLTORIO FINAL 🔥
 export const TrashSweeper: React.FC<TrashSweeperProps> = (props) => {
     const endpoint = "https://api.mainnet-beta.solana.com";
+    
     const wallets = useMemo(() => [
+        // El adaptador maestro para celulares (Abre el menú nativo de Android)
+        new SolanaMobileWalletAdapter({
+            addressSelector: createDefaultAddressSelector(),
+            appIdentity: {
+                name: 'Gem Nova Sweeper',
+                uri: 'https://gem-nova-tma.vercel.app', // Tu link oficial
+                icon: 'favicon.ico', // Puedes dejarlo así
+            },
+            authorizationResultCache: createDefaultAuthorizationResultCache(),
+            cluster: 'mainnet-beta',
+            onWalletNotFound: async () => {
+                 console.log("No wallet found on mobile");
+            }
+        }),
+        // Las opciones normales para PC
         new PhantomWalletAdapter(),
         new SolflareWalletAdapter(),
     ], []);
