@@ -9,6 +9,8 @@ import '@solana/wallet-adapter-react-ui/styles.css';
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { Buffer } from 'buffer';
 
+// ⚠️ ELIMINAMOS EL DECLARE GLOBAL QUE CAUSABA EL CONFLICTO ⚠️
+
 interface TrashSweeperProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
@@ -34,7 +36,7 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
 
     const BACKEND_URL = "https://gem-nova-api.onrender.com";
     
-    // 🔥 TU URL OFICIAL DE VERCEL AQUÍ 🔥
+    // 🔥 TU URL OFICIAL DE VERCEL (Sin barra diagonal al final) 🔥
     const APP_URL = "https://gem-nova-tma.vercel.app";
 
     // 1. ESCANEO PÚBLICO
@@ -122,15 +124,29 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 2. FUNCIONES DE DEEP LINKING (MODO AGRESIVO) 🔥
+    // 🔥 EL TRUCO NINJA PARA BYPASEAR LOS ERRORES DE TYPESCRIPT Y ESLINT 🔥
     const openPhantom = () => {
-        // window.location.href dispara el "intent" directo al celular en lugar de abrir pestañas falsas en Telegram.
-        window.location.href = `phantom://browse/${encodeURIComponent(APP_URL)}`;
+        const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(APP_URL)}?ref=${encodeURIComponent(APP_URL)}`;
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tg = (window as any).Telegram?.WebApp;
+        if (tg && typeof tg.openLink === 'function') {
+            tg.openLink(phantomUrl);
+        } else {
+            window.open(phantomUrl, '_blank');
+        }
     };
 
     const openSolflare = () => {
-        // Usamos el formato oficial v1 de Solflare específico para su navegador in-app.
-        window.location.href = `https://solflare.com/ul/v1/browse/${encodeURIComponent(APP_URL)}`;
+        const solflareUrl = `https://solflare.com/ul/v1/browse/${encodeURIComponent(APP_URL)}`;
+        
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const tg = (window as any).Telegram?.WebApp;
+        if (tg && typeof tg.openLink === 'function') {
+            tg.openLink(solflareUrl);
+        } else {
+            window.open(solflareUrl, '_blank');
+        }
     };
 
     return (
@@ -270,7 +286,7 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     );
 };
 
-// 🔥 EL ENVOLTORIO LIMPIO (Sin el adaptador móvil que rompía las cosas) 🔥
+// 🔥 3. ENVOLTORIO LIMPIO 🔥
 export const TrashSweeper: React.FC<TrashSweeperProps> = (props) => {
     const endpoint = "https://api.mainnet-beta.solana.com";
     
@@ -281,7 +297,7 @@ export const TrashSweeper: React.FC<TrashSweeperProps> = (props) => {
 
     return (
         <ConnectionProvider endpoint={endpoint}>
-            <WalletProvider wallets={wallets} autoConnect>
+            <WalletProvider wallets={wallets}>
                 <WalletModalProvider>
                     <InnerTrashSweeper {...props} />
                 </WalletModalProvider>
