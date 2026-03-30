@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-// 🔥 Agregamos Copy y Check a los íconos 🔥
 import { Trash2, ShieldCheck, Zap, AlertCircle, Lock, Search, Unlock, Copy, Check } from 'lucide-react';
 // Proveedores
 import { useWallet, ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
@@ -32,8 +31,11 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     
     const [walletInput, setWalletInput] = useState("");
     const [isUnlocked, setIsUnlocked] = useState(false);
-    const [copied, setCopied] = useState(false); // Estado para el botón de copiar
-   
+    const [copied, setCopied] = useState(false); 
+    
+    // 🔥 NUEVO: ESTADO PARA LOS CHECKBOXES 🔥
+    const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
+
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const urlUnlocked = params.get('unlocked');
@@ -46,6 +48,13 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
             setWalletInput(urlWallet); 
         }
     }, []);
+
+    // 🔥 NUEVO: CUANDO LLEGA EL RESULTADO, SELECCIONAR TODAS POR DEFECTO 🔥
+    useEffect(() => {
+        if (scanResult && scanResult.direccionesBasura) {
+            setSelectedAccounts(scanResult.direccionesBasura);
+        }
+    }, [scanResult]);
 
     const BACKEND_URL = "https://gem-nova-api.onrender.com";
 
@@ -84,6 +93,15 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         setIsUnlocked(true);
     };
 
+    // 🔥 NUEVO: FUNCIÓN PARA MARCAR/DESMARCAR CUENTAS 🔥
+    const toggleAccount = (address: string) => {
+        setSelectedAccounts(prev => 
+            prev.includes(address) 
+                ? prev.filter(acc => acc !== address) // Si la tiene, la quita
+                : [...prev, address] // Si no la tiene, la agrega
+        );
+    };
+
     const handleSweep = async () => {
         if (!user || !publicKey || !signTransaction) {
             setError("Please connect your wallet using the button above to sign the transaction.");
@@ -99,7 +117,9 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     wallet: publicKey.toString(),
-                    userId: user.id 
+                    userId: user.id,
+                    // 🔥 AHORA LE DECIMOS AL BACKEND EXACTAMENTE CUÁLES QUEMAR 🔥
+                    cuentasAQuemar: selectedAccounts 
                 })
             });
             
@@ -119,7 +139,7 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
             const signature = await connection.sendRawTransaction(rawTransaction);
             await connection.confirmTransaction(signature);
 
-            alert(`🎉 SUCCESS! Swept ${scanResult?.cuentasDetectadas} accounts. Check your wallet!`);
+            alert(`🎉 SUCCESS! Swept ${selectedAccounts.length} accounts. Check your wallet!`);
             setScanResult(null);
             setWalletInput("");
 
@@ -131,7 +151,6 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 GENERAMOS LA URL MÁGICA PARA USARLA EN LOS BOTONES Y EN EL COPY 🔥
     const magicUrl = typeof window !== 'undefined' 
         ? `${window.location.origin}${window.location.pathname}?unlocked=true&wallet=${walletInput}`
         : '';
@@ -152,12 +171,18 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         else window.location.href = solflareUrl;
     };
 
-    // Función para copiar al portapapeles
     const handleCopyLink = () => {
         navigator.clipboard.writeText(magicUrl);
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000); // Vuelve al estado normal en 2 segundos
+        setTimeout(() => setCopied(false), 2000); 
     };
+
+    // 🔥 ACORTADOR DE BILLETERAS PARA QUE SE VEA ELEGANTE 🔥
+    const truncateAddress = (address: string) => `${address.slice(0, 4)}...${address.slice(-4)}`;
+
+    // 🔥 CALCULADORA DINÁMICA DE SOL 🔥
+    // Asumimos que cada cuenta recupera aprox 0.002039 SOL
+    const dynamicSolRecuperable = (selectedAccounts.length * 0.002039).toFixed(4);
 
     return (
         <div style={{ padding: '20px', color: '#fff', textAlign: 'center' }}>
@@ -194,12 +219,37 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                 <div style={{ background: 'rgba(255, 81, 47, 0.1)', padding: '20px', borderRadius: '15px', border: '1px solid #FF512F', animation: 'fadeIn 0.5s' }}>
                     {scanResult.cuentasDetectadas > 0 ? (
                         <>
-                            <h3 style={{ margin: '0 0 15px 0', color: '#FF512F' }}>⚠️ {scanResult.cuentasDetectadas} Dead Tokens Found!</h3>
+                            <h3 style={{ margin: '0 0 10px 0', color: '#FF512F' }}>⚠️ {scanResult.cuentasDetectadas} Dead Tokens Found!</h3>
+                            
+                            {/* 🔥 PANEL DE RESUMEN DINÁMICO 🔥 */}
+                            <div style={{ background: 'rgba(0,0,0,0.5)', padding: '15px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                                <span style={{ color: '#aaa' }}>Selected to Burn:</span>
+                                <span style={{ fontWeight: 'bold' }}>{selectedAccounts.length} / {scanResult.cuentasDetectadas}</span>
+                            </div>
                             <div style={{ background: 'rgba(0,0,0,0.5)', padding: '15px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
                                 <span style={{ color: '#aaa' }}>Total Locked SOL:</span>
-                                <span style={{ fontWeight: 'bold' }}>{scanResult.solRecuperable} SOL</span>
+                                <span style={{ fontWeight: 'bold', color: '#14F195' }}>~{dynamicSolRecuperable} SOL</span>
                             </div>
 
+                            {/* 🔥 LA LISTA DE TOKENS CON CHECKBOXES 🔥 */}
+                            <div style={{ background: '#111', border: '1px solid #333', borderRadius: '10px', padding: '10px', marginBottom: '20px', maxHeight: '150px', overflowY: 'auto', textAlign: 'left' }}>
+                                <p style={{ fontSize: '11px', color: '#888', margin: '0 0 10px 0', borderBottom: '1px dashed #444', paddingBottom: '5px' }}>Select accounts to sweep:</p>
+                                {scanResult.direccionesBasura.map((cuenta, idx) => (
+                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', cursor: 'pointer' }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedAccounts.includes(cuenta)}
+                                            onChange={() => toggleAccount(cuenta)}
+                                            style={{ width: '16px', height: '16px', accentColor: '#FF512F', cursor: 'pointer' }}
+                                        />
+                                        <span style={{ fontSize: '13px', color: selectedAccounts.includes(cuenta) ? '#fff' : '#666', fontFamily: 'monospace' }}>
+                                            {truncateAddress(cuenta)}
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+
+                            {/* 🔥 ESTADOS DE BLOQUEO Y BOTONES (Igual que antes) 🔥 */}
                             {!isUnlocked ? (
                                 <div style={{ background: '#222', padding: '15px', borderRadius: '15px', border: '1px dashed #FFD700' }}>
                                     <Lock size={30} color="#FFD700" style={{ margin: '0 auto 10px auto' }} />
@@ -229,20 +279,11 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                                                 <button onClick={openSolflare} style={{ background: '#FC7A1E', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>🔥 SOLFLARE</button>
                                             </div>
 
-                                            {/* 🔥 NUEVO: CUADRO PARA COPIAR EL LINK MANUALMENTE 🔥 */}
                                             <div style={{ background: '#111', border: '1px solid #333', borderRadius: '10px', padding: '10px', textAlign: 'left' }}>
                                                 <p style={{ fontSize: '11px', color: '#888', margin: '0 0 8px 0' }}>Or copy link and paste in your Wallet Browser:</p>
                                                 <div style={{ display: 'flex', gap: '5px' }}>
-                                                    <input 
-                                                        type="text" 
-                                                        value={magicUrl} 
-                                                        readOnly 
-                                                        style={{ flex: 1, padding: '8px', borderRadius: '5px', border: '1px solid #444', background: '#222', color: '#aaa', fontSize: '10px' }}
-                                                    />
-                                                    <button 
-                                                        onClick={handleCopyLink}
-                                                        style={{ background: copied ? '#4CAF50' : '#333', color: '#fff', border: 'none', borderRadius: '5px', padding: '0 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: '0.3s' }}
-                                                    >
+                                                    <input type="text" value={magicUrl} readOnly style={{ flex: 1, padding: '8px', borderRadius: '5px', border: '1px solid #444', background: '#222', color: '#aaa', fontSize: '10px' }} />
+                                                    <button onClick={handleCopyLink} style={{ background: copied ? '#4CAF50' : '#333', color: '#fff', border: 'none', borderRadius: '5px', padding: '0 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: '0.3s' }}>
                                                         {copied ? <Check size={16} /> : <Copy size={16} />}
                                                     </button>
                                                 </div>
@@ -251,8 +292,9 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                                     ) : (
                                         <button 
                                             onClick={handleSweep}
-                                            disabled={loading}
-                                            style={{ width: '100%', padding: '15px', borderRadius: '30px', border: 'none', background: loading ? '#555' : 'linear-gradient(90deg, #FF512F, #DD2476)', color: '#fff', fontWeight: '900', fontSize: '16px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 20px rgba(255,81,47,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+                                            // 🔥 NO DEJA BARRER SI NO HAY NADA SELECCIONADO 🔥
+                                            disabled={loading || selectedAccounts.length === 0}
+                                            style={{ width: '100%', padding: '15px', borderRadius: '30px', border: 'none', background: (loading || selectedAccounts.length === 0) ? '#555' : 'linear-gradient(90deg, #FF512F, #DD2476)', color: '#fff', fontWeight: '900', fontSize: '16px', cursor: (loading || selectedAccounts.length === 0) ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 20px rgba(255,81,47,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                                         >
                                             {loading ? "PROCESSING..." : <><Zap size={18} /> CONFIRM & CLEAN</>}
                                         </button>
