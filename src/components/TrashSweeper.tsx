@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { Trash2, ShieldCheck, Zap, AlertCircle, Lock, Search, Unlock } from 'lucide-react';
 // Proveedores
@@ -8,8 +8,6 @@ import { Connection, Transaction } from '@solana/web3.js';
 import '@solana/wallet-adapter-react-ui/styles.css'; 
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { Buffer } from 'buffer';
-
-// ⚠️ ELIMINAMOS EL DECLARE GLOBAL QUE CAUSABA EL CONFLICTO ⚠️
 
 interface TrashSweeperProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
@@ -33,11 +31,22 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     
     const [walletInput, setWalletInput] = useState("");
     const [isUnlocked, setIsUnlocked] = useState(false);
+   
+    // 🔥 NUEVO: LEER LA URL CUANDO CARGA LA PÁGINA 🔥
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const urlUnlocked = params.get('unlocked');
+        const urlWallet = params.get('wallet');
+
+        if (urlUnlocked === 'true') {
+            setIsUnlocked(true); 
+        }
+        if (urlWallet) {
+            setWalletInput(urlWallet); 
+        }
+    }, []);
 
     const BACKEND_URL = "https://gem-nova-api.onrender.com";
-    
-    // 🔥 TU URL OFICIAL DE VERCEL (Sin barra diagonal al final) 🔥
-    const APP_URL = "https://gem-nova-tma.vercel.app";
 
     // 1. ESCANEO PÚBLICO
     const handleScan = async () => {
@@ -124,28 +133,35 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 EL TRUCO NINJA PARA BYPASEAR LOS ERRORES DE TYPESCRIPT Y ESLINT 🔥
+    // 🔥 FUNCIONES DE SALTO PERFECTAS 🔥
     const openPhantom = () => {
-        const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(APP_URL)}?ref=${encodeURIComponent(APP_URL)}`;
+        // Armamos la URL dinámicamente sin necesidad de la variable APP_URL
+        const currentRoute = window.location.origin + window.location.pathname;
+        const urlConMemoria = `${currentRoute}?unlocked=true&wallet=${walletInput}`;
+        const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(urlConMemoria)}`;
         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const tg = (window as any).Telegram?.WebApp;
+        const win = window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } };
+        const tg = win.Telegram?.WebApp;
+        
         if (tg && typeof tg.openLink === 'function') {
             tg.openLink(phantomUrl);
         } else {
-            window.open(phantomUrl, '_blank');
+            window.location.href = phantomUrl;
         }
     };
 
     const openSolflare = () => {
-        const solflareUrl = `https://solflare.com/ul/v1/browse/${encodeURIComponent(APP_URL)}`;
+        const currentRoute = window.location.origin + window.location.pathname;
+        const urlConMemoria = `${currentRoute}?unlocked=true&wallet=${walletInput}`;
+        const solflareUrl = `https://solflare.com/ul/v1/browse/${encodeURIComponent(urlConMemoria)}`;
         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const tg = (window as any).Telegram?.WebApp;
+        const win = window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } };
+        const tg = win.Telegram?.WebApp;
+        
         if (tg && typeof tg.openLink === 'function') {
             tg.openLink(solflareUrl);
         } else {
-            window.open(solflareUrl, '_blank');
+            window.location.href = solflareUrl;
         }
     };
 
