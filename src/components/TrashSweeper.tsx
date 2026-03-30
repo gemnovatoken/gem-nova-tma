@@ -35,7 +35,7 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     const BACKEND_URL = "https://gem-nova-api.onrender.com";
     
     // 🔥 TU URL OFICIAL DE VERCEL AQUÍ 🔥
-    const APP_URL = "https://gem-nova-tma.vercel.app/";
+    const APP_URL = "https://gem-nova-tma.vercel.app";
 
     // 1. ESCANEO PÚBLICO
     const handleScan = async () => {
@@ -122,17 +122,15 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 FUNCIONES DE DEEP LINKING CORREGIDAS 🔥
+    // 🔥 2. FUNCIONES DE DEEP LINKING (MODO AGRESIVO) 🔥
     const openPhantom = () => {
-        // Usamos el esquema universal exacto recomendado por Phantom docs
-        const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(APP_URL)}?ref=${encodeURIComponent(APP_URL)}`;
-        window.open(phantomUrl, '_blank');
+        // window.location.href dispara el "intent" directo al celular en lugar de abrir pestañas falsas en Telegram.
+        window.location.href = `phantom://browse/${encodeURIComponent(APP_URL)}`;
     };
 
     const openSolflare = () => {
-        // Solflare necesita el parámetro 'url' explícito para evitar el error "method not recognized"
-        const solflareUrl = `https://solflare.com/ul/browser?url=${encodeURIComponent(APP_URL)}`;
-        window.open(solflareUrl, '_blank');
+        // Usamos el formato oficial v1 de Solflare específico para su navegador in-app.
+        window.location.href = `https://solflare.com/ul/v1/browse/${encodeURIComponent(APP_URL)}`;
     };
 
     return (
