@@ -29,7 +29,18 @@ interface TelegramWebApp {
 }
 
 export default function App() {
-    const [currentTab, setCurrentTab] = useState('mine');
+    // 🔥 SOLUCIÓN: LA INICIALIZACIÓN PEREZOSA (LAZY INITIALIZATION) 🔥
+    // En lugar de un useEffect que causa doble renderizado, calculamos la pestaña 
+    // inicial EXACTAMENTE UNA VEZ cuando la App arranca.
+    const [currentTab, setCurrentTab] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('unlocked') === 'true') {
+                return 'wallet'; // Si viene de la billetera, arranca en 'wallet' directamente
+            }
+        }
+        return 'mine'; // Si es un inicio normal en Telegram, arranca en 'mine'
+    });
     
     // Estados Juego
     const [score, setScore] = useState(0);

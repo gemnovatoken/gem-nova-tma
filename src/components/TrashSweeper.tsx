@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Trash2, ShieldCheck, Zap, AlertCircle, Lock, Search, Unlock, Copy, Check } from 'lucide-react';
+import { Trash2, ShieldCheck, Zap, AlertCircle, Lock, Search, Unlock, Copy, Check, Coins } from 'lucide-react';
 // Proveedores
 import { useWallet, ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
@@ -13,12 +13,20 @@ interface TrashSweeperProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
 }
 
+// 🔥 Creamos un "molde" exacto para el nuevo formato del backend 🔥
+interface TokenBasuraInfo {
+    cuenta: string;
+    simbolo?: string;
+}
+
+// 🔥 ACTUALIZADO: Sin usar la palabra prohibida 'any' 🔥
 interface ScanResultData {
     exito: boolean;
     mensaje?: string;
     cuentasDetectadas: number;
     solRecuperable: string;
-    direccionesBasura: string[];
+    // Le decimos a TypeScript: "Puede ser un texto simple, O el objeto nuevo"
+    direccionesBasura: (string | TokenBasuraInfo)[]; 
 }
 
 const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
@@ -33,7 +41,6 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [copied, setCopied] = useState(false); 
     
-    // 🔥 NUEVO: ESTADO PARA LOS CHECKBOXES 🔥
     const [selectedAccounts, setSelectedAccounts] = useState<string[]>([]);
 
     useEffect(() => {
@@ -49,10 +56,13 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         }
     }, []);
 
-    // 🔥 NUEVO: CUANDO LLEGA EL RESULTADO, SELECCIONAR TODAS POR DEFECTO 🔥
     useEffect(() => {
         if (scanResult && scanResult.direccionesBasura) {
-            setSelectedAccounts(scanResult.direccionesBasura);
+            // Extraemos solo las direcciones para los checkboxes (soportando el formato viejo y el nuevo)
+            const addresses = scanResult.direccionesBasura.map(item => 
+                typeof item === 'string' ? item : item.cuenta
+            );
+            setSelectedAccounts(addresses);
         }
     }, [scanResult]);
 
@@ -93,12 +103,11 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         setIsUnlocked(true);
     };
 
-    // 🔥 NUEVO: FUNCIÓN PARA MARCAR/DESMARCAR CUENTAS 🔥
     const toggleAccount = (address: string) => {
         setSelectedAccounts(prev => 
             prev.includes(address) 
-                ? prev.filter(acc => acc !== address) // Si la tiene, la quita
-                : [...prev, address] // Si no la tiene, la agrega
+                ? prev.filter(acc => acc !== address) 
+                : [...prev, address] 
         );
     };
 
@@ -118,7 +127,6 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                 body: JSON.stringify({ 
                     wallet: publicKey.toString(),
                     userId: user.id,
-                    // 🔥 AHORA LE DECIMOS AL BACKEND EXACTAMENTE CUÁLES QUEMAR 🔥
                     cuentasAQuemar: selectedAccounts 
                 })
             });
@@ -177,11 +185,8 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         setTimeout(() => setCopied(false), 2000); 
     };
 
-    // 🔥 ACORTADOR DE BILLETERAS PARA QUE SE VEA ELEGANTE 🔥
     const truncateAddress = (address: string) => `${address.slice(0, 4)}...${address.slice(-4)}`;
 
-    // 🔥 CALCULADORA DINÁMICA DE SOL 🔥
-    // Asumimos que cada cuenta recupera aprox 0.002039 SOL
     const dynamicSolRecuperable = (selectedAccounts.length * 0.002039).toFixed(4);
 
     return (
@@ -221,7 +226,6 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                         <>
                             <h3 style={{ margin: '0 0 10px 0', color: '#FF512F' }}>⚠️ {scanResult.cuentasDetectadas} Dead Tokens Found!</h3>
                             
-                            {/* 🔥 PANEL DE RESUMEN DINÁMICO 🔥 */}
                             <div style={{ background: 'rgba(0,0,0,0.5)', padding: '15px', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
                                 <span style={{ color: '#aaa' }}>Selected to Burn:</span>
                                 <span style={{ fontWeight: 'bold' }}>{selectedAccounts.length} / {scanResult.cuentasDetectadas}</span>
@@ -231,25 +235,40 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                                 <span style={{ fontWeight: 'bold', color: '#14F195' }}>~{dynamicSolRecuperable} SOL</span>
                             </div>
 
-                            {/* 🔥 LA LISTA DE TOKENS CON CHECKBOXES 🔥 */}
-                            <div style={{ background: '#111', border: '1px solid #333', borderRadius: '10px', padding: '10px', marginBottom: '20px', maxHeight: '150px', overflowY: 'auto', textAlign: 'left' }}>
-                                <p style={{ fontSize: '11px', color: '#888', margin: '0 0 10px 0', borderBottom: '1px dashed #444', paddingBottom: '5px' }}>Select accounts to sweep:</p>
-                                {scanResult.direccionesBasura.map((cuenta, idx) => (
-                                    <label key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', cursor: 'pointer' }}>
-                                        <input 
-                                            type="checkbox" 
-                                            checked={selectedAccounts.includes(cuenta)}
-                                            onChange={() => toggleAccount(cuenta)}
-                                            style={{ width: '16px', height: '16px', accentColor: '#FF512F', cursor: 'pointer' }}
-                                        />
-                                        <span style={{ fontSize: '13px', color: selectedAccounts.includes(cuenta) ? '#fff' : '#666', fontFamily: 'monospace' }}>
-                                            {truncateAddress(cuenta)}
-                                        </span>
-                                    </label>
-                                ))}
+                            {/* 🔥 LA LISTA MEJORADA CON NOMBRES DE TOKENS 🔥 */}
+                            <div style={{ background: '#111', border: '1px solid #333', borderRadius: '10px', padding: '10px', marginBottom: '20px', maxHeight: '180px', overflowY: 'auto', textAlign: 'left' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed #444', paddingBottom: '5px', marginBottom: '10px' }}>
+                                    <span style={{ fontSize: '11px', color: '#888' }}>Token / Symbol</span>
+                                    <span style={{ fontSize: '11px', color: '#888' }}>Account Addr.</span>
+                                </div>
+
+                                {scanResult.direccionesBasura.map((item, idx) => {
+                                    // Soportamos el backend viejo (string) y el nuevo (objeto)
+                                    const cuenta = typeof item === 'string' ? item : item.cuenta;
+                                    const simbolo = typeof item === 'string' ? 'Unknown Token' : (item.simbolo || 'Unknown Token');
+                                    
+                                    return (
+                                        <label key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px', cursor: 'pointer', background: 'rgba(255,255,255,0.02)', padding: '8px', borderRadius: '8px' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedAccounts.includes(cuenta)}
+                                                    onChange={() => toggleAccount(cuenta)}
+                                                    style={{ width: '16px', height: '16px', accentColor: '#FF512F', cursor: 'pointer' }}
+                                                />
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: selectedAccounts.includes(cuenta) ? '#fff' : '#666' }}>
+                                                    <Coins size={14} color={selectedAccounts.includes(cuenta) ? '#FFD700' : '#555'} />
+                                                    <span style={{ fontSize: '12px', fontWeight: 'bold' }}>{simbolo}</span>
+                                                </div>
+                                            </div>
+                                            <span style={{ fontSize: '11px', color: selectedAccounts.includes(cuenta) ? '#aaa' : '#444', fontFamily: 'monospace' }}>
+                                                {truncateAddress(cuenta)}
+                                            </span>
+                                        </label>
+                                    );
+                                })}
                             </div>
 
-                            {/* 🔥 ESTADOS DE BLOQUEO Y BOTONES (Igual que antes) 🔥 */}
                             {!isUnlocked ? (
                                 <div style={{ background: '#222', padding: '15px', borderRadius: '15px', border: '1px dashed #FFD700' }}>
                                     <Lock size={30} color="#FFD700" style={{ margin: '0 auto 10px auto' }} />
@@ -292,7 +311,6 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                                     ) : (
                                         <button 
                                             onClick={handleSweep}
-                                            // 🔥 NO DEJA BARRER SI NO HAY NADA SELECCIONADO 🔥
                                             disabled={loading || selectedAccounts.length === 0}
                                             style={{ width: '100%', padding: '15px', borderRadius: '30px', border: 'none', background: (loading || selectedAccounts.length === 0) ? '#555' : 'linear-gradient(90deg, #FF512F, #DD2476)', color: '#fff', fontWeight: '900', fontSize: '16px', cursor: (loading || selectedAccounts.length === 0) ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 20px rgba(255,81,47,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                                         >
