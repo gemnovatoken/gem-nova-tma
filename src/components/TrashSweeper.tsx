@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { Trash2, ShieldCheck, Zap, AlertCircle, Lock, Search, Unlock } from 'lucide-react';
+// 🔥 Agregamos Copy y Check a los íconos 🔥
+import { Trash2, ShieldCheck, Zap, AlertCircle, Lock, Search, Unlock, Copy, Check } from 'lucide-react';
 // Proveedores
 import { useWallet, ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
@@ -31,8 +32,8 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     
     const [walletInput, setWalletInput] = useState("");
     const [isUnlocked, setIsUnlocked] = useState(false);
+    const [copied, setCopied] = useState(false); // Estado para el botón de copiar
    
-    // 🔥 NUEVO: LEER LA URL CUANDO CARGA LA PÁGINA 🔥
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const urlUnlocked = params.get('unlocked');
@@ -48,7 +49,6 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
 
     const BACKEND_URL = "https://gem-nova-api.onrender.com";
 
-    // 1. ESCANEO PÚBLICO
     const handleScan = async () => {
         if (!walletInput.trim()) {
             setError("Please enter a Solana wallet address.");
@@ -78,14 +78,12 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 2. DESBLOQUEO
     const handleUnlock = () => {
         if (!window.confirm("⚠️ Pay 100,000 Points to unlock the cleaner?")) return;
         setGlobalScore(prev => prev - 100000);
         setIsUnlocked(true);
     };
 
-    // 3. LIMPIEZA FINAL
     const handleSweep = async () => {
         if (!user || !publicKey || !signTransaction) {
             setError("Please connect your wallet using the button above to sign the transaction.");
@@ -133,36 +131,32 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 🔥 FUNCIONES DE SALTO PERFECTAS 🔥
+    // 🔥 GENERAMOS LA URL MÁGICA PARA USARLA EN LOS BOTONES Y EN EL COPY 🔥
+    const magicUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}${window.location.pathname}?unlocked=true&wallet=${walletInput}`
+        : '';
+
     const openPhantom = () => {
-        // Armamos la URL dinámicamente sin necesidad de la variable APP_URL
-        const currentRoute = window.location.origin + window.location.pathname;
-        const urlConMemoria = `${currentRoute}?unlocked=true&wallet=${walletInput}`;
-        const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(urlConMemoria)}`;
-        
+        const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(magicUrl)}`;
         const win = window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } };
         const tg = win.Telegram?.WebApp;
-        
-        if (tg && typeof tg.openLink === 'function') {
-            tg.openLink(phantomUrl);
-        } else {
-            window.location.href = phantomUrl;
-        }
+        if (tg && typeof tg.openLink === 'function') tg.openLink(phantomUrl);
+        else window.location.href = phantomUrl;
     };
 
     const openSolflare = () => {
-        const currentRoute = window.location.origin + window.location.pathname;
-        const urlConMemoria = `${currentRoute}?unlocked=true&wallet=${walletInput}`;
-        const solflareUrl = `https://solflare.com/ul/v1/browse/${encodeURIComponent(urlConMemoria)}`;
-        
+        const solflareUrl = `https://solflare.com/ul/v1/browse/${encodeURIComponent(magicUrl)}`;
         const win = window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } };
         const tg = win.Telegram?.WebApp;
-        
-        if (tg && typeof tg.openLink === 'function') {
-            tg.openLink(solflareUrl);
-        } else {
-            window.location.href = solflareUrl;
-        }
+        if (tg && typeof tg.openLink === 'function') tg.openLink(solflareUrl);
+        else window.location.href = solflareUrl;
+    };
+
+    // Función para copiar al portapapeles
+    const handleCopyLink = () => {
+        navigator.clipboard.writeText(magicUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000); // Vuelve al estado normal en 2 segundos
     };
 
     return (
@@ -176,7 +170,6 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                 Detect dead tokens in any wallet and recover the trapped SOL.
             </p>
 
-            {/* 🔥 PASO 1: BARRA DE BÚSQUEDA 🔥 */}
             {!scanResult && (
                 <div style={{ background: 'rgba(0,0,0,0.5)', padding: '20px', borderRadius: '15px', border: '1px solid #333', marginBottom: '20px' }}>
                     <p style={{ fontSize: '12px', color: '#888', marginBottom: '10px', textAlign: 'left' }}>Enter Solana Wallet Address:</p>
@@ -185,26 +178,18 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                         placeholder="Paste wallet address here..."
                         value={walletInput}
                         onChange={(e) => setWalletInput(e.target.value)}
-                        style={{
-                            width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555',
-                            background: '#111', color: '#fff', marginBottom: '15px', boxSizing: 'border-box'
-                        }}
+                        style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #555', background: '#111', color: '#fff', marginBottom: '15px', boxSizing: 'border-box' }}
                     />
                     <button 
                         onClick={handleScan} 
                         disabled={loading || !walletInput}
-                        style={{
-                            width: '100%', padding: '15px', borderRadius: '30px', border: 'none',
-                            background: loading ? '#555' : '#00F2FE', color: '#000', fontWeight: '900', fontSize: '16px',
-                            cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px'
-                        }}
+                        style={{ width: '100%', padding: '15px', borderRadius: '30px', border: 'none', background: loading ? '#555' : '#00F2FE', color: '#000', fontWeight: '900', fontSize: '16px', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                     >
                         {loading ? "SCANNING..." : <><Search size={18} /> SCAN BLOCKCHAIN</>}
                     </button>
                 </div>
             )}
 
-            {/* 🔥 PASO 2: RESULTADOS Y CANDADO 🔥 */}
             {scanResult && (
                 <div style={{ background: 'rgba(255, 81, 47, 0.1)', padding: '20px', borderRadius: '15px', border: '1px solid #FF512F', animation: 'fadeIn 0.5s' }}>
                     {scanResult.cuentasDetectadas > 0 ? (
@@ -215,24 +200,18 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                                 <span style={{ fontWeight: 'bold' }}>{scanResult.solRecuperable} SOL</span>
                             </div>
 
-                            {/* ESTADO BLOQUEADO */}
                             {!isUnlocked ? (
                                 <div style={{ background: '#222', padding: '15px', borderRadius: '15px', border: '1px dashed #FFD700' }}>
                                     <Lock size={30} color="#FFD700" style={{ margin: '0 auto 10px auto' }} />
                                     <p style={{ fontSize: '12px', color: '#aaa', margin: '0 0 15px 0' }}>Cleaning is locked. Pay with your in-game points to unlock.</p>
                                     <button 
                                         onClick={handleUnlock}
-                                        style={{
-                                            width: '100%', padding: '12px', borderRadius: '30px', border: 'none',
-                                            background: '#FFD700', color: '#000', fontWeight: '900', cursor: 'pointer',
-                                            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px'
-                                        }}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '30px', border: 'none', background: '#FFD700', color: '#000', fontWeight: '900', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                                     >
                                         <Unlock size={16} /> UNLOCK SWEEPER (100k Pts)
                                     </button>
                                 </div>
                             ) : (
-                                /* ESTADO DESBLOQUEADO */
                                 <div style={{ animation: 'fadeIn 0.5s' }}>
                                     <div style={{ background: 'rgba(76, 175, 80, 0.1)', padding: '10px', borderRadius: '10px', border: '1px solid #4CAF50', marginBottom: '15px', color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>
                                         ✅ Unlocked! Connect to clean:
@@ -240,41 +219,40 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                                     
                                     {!publicKey ? (
                                         <div style={{ marginBottom: '15px' }}>
-                                            {/* BOTÓN OFICIAL DE SOLANA (Para PC) */}
                                             <WalletMultiButton style={{ background: 'linear-gradient(90deg, #9945FF, #14F195)', borderRadius: '30px', margin: '0 auto', width: '100%', justifyContent: 'center' }} />
                                             
                                             <div style={{ margin: '20px 0 10px 0', borderBottom: '1px dashed #444' }}></div>
                                             <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>Playing on Mobile? Open app directly:</p>
                                             
-                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                                                {/* 🚀 BOTÓN SALTO A PHANTOM 🚀 */}
-                                                <button 
-                                                    onClick={openPhantom}
-                                                    style={{ background: '#551BF9', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}
-                                                >
-                                                    👻 PHANTOM
-                                                </button>
+                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '15px' }}>
+                                                <button onClick={openPhantom} style={{ background: '#551BF9', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>👻 PHANTOM</button>
+                                                <button onClick={openSolflare} style={{ background: '#FC7A1E', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}>🔥 SOLFLARE</button>
+                                            </div>
 
-                                                {/* 🚀 BOTÓN SALTO A SOLFLARE 🚀 */}
-                                                <button 
-                                                    onClick={openSolflare}
-                                                    style={{ background: '#FC7A1E', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}
-                                                >
-                                                    🔥 SOLFLARE
-                                                </button>
+                                            {/* 🔥 NUEVO: CUADRO PARA COPIAR EL LINK MANUALMENTE 🔥 */}
+                                            <div style={{ background: '#111', border: '1px solid #333', borderRadius: '10px', padding: '10px', textAlign: 'left' }}>
+                                                <p style={{ fontSize: '11px', color: '#888', margin: '0 0 8px 0' }}>Or copy link and paste in your Wallet Browser:</p>
+                                                <div style={{ display: 'flex', gap: '5px' }}>
+                                                    <input 
+                                                        type="text" 
+                                                        value={magicUrl} 
+                                                        readOnly 
+                                                        style={{ flex: 1, padding: '8px', borderRadius: '5px', border: '1px solid #444', background: '#222', color: '#aaa', fontSize: '10px' }}
+                                                    />
+                                                    <button 
+                                                        onClick={handleCopyLink}
+                                                        style={{ background: copied ? '#4CAF50' : '#333', color: '#fff', border: 'none', borderRadius: '5px', padding: '0 15px', cursor: 'pointer', display: 'flex', alignItems: 'center', transition: '0.3s' }}
+                                                    >
+                                                        {copied ? <Check size={16} /> : <Copy size={16} />}
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     ) : (
                                         <button 
                                             onClick={handleSweep}
                                             disabled={loading}
-                                            style={{
-                                                width: '100%', padding: '15px', borderRadius: '30px', border: 'none',
-                                                background: loading ? '#555' : 'linear-gradient(90deg, #FF512F, #DD2476)', 
-                                                color: '#fff', fontWeight: '900', fontSize: '16px',
-                                                cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 20px rgba(255,81,47,0.5)',
-                                                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px'
-                                            }}
+                                            style={{ width: '100%', padding: '15px', borderRadius: '30px', border: 'none', background: loading ? '#555' : 'linear-gradient(90deg, #FF512F, #DD2476)', color: '#fff', fontWeight: '900', fontSize: '16px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 20px rgba(255,81,47,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
                                         >
                                             {loading ? "PROCESSING..." : <><Zap size={18} /> CONFIRM & CLEAN</>}
                                         </button>
@@ -302,7 +280,6 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     );
 };
 
-// 🔥 3. ENVOLTORIO LIMPIO 🔥
 export const TrashSweeper: React.FC<TrashSweeperProps> = (props) => {
     const endpoint = "https://api.mainnet-beta.solana.com";
     
