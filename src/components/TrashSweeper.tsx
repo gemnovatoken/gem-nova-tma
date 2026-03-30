@@ -8,8 +8,6 @@ import { Connection, Transaction } from '@solana/web3.js';
 import '@solana/wallet-adapter-react-ui/styles.css'; 
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { Buffer } from 'buffer';
-import { createDefaultAddressSelector, createDefaultAuthorizationResultCache, SolanaMobileWalletAdapter } from '@solana-mobile/wallet-adapter-mobile';
-
 
 interface TrashSweeperProps {
     setGlobalScore: (val: number | ((prev: number) => number)) => void;
@@ -31,13 +29,15 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     const [scanResult, setScanResult] = useState<ScanResultData | null>(null);
     const [error, setError] = useState<string | null>(null);
     
-    // 🔥 TUS NUEVAS VARIABLES DE ESTADO 🔥
     const [walletInput, setWalletInput] = useState("");
     const [isUnlocked, setIsUnlocked] = useState(false);
 
     const BACKEND_URL = "https://gem-nova-api.onrender.com";
+    
+    // 🔥 TU URL OFICIAL DE VERCEL AQUÍ 🔥
+    const APP_URL = "https://gem-nova-tma.vercel.app/";
 
-    // 1. ESCANEO PÚBLICO (Solo necesita el texto)
+    // 1. ESCANEO PÚBLICO
     const handleScan = async () => {
         if (!walletInput.trim()) {
             setError("Please enter a Solana wallet address.");
@@ -67,16 +67,14 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         }
     };
 
-    // 2. DESBLOQUEO (Cobramos los puntos)
+    // 2. DESBLOQUEO
     const handleUnlock = () => {
         if (!window.confirm("⚠️ Pay 100,000 Points to unlock the cleaner?")) return;
-        
-        // Cobramos los puntos al instante
         setGlobalScore(prev => prev - 100000);
         setIsUnlocked(true);
     };
 
-    // 3. LIMPIEZA FINAL (Requiere firma real)
+    // 3. LIMPIEZA FINAL
     const handleSweep = async () => {
         if (!user || !publicKey || !signTransaction) {
             setError("Please connect your wallet using the button above to sign the transaction.");
@@ -122,6 +120,19 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
         } finally {
             setLoading(false);
         }
+    };
+
+    // 🔥 FUNCIONES DE DEEP LINKING CORREGIDAS 🔥
+    const openPhantom = () => {
+        // Usamos el esquema universal exacto recomendado por Phantom docs
+        const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(APP_URL)}?ref=${encodeURIComponent(APP_URL)}`;
+        window.open(phantomUrl, '_blank');
+    };
+
+    const openSolflare = () => {
+        // Solflare necesita el parámetro 'url' explícito para evitar el error "method not recognized"
+        const solflareUrl = `https://solflare.com/ul/browser?url=${encodeURIComponent(APP_URL)}`;
+        window.open(solflareUrl, '_blank');
     };
 
     return (
@@ -191,62 +202,54 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
                                     </button>
                                 </div>
                             ) : (
-                                /* ESTADO DESBLOQUEADO (AQUÍ APARECEN LAS WALLETS Y LOS LINKS MÓVILES) */
-<div style={{ animation: 'fadeIn 0.5s' }}>
-    <div style={{ background: 'rgba(76, 175, 80, 0.1)', padding: '10px', borderRadius: '10px', border: '1px solid #4CAF50', marginBottom: '15px', color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>
-        ✅ Unlocked! Connect to clean:
-    </div>
-    
-    {!publicKey ? (
-        <div style={{ marginBottom: '15px' }}>
-            {/* BOTÓN OFICIAL DE SOLANA (Funciona en PC) */}
-            <WalletMultiButton style={{ background: 'linear-gradient(90deg, #9945FF, #14F195)', borderRadius: '30px', margin: '0 auto', width: '100%', justifyContent: 'center' }} />
-            
-            <div style={{ margin: '20px 0 10px 0', borderBottom: '1px dashed #444' }}></div>
-            <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>Playing on Mobile? Use these links:</p>
-            
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                {/* 🚀 BOTÓN SALTO A PHANTOM 🚀 */}
-                <button 
-                    onClick={() => {
-                        // 🔥 PON TU LINK DE VERCEL EXACTO AQUÍ ADENTRO 🔥
-                        const MI_VERCEL = "https://gem-nova-tma.vercel.app/";
-                        window.open(`https://phantom.app/ul/browse/${encodeURIComponent(MI_VERCEL)}`, '_blank');
-                    }}
-                    style={{ background: '#551BF9', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}
-                >
-                    👻 PHANTOM
-                </button>
+                                /* ESTADO DESBLOQUEADO */
+                                <div style={{ animation: 'fadeIn 0.5s' }}>
+                                    <div style={{ background: 'rgba(76, 175, 80, 0.1)', padding: '10px', borderRadius: '10px', border: '1px solid #4CAF50', marginBottom: '15px', color: '#4CAF50', fontSize: '12px', fontWeight: 'bold' }}>
+                                        ✅ Unlocked! Connect to clean:
+                                    </div>
+                                    
+                                    {!publicKey ? (
+                                        <div style={{ marginBottom: '15px' }}>
+                                            {/* BOTÓN OFICIAL DE SOLANA (Para PC) */}
+                                            <WalletMultiButton style={{ background: 'linear-gradient(90deg, #9945FF, #14F195)', borderRadius: '30px', margin: '0 auto', width: '100%', justifyContent: 'center' }} />
+                                            
+                                            <div style={{ margin: '20px 0 10px 0', borderBottom: '1px dashed #444' }}></div>
+                                            <p style={{ fontSize: '11px', color: '#aaa', marginBottom: '10px' }}>Playing on Mobile? Open app directly:</p>
+                                            
+                                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+                                                {/* 🚀 BOTÓN SALTO A PHANTOM 🚀 */}
+                                                <button 
+                                                    onClick={openPhantom}
+                                                    style={{ background: '#551BF9', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}
+                                                >
+                                                    👻 PHANTOM
+                                                </button>
 
-                {/* 🚀 BOTÓN SALTO A SOLFLARE 🚀 */}
-                <button 
-                    onClick={() => {
-                        // 🔥 PON TU LINK DE VERCEL EXACTO AQUÍ ADENTRO 🔥
-                        const MI_VERCEL = "https://gem-nova-tma.vercel.app/";
-                        window.open(`https://solflare.com/ul/browser/${encodeURIComponent(MI_VERCEL)}`, '_blank');
-                    }}
-                    style={{ background: '#FC7A1E', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}
-                >
-                    🔥 SOLFLARE
-                </button>
-            </div>
-        </div>
-    ) : (
-        <button 
-            onClick={handleSweep}
-            disabled={loading}
-            style={{
-                width: '100%', padding: '15px', borderRadius: '30px', border: 'none',
-                background: loading ? '#555' : 'linear-gradient(90deg, #FF512F, #DD2476)', 
-                color: '#fff', fontWeight: '900', fontSize: '16px',
-                cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 20px rgba(255,81,47,0.5)',
-                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px'
-            }}
-        >
-            {loading ? "PROCESSING..." : <><Zap size={18} /> CONFIRM & CLEAN</>}
-        </button>
-    )}
-</div>
+                                                {/* 🚀 BOTÓN SALTO A SOLFLARE 🚀 */}
+                                                <button 
+                                                    onClick={openSolflare}
+                                                    style={{ background: '#FC7A1E', color: '#fff', border: 'none', padding: '10px 15px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', flex: 1 }}
+                                                >
+                                                    🔥 SOLFLARE
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button 
+                                            onClick={handleSweep}
+                                            disabled={loading}
+                                            style={{
+                                                width: '100%', padding: '15px', borderRadius: '30px', border: 'none',
+                                                background: loading ? '#555' : 'linear-gradient(90deg, #FF512F, #DD2476)', 
+                                                color: '#fff', fontWeight: '900', fontSize: '16px',
+                                                cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 0 20px rgba(255,81,47,0.5)',
+                                                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px'
+                                            }}
+                                        >
+                                            {loading ? "PROCESSING..." : <><Zap size={18} /> CONFIRM & CLEAN</>}
+                                        </button>
+                                    )}
+                                </div>
                             )}
                         </>
                     ) : (
@@ -269,33 +272,18 @@ const InnerTrashSweeper: React.FC<TrashSweeperProps> = ({ setGlobalScore }) => {
     );
 };
 
-// 🔥 2. ACTUALIZA EL ENVOLTORIO FINAL 🔥
+// 🔥 EL ENVOLTORIO LIMPIO (Sin el adaptador móvil que rompía las cosas) 🔥
 export const TrashSweeper: React.FC<TrashSweeperProps> = (props) => {
     const endpoint = "https://api.mainnet-beta.solana.com";
     
     const wallets = useMemo(() => [
-        // El adaptador maestro para celulares (Abre el menú nativo de Android)
-        new SolanaMobileWalletAdapter({
-            addressSelector: createDefaultAddressSelector(),
-            appIdentity: {
-                name: 'Gem Nova Sweeper',
-                uri: 'https://gem-nova-tma.vercel.app', // Tu link oficial
-                icon: 'favicon.ico', // Puedes dejarlo así
-            },
-            authorizationResultCache: createDefaultAuthorizationResultCache(),
-            cluster: 'mainnet-beta',
-            onWalletNotFound: async () => {
-                 console.log("No wallet found on mobile");
-            }
-        }),
-        // Las opciones normales para PC
         new PhantomWalletAdapter(),
         new SolflareWalletAdapter(),
     ], []);
 
     return (
         <ConnectionProvider endpoint={endpoint}>
-            <WalletProvider wallets={wallets}>
+            <WalletProvider wallets={wallets} autoConnect>
                 <WalletModalProvider>
                     <InnerTrashSweeper {...props} />
                 </WalletModalProvider>
