@@ -10,6 +10,8 @@ import { supabase } from './services/supabase';
 import { useAuth } from './hooks/useAuth';
 import { MissionZone } from './components/MissionZone';
 
+// 🔥 IMPORTAMOS LA NUEVA RULETA AQUÍ 🔥
+import { LuckyWheel } from './components/LuckyWheel';
 
 const GAME_CONFIG = {
     limit: { values: [500, 1000, 1500, 2000, 4000, 6000, 8500, 12000] },
@@ -30,16 +32,14 @@ interface TelegramWebApp {
 
 export default function App() {
     // 🔥 SOLUCIÓN: LA INICIALIZACIÓN PEREZOSA (LAZY INITIALIZATION) 🔥
-    // En lugar de un useEffect que causa doble renderizado, calculamos la pestaña 
-    // inicial EXACTAMENTE UNA VEZ cuando la App arranca.
     const [currentTab, setCurrentTab] = useState(() => {
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             if (params.get('unlocked') === 'true') {
-                return 'wallet'; // Si viene de la billetera, arranca en 'wallet' directamente
+                return 'wallet'; 
             }
         }
-        return 'mine'; // Si es un inicio normal en Telegram, arranca en 'mine'
+        return 'mine'; 
     });
     
     // Estados Juego
@@ -93,14 +93,12 @@ export default function App() {
                 if (!startParam) {
                     const urlParams = new URLSearchParams(window.location.search);
                     const hashParams = new URLSearchParams(window.location.hash.slice(1));
-                    // Aseguramos que el resultado sea siempre un string (o vacío), nunca null.
                     startParam = urlParams.get('tgWebAppStartParam') || hashParams.get('tgWebAppStartParam') || "";
                 }
 
                 const username = tgUser?.username || tgUser?.first_name || 'Miner';
 
                 let referrerId: string = "";
-                // Como startParam ahora está garantizado como string, el trim() no fallará
                 if (startParam.trim() !== '') { 
                     referrerId = startParam.replace('ref_', ''); 
                 }
@@ -192,7 +190,6 @@ export default function App() {
                     });
                     
                     if (!insertError) {
-                        // Verificamos si realmente traía un código para darle los 5000 iniciales
                         const initialScore = referrerId !== "" ? 5000 : 0;
                         setScore(initialScore); 
                         scoreRef.current = initialScore;
@@ -255,10 +252,9 @@ export default function App() {
         <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
             <div className="app-container" style={{ height: '100dvh', overflow: 'hidden', background: '#000', color: 'white', position: 'relative', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ flex: 1, overflowY: 'auto', position: 'relative', display: 'flex', flexDirection: 'column', paddingTop: '20px' }}>
+                    
                     {currentTab === 'mine' && (
                         <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                            
-
                             <div style={{ padding: '0 15px', marginBottom: '0', flexShrink: 0 }}>
                                 <MarketDashboard globalProgress={globalProgress} />
                             </div>
@@ -288,6 +284,16 @@ export default function App() {
                                 score={score} 
                                 setScore={setScore}
                                 userLevel={levels.limit}
+                            />
+                        </div>
+                    )}
+
+                    {/* 🔥 LA REGLA DE RUTA PARA LA NUEVA RULETA 🔥 */}
+                    {currentTab === 'wheel' && (
+                        <div style={{ animation: 'fadeIn 0.3s', height: '100%' }}>
+                            <LuckyWheel 
+                                score={score} 
+                                onUpdateScore={setScore} 
                             />
                         </div>
                     )}
