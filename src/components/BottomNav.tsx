@@ -1,4 +1,4 @@
-import { Pickaxe, Aperture, Map, Users, Wallet } from 'lucide-react';
+import { Pickaxe, Rocket, Aperture, Map, Users, Wallet } from 'lucide-react';
 
 // 1. Definimos la "forma" de los datos que recibe el componente
 interface BottomNavProps {
@@ -8,10 +8,11 @@ interface BottomNavProps {
 
 // 2. Usamos esa definición en lugar de 'any'
 export const BottomNav = ({ activeTab, setTab }: BottomNavProps) => {
-  // 🔥 REEMPLAZAMOS "MARKET" POR LA NUEVA PESTAÑA "SPIN" (RULETA) 🔥
+  // 🔥 MARKET REGRESA INTACTO Y SE MANTIENE LA NUEVA RULETA (SPIN) 🔥
   const tabs = [
     { id: 'mine', icon: Pickaxe, label: 'Mine' },
-    { id: 'wheel', icon: Aperture, label: 'Spin' }, // <--- AQUÍ ESTÁ TU NUEVA PESTAÑA
+    { id: 'market', icon: Rocket, label: 'Market' }, // <--- TU MARKET 100% FUNCIONAL
+    { id: 'wheel', icon: Aperture, label: 'Spin' },  // <--- LA NUEVA RULETA
     { id: 'mission', icon: Map, label: 'Mission' },
     { id: 'squad', icon: Users, label: 'Squad' },
     { id: 'wallet', icon: Wallet, label: 'Airdrop' },
@@ -29,9 +30,9 @@ export const BottomNav = ({ activeTab, setTab }: BottomNavProps) => {
       WebkitBackdropFilter: 'blur(12px)', /* Para Safari/iOS */
       borderTop: '1px solid rgba(255, 255, 255, 0.05)', 
       display: 'flex', 
-      justifyContent: 'space-around', 
+      justifyContent: 'space-between', /* Ajustado para que quepan 6 botones */
       /* 🔥 Safe Area para que no choque con la barra de iPhone */
-      padding: '12px 0 calc(12px + env(safe-area-inset-bottom)) 0', 
+      padding: '12px 10px calc(12px + env(safe-area-inset-bottom)) 10px', 
       zIndex: 100,
       boxShadow: '0 -5px 25px rgba(0,0,0,0.5)'
     }}>
@@ -48,14 +49,15 @@ export const BottomNav = ({ activeTab, setTab }: BottomNavProps) => {
               display: 'flex', 
               flexDirection: 'column', 
               alignItems: 'center', 
-              gap: '6px', 
-              fontSize: '11px', 
+              gap: '4px', 
+              fontSize: '10px', /* Letra un poco más ajustada para 6 tabs */
               fontWeight: isActive ? '900' : '600',
               color: isActive ? '#00F2FE' : '#666',
               cursor: 'pointer',
               /* 🔥 Animación suave al hacer clic */
               transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
               transform: isActive ? 'translateY(-4px)' : 'translateY(0)',
+              flex: 1 /* Distribución equitativa */
             }}
           >
             <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
@@ -63,8 +65,8 @@ export const BottomNav = ({ activeTab, setTab }: BottomNavProps) => {
               {isActive && (
                 <div style={{
                   position: 'absolute',
-                  width: '30px',
-                  height: '30px',
+                  width: '28px',
+                  height: '28px',
                   background: 'rgba(0, 242, 254, 0.2)',
                   borderRadius: '50%',
                   filter: 'blur(8px)',
@@ -73,7 +75,7 @@ export const BottomNav = ({ activeTab, setTab }: BottomNavProps) => {
               )}
               
               <t.icon 
-                size={24} 
+                size={22} /* Ícono un pixel más pequeño para balancear */
                 style={{ 
                   zIndex: 1,
                   /* 🔥 El ícono brilla con luz de neón si está activo */
