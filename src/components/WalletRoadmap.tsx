@@ -5,7 +5,6 @@ import { useAuth } from '../hooks/useAuth';
 import { Lock, TrendingUp, Users, DollarSign, Wallet, ShieldCheck, ArrowUpRight, BookOpen, Trophy, X, Gift, Star, Target, Zap, Unlock } from 'lucide-react';
 import { TonConnectButton, useTonAddress } from '@tonconnect/ui-react';
 import { WhitepaperModal } from './WhitepaperModal';
-import EarnTonSection from './EarnTonSection';
 // 🔥 IMPORTAMOS TU COMPONENTE SECRETO 🔥
 import { TrashSweeper } from './TrashSweeper';
 
@@ -410,13 +409,6 @@ export const WalletRoadmap: React.FC<WalletRoadmapProps> = ({ setGlobalScore }) 
                      <InfoRow icon={<TrendingUp size={14} color="#E040FB"/>} title="3. Withdraw" desc={`Min 1 TON (Or 0 TON if Level 5+)`}/>
                 </div>
             </div>
-
-            {/* 5. EARN TON SECTION (MOVIDO AL FINAL) */}
-            {user && (
-                <div style={{ marginTop: 'auto' }}>
-                    <EarnTonSection userId={user.id} />
-                </div>
-            )}
 
             {/* MODAL DE WHITEPAPER */}
             {showWhitepaper && (
