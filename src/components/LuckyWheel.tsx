@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useTonConnectUI } from '@tonconnect/ui-react';
 import { X, Ticket, Diamond, Video, Trophy, Clock, CheckCircle2, Send, Star, Zap, Flame } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
+import { PuzzleWidget } from './PuzzleWidget';
 
 // Si instalaste 'canvas-confetti', descomenta esta línea. 
 // Si no, el código abajo tiene un try/catch para que no falle.
@@ -29,6 +30,7 @@ interface WheelWinner {
     prize: string;
     status: string;
 }
+
 
 const MAX_DAILY_SPINS = 3; 
 const MAX_AD_SPINS = 10;   
@@ -59,17 +61,30 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [timeLeftPromo, setTimeLeftPromo] = useState<string | null>(null);
     const [SPIN_COST, setSpinCost] = useState(25000); 
 
-    // 🔥 NUEVA LÓGICA VENTA FLASH FOMO (Constante para evitar el error de set no usado) 🔥
+    // 🔥 NUEVA LÓGICA VENTA FLASH FOMO
     const isFlashSaleActive = true; 
 
-    // 🎯 NUEVA ECONOMÍA MICRO-RECOMPENSAS (Se duplica si hay Venta Flash)
+    // 🔥 1. DETECTOR DE FEVER MODE: ¿Ya vio los 10 videos?
+    const isFeverReady = adSpinsUsed >= MAX_AD_SPINS;
+
+    // 🔥 2. ECONOMÍA DINÁMICA: Movimos WHEEL_ITEMS aquí adentro para que reaccione al Fever Mode.
     const WHEEL_ITEMS = [
         { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
         { value: 50000,    label: "50K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
         { value: '0.20TON',label: isFlashSaleActive ? "0.40" : "0.20", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }, 
-        { value: 10000,    label: "10K",    sub: "PTS",     color: "#444",    textCol: "#aaa" }, 
+        
+        // ⚠️ CASILLA REEMPLAZABLE 1 (Antes 10k Pts)
+        isFeverReady 
+            ? { value: 'PUZZLE', label: "+1", sub: "PIEZA", color: "#FFD700", textCol: "#000" }
+            : { value: 10000,    label: "10K",  sub: "PTS",   color: "#444",    textCol: "#aaa" }, 
+        
         { value: '0.05TON',label: isFlashSaleActive ? "0.10" : "0.05", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }, 
-        { value: 0,        label: "FAIL",   sub: "SKULL",   color: "#111",    textCol: "#FF0055" }, 
+        
+        // ⚠️ CASILLA REEMPLAZABLE 2 (Antes FAIL)
+        isFeverReady 
+            ? { value: '0.05TON',label: "0.05", sub: "TON", color: "#FF0055", textCol: "#fff" }
+            : { value: 0,        label: "FAIL", sub: "SKULL", color: "#111",    textCol: "#FF0055" }, 
+        
         { value: '1GOLD',  label: "1 GOLD", sub: "VOUCHER", color: "#FFD700", textCol: "#000" }, 
         { value: '0.01TON',label: isFlashSaleActive ? "0.02" : "0.01", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }  
     ];
@@ -268,7 +283,15 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 throw new Error("Invalid or empty data returned from database.");
             }
             
-            const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === wonAmount);
+            // ⚠️ Ajuste temporal: Si el backend todavía devuelve 0 o 10000, 
+            // pero estamos en Fever Mode, forzamos visualmente que caiga en una de las nuevas casillas.
+            let effectiveWonAmount = wonAmount;
+            if (isFeverReady) {
+                if (wonAmount === 0) effectiveWonAmount = '0.05TON';
+                if (wonAmount === 10000) effectiveWonAmount = 'PUZZLE';
+            }
+
+            const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === effectiveWonAmount);
             const targetIndex = winningIndex !== -1 ? winningIndex : 5; 
 
             const segmentAngle = 360 / WHEEL_ITEMS.length; 
@@ -279,6 +302,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             const currentFullSpins = Math.floor(rotation / 360);
             const finalRotation = ((currentFullSpins + 5) * 360) + baseRotation + randomWobble;
 
+
             setRotation(finalRotation);
 
             setTimeout(() => {
@@ -288,39 +312,42 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
                 else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
 
-                if (typeof wonAmount === 'string') {
-                    if (wonAmount === '1GOLD') {
+                if (typeof effectiveWonAmount === 'string') {
+                    if (effectiveWonAmount === '1GOLD') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
                         alert(`🎟️ GOLDEN VOUCHER AQUIRED!\n\nYou found a legendary Golden Voucher. Keep collecting!`);
                         registerPointWinner("1 GOLD VOUCHER"); 
-                    } else if (wonAmount.includes('TON')) {
+                    } else if (effectiveWonAmount === 'PUZZLE') {
+                        if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
+                        alert(`🧩 PIEZA DE PUZZLE ENCONTRADA!\n\n(Lógica de backend pendiente de conexión)`);
+                    } else if (effectiveWonAmount.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
                         
-                        const finalPrize = isFlashSaleActive ? `${parseFloat(wonAmount.replace('TON','')) * 2} TON` : wonAmount;
+                        const finalPrize = isFlashSaleActive ? `${parseFloat(effectiveWonAmount.replace('TON','')) * 2} TON` : effectiveWonAmount;
                         setWonTonPrize(finalPrize);
                         
                         if (tonConnectUI.account?.address) {
                             setWalletInput(tonConnectUI.account.address);
                         }
                     }
-                } else if (typeof wonAmount === 'number' && wonAmount > 0) {
-                    onUpdateScore(s => s + wonAmount);
+                } else if (typeof effectiveWonAmount === 'number' && effectiveWonAmount > 0) {
+                    onUpdateScore(s => s + effectiveWonAmount);
                     if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
                     
-                    if (wonAmount >= 50000) {
-                        registerPointWinner(`${(wonAmount/1000).toFixed(0)}K PTS`);
+                    if (effectiveWonAmount >= 50000) {
+                        registerPointWinner(`${(effectiveWonAmount/1000).toFixed(0)}K PTS`);
                     }
 
                     if (spinType === 'premium') {
-                        alert(`🎉 VIP WIN! +${wonAmount.toLocaleString()} Pts added to balance!`);
+                        alert(`🎉 VIP WIN! +${effectiveWonAmount.toLocaleString()} Pts added to balance!`);
                     } else {
-                        if (wonAmount > SPIN_COST) {
-                            const profit = wonAmount - SPIN_COST;
+                        if (effectiveWonAmount > SPIN_COST) {
+                            const profit = effectiveWonAmount - SPIN_COST;
                             alert(`🎉 BIG WIN! You profited +${profit.toLocaleString()} Pts!`);
-                        } else if (wonAmount === SPIN_COST) {
-                            alert(`⚖️ Phew! You got your ${wonAmount.toLocaleString()} points back.`);
+                        } else if (effectiveWonAmount === SPIN_COST) {
+                            alert(`⚖️ Phew! You got your ${effectiveWonAmount.toLocaleString()} points back.`);
                         } else {
-                            alert(`📉 Ouch! You only won ${wonAmount.toLocaleString()} points back.`);
+                            alert(`📉 Ouch! You only won ${effectiveWonAmount.toLocaleString()} points back.`);
                         }
                     }
                 } else {
@@ -433,6 +460,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         ${WHEEL_ITEMS.map((item, i) => `${item.color} ${i * (360 / WHEEL_ITEMS.length)}deg ${(i + 1) * (360 / WHEEL_ITEMS.length)}deg`).join(', ')}
     )`;
 
+    
+
     const renderMainButton = () => {
         if (premiumSpins > 0) {
             return (
@@ -472,6 +501,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', paddingBottom: '100px', position: 'relative'
         }}>
             
+            {/* 🔥 EL WIDGET FLOTANTE DEL ROMPECABEZAS 🔥 */}
+            {/* Si NO hay botón de cerrar (o sea, si estamos en la pestaña normal de Spin), el widget se coloca arriba a la derecha */}
+            {!onClose && <PuzzleWidget onClick={() => alert("¡Pronto abriremos el Árbol del Rompecabezas aquí!")} />}
+
+
             {/* 🔥 BOTÓN PARA CERRAR LA PESTAÑA O VOLVER AL MENÚ 🔥 */}
             {onClose && (
                 <button onClick={onClose} style={{
@@ -509,6 +543,23 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     <span style={{background:'#222', padding:'4px 10px', borderRadius:'10px', border:'1px solid #4CAF50', color:'#4CAF50'}}>Ads: {MAX_AD_SPINS - adSpinsUsed}</span>
                     <span style={{background:'#222', padding:'4px 10px', borderRadius:'10px', border:'1px solid #FFD700', color:'#FFD700'}}>VIP: {premiumSpins}</span>
                 </div>
+
+                {/* 🔥 BARRA FEVER MODE (NUEVO) 🔥 */}
+                <div style={{ margin: '15px auto 0 auto', width: '250px', background: 'rgba(255,255,255,0.05)', borderRadius: '15px', padding: '5px', border: isFeverReady ? '1px solid #FF0055' : '1px solid #333', boxShadow: isFeverReady ? '0 0 15px rgba(255,0,85,0.4)' : 'none' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 'bold', color: isFeverReady ? '#FF0055' : '#888', marginBottom: '4px', padding: '0 5px' }}>
+                        <span>{isFeverReady ? '🔥 FEVER MODE READY 🔥' : 'FEVER MODE CHARGE'}</span>
+                        <span>{adSpinsUsed}/{MAX_AD_SPINS}</span>
+                    </div>
+                    <div style={{ width: '100%', height: '8px', background: '#111', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ 
+                            height: '100%', 
+                            width: `${(adSpinsUsed / MAX_AD_SPINS) * 100}%`, 
+                            background: isFeverReady ? 'linear-gradient(90deg, #FF0055, #FFD700)' : '#4CAF50',
+                            transition: 'width 0.5s ease-out' 
+                        }}></div>
+                    </div>
+                </div>
+
             </div>
 
             <div style={{ position: 'relative', width: '320px', height: '320px', marginBottom: '30px' }}>
