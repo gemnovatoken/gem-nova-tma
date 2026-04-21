@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useTonConnectUI } from '@tonconnect/ui-react';
-import { X, Ticket, Diamond, Video, Trophy, Clock, CheckCircle2, Send, Star, Zap } from 'lucide-react';
+import { X, Ticket, Diamond, Video, Trophy, Clock, CheckCircle2, Send, Star, Zap, Flame } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 
 // Si instalaste 'canvas-confetti', descomenta esta línea. 
@@ -19,7 +19,7 @@ declare global {
 }
 
 interface LuckyWheelProps {
-    onClose: () => void;
+    onClose?: () => void; 
     score: number; 
     onUpdateScore: Dispatch<SetStateAction<number>>;
 }
@@ -30,23 +30,11 @@ interface WheelWinner {
     status: string;
 }
 
-const MAX_DAILY_SPINS = 2; 
-const MAX_AD_SPINS = 10;   ///ESTO SE CAMBIO TEMPORALMENTE//// 
+const MAX_DAILY_SPINS = 3; 
+const MAX_AD_SPINS = 10;   
 const EXTRA_SPINS_PRICE_TON = 0.10; 
 
 const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
-
-const WHEEL_ITEMS = [
-    { value: '5TON',   label: "5 TON",  sub: "GRAND",  color: "#FF0055", textCol: "#fff" }, 
-    { value: 25000,    label: "25K",    sub: "REFUND", color: "#222",    textCol: "#fff" }, 
-    { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
-    { value: 10000,    label: "10K",    sub: "PTS",     color: "#444",    textCol: "#aaa" }, 
-    { value: '0.15TON',label: "0.15",   sub: "TON",     color: "#E040FB", textCol: "#fff" }, 
-    { value: 0,        label: "FAIL",   sub: "SKULL",   color: "#111",    textCol: "#FF0055" }, 
-    { value: '1GOLD',  label: "1 GOLD", sub: "VOUCHER", color: "#FFD700", textCol: "#000" }, 
-    { value: 100000,   label: "100K",   sub: "MEGA",    color: "#00F2FE", textCol: "#000" }, 
-    { value: 50000,    label: "50K",    sub: "DOUBLE",  color: "#333",    textCol: "#fff" }  
-];
 
 export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdateScore }) => {
     const { user } = useAuth();
@@ -71,17 +59,28 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [timeLeftPromo, setTimeLeftPromo] = useState<string | null>(null);
     const [SPIN_COST, setSpinCost] = useState(25000); 
 
+    // 🔥 NUEVA LÓGICA VENTA FLASH FOMO (Constante para evitar el error de set no usado) 🔥
+    const isFlashSaleActive = true; 
+
+    // 🎯 NUEVA ECONOMÍA MICRO-RECOMPENSAS (Se duplica si hay Venta Flash)
+    const WHEEL_ITEMS = [
+        { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
+        { value: 50000,    label: "50K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
+        { value: '0.20TON',label: isFlashSaleActive ? "0.40" : "0.20", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }, 
+        { value: 10000,    label: "10K",    sub: "PTS",     color: "#444",    textCol: "#aaa" }, 
+        { value: '0.05TON',label: isFlashSaleActive ? "0.10" : "0.05", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }, 
+        { value: 0,        label: "FAIL",   sub: "SKULL",   color: "#111",    textCol: "#FF0055" }, 
+        { value: '1GOLD',  label: "1 GOLD", sub: "VOUCHER", color: "#FFD700", textCol: "#000" }, 
+        { value: '0.01TON',label: isFlashSaleActive ? "0.02" : "0.01", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }  
+    ];
+
     useEffect(() => {
         const calculatePromo = () => {
-            // 🔥 FECHA CERO: Puedes ajustar esta fecha a tu gusto.
-            // Actualmente está puesta para que hoy comience el Tier de 10k.
             const START_PHASE_1 = new Date('2026-03-11T07:00:00Z').getTime(); 
-            
-            // Calculamos automáticamente los bloques de 10 días
             const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000;
-            const START_PHASE_2 = START_PHASE_1 + TEN_DAYS_MS; // Día 10 al 20 (15k)
-            const START_PHASE_3 = START_PHASE_2 + TEN_DAYS_MS; // Día 20 al 30 (20k)
-            const NORMAL_PRICE_DATE = START_PHASE_3 + TEN_DAYS_MS; // Día 30+ (25k normal)
+            const START_PHASE_2 = START_PHASE_1 + TEN_DAYS_MS; 
+            const START_PHASE_3 = START_PHASE_2 + TEN_DAYS_MS; 
+            const NORMAL_PRICE_DATE = START_PHASE_3 + TEN_DAYS_MS; 
             
             const NOW = new Date().getTime();
 
@@ -89,9 +88,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             let nextDeadline = null;
             let phaseName = "";
 
-            // Lógica de escalada automática
             if (NOW < START_PHASE_1) {
-                currentCost = 20000; // Precio si entran ANTES de que empiece la fase 1
+                currentCost = 20000; 
                 nextDeadline = START_PHASE_1;
                 phaseName = "CURRENT PROMO";
             } else if (NOW >= START_PHASE_1 && NOW < START_PHASE_2) {
@@ -107,13 +105,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 nextDeadline = NORMAL_PRICE_DATE;
                 phaseName = "FINAL TIER (20K PTS)";
             } else {
-                currentCost = 25000; // Vuelve a la normalidad
+                currentCost = 25000; 
                 nextDeadline = null; 
             }
 
             setSpinCost(currentCost);
 
-            // Actualización del reloj visual
             if (nextDeadline) {
                 const difference = nextDeadline - NOW;
                 const d = Math.floor(difference / (1000 * 60 * 60 * 24));
@@ -132,7 +129,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         
         return () => clearInterval(timer);
     }, []);
-    // 🔥 FIN DE LÓGICA DE CRONÓMETRO ESCALONADO 🔥
 
     useEffect(() => {
         if (user) {
@@ -187,7 +183,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
     useEffect(() => {
         fetchWinners();
-    /// eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const registerPointWinner = async (prizeLabel: string) => {
@@ -279,7 +274,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             const segmentAngle = 360 / WHEEL_ITEMS.length; 
             const centerOffset = segmentAngle / 2; 
             const baseRotation = 360 - (targetIndex * segmentAngle) - centerOffset;
-            const randomWobble = Math.floor(Math.random() * 26) - 13; 
+            const randomWobble = Math.floor(Math.random() * (segmentAngle - 10)) - ((segmentAngle - 10) / 2); 
             
             const currentFullSpins = Math.floor(rotation / 360);
             const finalRotation = ((currentFullSpins + 5) * 360) + baseRotation + randomWobble;
@@ -300,7 +295,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                         registerPointWinner("1 GOLD VOUCHER"); 
                     } else if (wonAmount.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
-                        setWonTonPrize(wonAmount);
+                        
+                        const finalPrize = isFlashSaleActive ? `${parseFloat(wonAmount.replace('TON','')) * 2} TON` : wonAmount;
+                        setWonTonPrize(finalPrize);
+                        
                         if (tonConnectUI.account?.address) {
                             setWalletInput(tonConnectUI.account.address);
                         }
@@ -471,34 +469,45 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
     return (
         <div style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(5, 5, 10, 0.98)', zIndex: 6000,
-            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-            backdropFilter: 'blur(10px)'
+            display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', paddingBottom: '100px', position: 'relative'
         }}>
             
-            <button onClick={() => setShowWinners(true)} style={{
-                position:'absolute', top:80, left:20, border:'1px solid #FFD700', color:'#FFD700', cursor:'pointer',
-                background: 'rgba(255, 215, 0, 0.1)', borderRadius: '50%', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 15px rgba(255, 215, 0, 0.3)', zIndex: 7000
-            }}><Trophy size={20}/></button>
+            {/* 🔥 BOTÓN PARA CERRAR LA PESTAÑA O VOLVER AL MENÚ 🔥 */}
+            {onClose && (
+                <button onClick={onClose} style={{
+                    position:'absolute', top: 10, right: 10, border:'none', color:'#fff', cursor:'pointer',
+                    background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 7000
+                }}><X size={24}/></button>
+            )}
 
-            <button onClick={onClose} style={{
-                position:'absolute', top:80, right:20, border:'none', color:'#fff', cursor:'pointer',
-                background: 'rgba(255,255,255,0.1)', borderRadius: '50%', padding: '8px', zIndex: 7000
-            }}><X size={24}/></button>
+            {/* 🔥 ALERTA DE VENTA FLASH FOMO 🔥 */}
+            {isFlashSaleActive && (
+                <div style={{ width: '100%', background: 'linear-gradient(90deg, #FF0055 0%, #FF4400 100%)', borderRadius: '15px', padding: '15px', marginBottom: '25px', boxShadow: '0 10px 25px rgba(255,0,85,0.4)', border: '2px solid #FFAA00', textAlign: 'center', animation: 'pulse 2s infinite', marginTop: onClose ? '40px' : '0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
+                        <Flame color="#FFD700" fill="#FFD700" />
+                        <h2 style={{ margin: 0, color: '#FFF', fontSize: '20px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px' }}>Double Rewards Active!</h2>
+                        <Flame color="#FFD700" fill="#FFD700" />
+                    </div>
+                    <p style={{ margin: '0 0 10px 0', color: '#FFF', fontSize: '13px', fontWeight: 'bold' }}>All TON Micro-Prizes are doubled!</p>
+                    <div style={{ background: 'rgba(0,0,0,0.3)', display: 'inline-block', padding: '5px 15px', borderRadius: '20px', color: '#FFD700', fontWeight: '900', fontSize: '18px', letterSpacing: '2px' }}>
+                        <Clock size={16} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '5px' }}/> 
+                        03:59:59
+                    </div>
+                </div>
+            )}
 
-            <div style={{textAlign:'center', marginBottom:'20px', position:'relative'}}>
+            <div style={{textAlign:'center', marginBottom:'30px', position:'relative'}}>
                 <div style={{position:'absolute', top:'-20px', left:'50%', transform:'translateX(-50%)', width:'150px', height:'150px', background:'radial-gradient(circle, rgba(0, 136, 204, 0.4) 0%, transparent 70%)', zIndex:-1}}></div>
                 <h2 style={{
-                    color:'#fff', textShadow:'0 0 20px #0088CC, 0 0 40px #0088CC', 
+                    color:'#fff', textShadow: isFlashSaleActive ? '0 0 20px #FF0055' : '0 0 20px #0088CC', 
                     fontSize:'32px', margin:0, fontWeight:'900', letterSpacing:'2px', marginTop: '20px'
                 }}>
-                    HIGH ROLLER <Diamond size={24} style={{verticalAlign: 'middle', color: '#00F2FE'}}/>
+                    GNOVA WHEEL <Diamond size={24} style={{verticalAlign: 'middle', color: isFlashSaleActive ? '#FFD700' : '#00F2FE'}}/>
                 </h2>
-                <div style={{display:'flex', gap:'10px', justifyContent:'center', marginTop:'10px', fontSize:'10px', fontWeight:'bold', color:'#aaa'}}>
-                    <span style={{background:'#222', padding:'2px 8px', borderRadius:'10px', border:'1px solid #444'}}>Daily: {MAX_DAILY_SPINS - dailySpinsUsed}</span>
-                    <span style={{background:'#222', padding:'2px 8px', borderRadius:'10px', border:'1px solid #4CAF50', color:'#4CAF50'}}>Ads: {MAX_AD_SPINS - adSpinsUsed}</span>
-                    <span style={{background:'#222', padding:'2px 8px', borderRadius:'10px', border:'1px solid #0088CC', color:'#00F2FE'}}>VIP: {premiumSpins}</span>
+                <div style={{display:'flex', gap:'10px', justifyContent:'center', marginTop:'10px', fontSize:'11px', fontWeight:'bold', color:'#aaa'}}>
+                    <span style={{background:'#222', padding:'4px 10px', borderRadius:'10px', border:'1px solid #444'}}>Free: {MAX_DAILY_SPINS - dailySpinsUsed}</span>
+                    <span style={{background:'#222', padding:'4px 10px', borderRadius:'10px', border:'1px solid #4CAF50', color:'#4CAF50'}}>Ads: {MAX_AD_SPINS - adSpinsUsed}</span>
+                    <span style={{background:'#222', padding:'4px 10px', borderRadius:'10px', border:'1px solid #FFD700', color:'#FFD700'}}>VIP: {premiumSpins}</span>
                 </div>
             </div>
 
@@ -511,8 +520,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
                 <div style={{
                     position:'absolute', top:'-10px', left:'-10px', right:'-10px', bottom:'-10px',
-                    borderRadius:'50%', border:'2px solid rgba(0, 136, 204, 0.5)',
-                    boxShadow: '0 0 30px rgba(0, 136, 204, 0.3)',
+                    borderRadius:'50%', border: isFlashSaleActive ? '2px solid rgba(255, 0, 85, 0.8)' : '2px solid rgba(0, 136, 204, 0.5)',
+                    boxShadow: isFlashSaleActive ? '0 0 40px rgba(255, 0, 85, 0.5)' : '0 0 30px rgba(0, 136, 204, 0.3)',
                     animation: 'spinSlow 15s linear infinite'
                 }}></div>
 
@@ -528,7 +537,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 }}>
                     {WHEEL_ITEMS.map((item, i) => (
                         <WheelLabel 
-                            key={i} text={item.label} sub={item.sub} angle={(i * 40) + 20} color={item.textCol} 
+                            key={i} text={item.label} sub={item.sub} angle={(i * (360/WHEEL_ITEMS.length)) + (360/WHEEL_ITEMS.length/2)} color={item.textCol} 
                         />
                     ))}
                 </div>
@@ -536,15 +545,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 <div style={{
                     position:'absolute', top:'50%', left:'50%', transform:'translate(-50%, -50%)',
                     width:'60px', height:'60px', background:'#111', borderRadius:'50%',
-                    border:'4px solid #0088CC', display:'flex', alignItems:'center', justifyContent:'center',
-                    boxShadow: '0 0 20px #0088CC'
+                    border: isFlashSaleActive ? '4px solid #FF0055' : '4px solid #0088CC', display:'flex', alignItems:'center', justifyContent:'center',
+                    boxShadow: isFlashSaleActive ? '0 0 20px #FF0055' : '0 0 20px #0088CC'
                 }}>
-                    <Diamond size={24} color="#fff" fill="#0088CC" />
+                    <Diamond size={24} color="#fff" fill={isFlashSaleActive ? "#FF0055" : "#0088CC"} />
                 </div>
             </div>
 
-            {/* 🔥 RECUADRO DEL RELOJ DE DESCUENTO (SOLO APARECE SI HAY TIEMPO) 🔥 */}
-            {timeLeftPromo && (
+            {!isFlashSaleActive && timeLeftPromo && (
                 <div style={{
                     background: 'rgba(255, 0, 85, 0.1)', border: '1px solid #FF0055', color: '#FF0055',
                     padding: '8px 15px', borderRadius: '10px', fontWeight: 'bold', fontSize: '12px',
@@ -555,14 +563,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             )}
 
-            <div style={{width: '85%', display: 'flex', flexDirection: 'column', gap: '10px'}}>
+            <div style={{width: '100%', maxWidth: '350px', display: 'flex', flexDirection: 'column', gap: '15px'}}>
                 {renderMainButton()}
                 
                 <button 
                     className="btn-neon"
                     onClick={handleBuyMoreSpins}
                     style={{
-                        width: '100%', padding: '12px', fontSize: '14px', 
+                        width: '100%', padding: '15px', fontSize: '14px', 
                         background: 'linear-gradient(180deg, #FFD700 0%, #B8860B 100%)', 
                         color: '#000', border: '1px solid #FFF', 
                         fontWeight:'900', borderRadius:'12px',
@@ -576,6 +584,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     <span style={{fontSize: '11px', background: 'rgba(0,0,0,0.3)', padding: '2px 8px', borderRadius: '4px', color: '#fff'}}>
                         PAY {EXTRA_SPINS_PRICE_TON} TON
                     </span>
+                </button>
+
+                <button onClick={() => setShowWinners(true)} style={{ width: '100%', padding: '15px', background: '#222', border: '1px solid #444', color: '#FFF', borderRadius: '12px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
+                    <Trophy size={18} color="#FFD700" /> VIEW LEADERBOARD
                 </button>
             </div>
 

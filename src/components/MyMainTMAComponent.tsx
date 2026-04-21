@@ -5,7 +5,7 @@ import { RankingModal } from './RankingModal';
 import { LuckyWheel } from './LuckyWheel';
 import { BoostModal } from './BoostModal';
 import { useTonConnectUI } from '@tonconnect/ui-react'; 
-import { Zap, Gamepad2, Rocket, Bot, Video, Server, X, BatteryCharging, ShieldCheck, Clock } from 'lucide-react';
+import { Zap, Gamepad2, Server, Bot, Video, X, BatteryCharging, ShieldCheck, Clock, Rocket } from 'lucide-react';
 import type { SetStateAction, Dispatch } from 'react';
 
 // 🔥 LA SOLUCIÓN: Le decimos a TypeScript oficialmente qué es Adsgram 🔥
@@ -379,9 +379,9 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
                 
                 <div className="glass-card" style={{ padding: '8px 6px', borderRadius: '16px', background: 'rgba(20, 20, 30, 0.95)', border: '1px solid rgba(255,255,255,0.1)' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px' }}>
-                        <DockButton icon={<Rocket/>} label="UPGRADE" color="#00F2FE" onClick={() => setShowBoosts(true)} />
-                        <DockButton icon={<Bot/>} label="MANAGER" sub={getBotLabel()} color={getBotColor()} onClick={() => setShowManager(true)} />
-                        <DockButton icon={<Zap/>} label="OVERCLOCK" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
+                        <DockButton icon={<Rocket size={18}/>} label="UPGRADE" color="#00F2FE" onClick={() => setShowBoosts(true)} />
+                        <DockButton icon={<Bot size={18}/>} label="MANAGER" sub={getBotLabel()} color={getBotColor()} onClick={() => setShowManager(true)} />
+                        <DockButton icon={<Zap size={18}/>} label="OVERCLOCK" sub="AD" color="#FF512F" onClick={() => watchVideo('turbo')} />
                     </div>
                 </div>
             </div>
@@ -462,8 +462,23 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
             )}
             
             {showRanking && <RankingModal onClose={() => setShowRanking(false)} />}
-            {showLucky && <LuckyWheel onClose={() => setShowLucky(false)} score={score} onUpdateScore={setScore} />}
             {showBoosts && <BoostModal onClose={() => setShowBoosts(false)} levels={levels} score={score} onBuy={buyBoost} />}
+            
+            {/* 🔥 EL ENVOLTORIO MÁGICO PARA LA RULETA 🔥 */}
+            {/* Ahora, si presionan SPIN en el orbe, la ruleta se abre flotando encima de todo sin desarmarse */}
+            {showLucky && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, 
+                    zIndex: 9999, background: 'rgba(5,5,10,0.98)', 
+                    overflowY: 'auto', backdropFilter: 'blur(10px)'
+                }}>
+                    <LuckyWheel 
+                        onClose={() => setShowLucky(false)} 
+                        score={score} 
+                        onUpdateScore={setScore} 
+                    />
+                </div>
+            )}
             
             <style>{`
                 /* 🔥 ESTA CLASE OCULTA LA BARRA DE SCROLL PERO PERMITE DESLIZAR 🔥 */
@@ -486,7 +501,7 @@ export const MyMainTMAComponent: React.FC<GameProps> = (props) => {
 
 const DockButton: React.FC<DockButtonProps> = ({ icon, label, sub, color, onClick }) => (
     <button onClick={onClick} style={{ background: 'transparent', border: 'none', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0px', cursor: 'pointer', color: color || '#fff', padding: '4px 0' }}>
-        {React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement<{ size: number }>, { size: 18 }) : icon}
+        {icon}
         <span style={{ fontSize: '8px', fontWeight: 'bold', marginTop:'1px' }}>{label}</span>
         {sub && <span style={{ fontSize: '6px', background: '#333', padding: '0px 3px', borderRadius: '2px', color: '#aaa', marginTop:'1px' }}>{sub}</span>}
     </button>
