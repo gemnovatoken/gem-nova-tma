@@ -5,6 +5,7 @@ import { useTonConnectUI } from '@tonconnect/ui-react';
 import { X, Ticket, Diamond, Video, Trophy, Clock, CheckCircle2, Send, Star, Zap, Flame } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import { PuzzleWidget } from './PuzzleWidget';
+import { PuzzleModal } from './PuzzleModal'; // <--- AGREGA ESTO
 
 // Si instalaste 'canvas-confetti', descomenta esta línea. 
 // Si no, el código abajo tiene un try/catch para que no falle.
@@ -53,6 +54,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [walletInput, setWalletInput] = useState("");
     const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
     const [showWinners, setShowWinners] = useState(false);
+    const [showPuzzleModal, setShowPuzzleModal] = useState(false);
     
     const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
     const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
@@ -502,8 +504,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }}>
             
             {/* 🔥 EL WIDGET FLOTANTE DEL ROMPECABEZAS 🔥 */}
-            {/* Si NO hay botón de cerrar (o sea, si estamos en la pestaña normal de Spin), el widget se coloca arriba a la derecha */}
-            {!onClose && <PuzzleWidget onClick={() => alert("¡Pronto abriremos el Árbol del Rompecabezas aquí!")} />}
+            {!onClose && <PuzzleWidget onClick={() => setShowPuzzleModal(true)} />}
 
 
             {/* 🔥 BOTÓN PARA CERRAR LA PESTAÑA O VOLVER AL MENÚ 🔥 */}
@@ -714,6 +715,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             )}
 
+            {/* 🔥 MODAL DEL ÁRBOL EMERGENTE 🔥 */}
+            {showPuzzleModal && <PuzzleModal onClose={() => setShowPuzzleModal(false)} />}
             <style>{`
                 @keyframes spinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 @keyframes pulse-dot { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
