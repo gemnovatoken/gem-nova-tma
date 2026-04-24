@@ -268,30 +268,42 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 username_in: exactUsername 
             });
 
+            // --- INICIO DE LA LÓGICA DE LECTURA (Copia desde aquí) ---
             if (error) throw error;
 
-            let wonAmount: string | number | undefined;
-            
+            // 🔥 EL ARREGLO MAESTRO DEL PARSEO (Traductor de Supabase - 100% TypeScript Puro) 🔥
+            let rawWonAmount: unknown;
+
             if (Array.isArray(data) && data.length > 0) {
-                wonAmount = data[0].reward !== undefined ? data[0].reward : data[0];
-            } else if (data !== null && typeof data === 'object' && 'reward' in data) {
-                wonAmount = (data as Record<string, unknown>).reward as string | number;
-            } else if (data !== null && data !== undefined) {
-                wonAmount = data as string | number;
+                // Supabase a veces devuelve [{ prize_value: ... }]
+                const firstItem = data[0] as Record<string, unknown>;
+                rawWonAmount = firstItem.prize_value !== undefined ? firstItem.prize_value : (firstItem.reward !== undefined ? firstItem.reward : data[0]);
+            } else if (data !== null && typeof data === 'object') {
+                // Otras veces devuelve un objeto directo { prize_value: ... }
+                const dataObj = data as Record<string, unknown>;
+                rawWonAmount = ('prize_value' in dataObj) ? dataObj.prize_value : ('reward' in dataObj ? dataObj.reward : data);
+            } else {
+                rawWonAmount = data;
             }
 
-            if (wonAmount === undefined || wonAmount === null || (Array.isArray(data) && data.length === 0)) {
+            if (rawWonAmount === undefined || rawWonAmount === null) {
                 throw new Error("Invalid or empty data returned from database.");
             }
             
-            // 🔥 SOLUCIÓN AL BUG DE PARSEO (Limpiamos las comillas extra de Supabase)
+            let wonAmount = rawWonAmount as string | number;
+            
+            // Limpiamos cualquier comilla JSONB residual de Supabase
             if (typeof wonAmount === 'string') {
                 wonAmount = wonAmount.replace(/^"|"$/g, '');
+                // Si es un número en formato de texto (ej. "25000" o "0"), lo pasamos a Número Real
+                if (/^\d+$/.test(wonAmount)) {
+                    wonAmount = parseInt(wonAmount, 10);
+                }
             }
             
             let effectiveWonAmount = wonAmount;
             
-            // Mapeo forzado visual si hay inconsistencias
+            // Mapeo seguro visual para el Fever Mode
             if (isFeverReady) {
                 if (wonAmount === 0) effectiveWonAmount = '0.05TON';
                 if (wonAmount === 10000) effectiveWonAmount = 'PUZZLE';
@@ -299,6 +311,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
             const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === effectiveWonAmount);
             const targetIndex = winningIndex !== -1 ? winningIndex : 5; 
+            // --- FIN DE LA LÓGICA DE LECTURA (Reemplaza hasta aquí) ---
 
             const segmentAngle = 360 / WHEEL_ITEMS.length; 
             const centerOffset = segmentAngle / 2; 
