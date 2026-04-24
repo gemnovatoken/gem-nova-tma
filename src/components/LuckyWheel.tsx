@@ -6,6 +6,7 @@ import { X, Ticket, Diamond, Video, Trophy, Clock, CheckCircle2, Send, Star, Zap
 import type { Dispatch, SetStateAction } from 'react';
 import { PuzzleWidget } from './PuzzleWidget';
 import { PuzzleModal } from './PuzzleModal'; 
+import { VipStoreModal } from './VipStoreModal'; // <--- AGREGA ESTO
 
 // Si instalaste 'canvas-confetti', descomenta esta línea. 
 import confetti from 'canvas-confetti'; 
@@ -54,6 +55,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
     const [showWinners, setShowWinners] = useState(false);
     const [showPuzzleModal, setShowPuzzleModal] = useState(false);
+    const [showVipStore, setShowVipStore] = useState(false); // <--- AGREGA ESTO
     
     const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
     const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
@@ -542,7 +544,21 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             <div style={{width: '100%', maxWidth: '350px', display: 'flex', flexDirection: 'column', gap: '15px'}}>
                 {renderMainButton()}
                 
-                {/* ⚠️ ESTE BOTÓN SERÁ REEMPLAZADO POR LA TIENDA VIP EN EL SIGUIENTE PASO */}
+                <button 
+                    className="btn-neon"
+                    onClick={() => setShowVipStore(true)}
+                    style={{
+                        width: '100%', padding: '16px', fontSize: '16px', 
+                        background: 'linear-gradient(90deg, #FF0055 0%, #FF4400 100%)', 
+                        color: '#FFF', border: '1px solid #FFAA00', 
+                        fontWeight:'900', borderRadius:'14px',
+                        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                        boxShadow: '0 5px 20px rgba(255,0,85,0.4)', textTransform: 'uppercase', letterSpacing: '1px'
+                    }}
+                >
+                    <Zap size={20} fill="#FFF" /> GNOVA BLACK MARKET
+                </button>
+
                 <button 
                     className="btn-neon"
                     onClick={handleBuyMoreSpins}
@@ -642,6 +658,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
             {/* 🔥 MODAL DEL ÁRBOL EMERGENTE 🔥 */}
             {showPuzzleModal && <PuzzleModal onClose={() => setShowPuzzleModal(false)} />}
+            {/* 🔥 MODAL DE LA TIENDA VIP 🔥 */}
+{showVipStore && <VipStoreModal onClose={() => setShowVipStore(false)} userLevel={1} />}
             <style>{`
                 @keyframes spinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 @keyframes pulse-dot { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
