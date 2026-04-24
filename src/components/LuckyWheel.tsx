@@ -5,10 +5,9 @@ import { useTonConnectUI } from '@tonconnect/ui-react';
 import { X, Ticket, Diamond, Video, Trophy, Clock, CheckCircle2, Send, Star, Zap, Flame } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import { PuzzleWidget } from './PuzzleWidget';
-import { PuzzleModal } from './PuzzleModal'; // <--- AGREGA ESTO
+import { PuzzleModal } from './PuzzleModal'; 
 
 // Si instalaste 'canvas-confetti', descomenta esta línea. 
-// Si no, el código abajo tiene un try/catch para que no falle.
 import confetti from 'canvas-confetti'; 
 
 // 🔥 REGISTRAMOS ADSGRAM EN TYPESCRIPT PARA LA RULETA 🔥
@@ -32,10 +31,10 @@ interface WheelWinner {
     status: string;
 }
 
-
 const MAX_DAILY_SPINS = 3; 
 const MAX_AD_SPINS = 10;   
 const EXTRA_SPINS_PRICE_TON = 0.10; 
+const SPIN_COST = 15000; // 🔥 PRECIO FIJO ACTUALIZADO
 
 const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
@@ -59,93 +58,33 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
     const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
 
-    // 🔥 ESTADO Y LÓGICA DEL CRONÓMETRO ESCALONADO (TIERS) 🔥
-    const [timeLeftPromo, setTimeLeftPromo] = useState<string | null>(null);
-    const [SPIN_COST, setSpinCost] = useState(25000); 
-
-    // 🔥 NUEVA LÓGICA VENTA FLASH FOMO
+    // 🔥 VENTA FLASH FOMO (Mantenida)
     const isFlashSaleActive = true; 
 
     // 🔥 1. DETECTOR DE FEVER MODE: ¿Ya vio los 10 videos?
     const isFeverReady = adSpinsUsed >= MAX_AD_SPINS;
 
-    // 🔥 2. ECONOMÍA DINÁMICA: Movimos WHEEL_ITEMS aquí adentro para que reaccione al Fever Mode.
+    // 🔥 2. NUEVA ECONOMÍA VISUAL DE PREMIOS (Alineada con SQL)
     const WHEEL_ITEMS = [
         { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
-        { value: 50000,    label: "50K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
-        { value: '0.20TON',label: isFlashSaleActive ? "0.40" : "0.20", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }, 
+        { value: 25000,    label: "25K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
+        { value: '0.10TON',label: isFlashSaleActive ? "0.20" : "0.10", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }, 
         
-        // ⚠️ CASILLA REEMPLAZABLE 1 (Antes 10k Pts)
+        // ⚠️ CASILLA REEMPLAZABLE 1
         isFeverReady 
             ? { value: 'PUZZLE', label: "+1", sub: "PIEZA", color: "#FFD700", textCol: "#000" }
             : { value: 10000,    label: "10K",  sub: "PTS",   color: "#444",    textCol: "#aaa" }, 
         
-        { value: '0.05TON',label: isFlashSaleActive ? "0.10" : "0.05", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }, 
+        { value: '0.03TON',label: isFlashSaleActive ? "0.06" : "0.03", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
         
-        // ⚠️ CASILLA REEMPLAZABLE 2 (Antes FAIL)
+        // ⚠️ CASILLA REEMPLAZABLE 2
         isFeverReady 
             ? { value: '0.05TON',label: "0.05", sub: "TON", color: "#FF0055", textCol: "#fff" }
             : { value: 0,        label: "FAIL", sub: "SKULL", color: "#111",    textCol: "#FF0055" }, 
         
-        { value: '1GOLD',  label: "1 GOLD", sub: "VOUCHER", color: "#FFD700", textCol: "#000" }, 
-        { value: '0.01TON',label: isFlashSaleActive ? "0.02" : "0.01", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }  
+        { value: '0.01TON',label: isFlashSaleActive ? "0.02" : "0.01", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
+        { value: '0.05TON',label: isFlashSaleActive ? "0.10" : "0.05", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }  
     ];
-
-    useEffect(() => {
-        const calculatePromo = () => {
-            const START_PHASE_1 = new Date('2026-03-11T07:00:00Z').getTime(); 
-            const TEN_DAYS_MS = 10 * 24 * 60 * 60 * 1000;
-            const START_PHASE_2 = START_PHASE_1 + TEN_DAYS_MS; 
-            const START_PHASE_3 = START_PHASE_2 + TEN_DAYS_MS; 
-            const NORMAL_PRICE_DATE = START_PHASE_3 + TEN_DAYS_MS; 
-            
-            const NOW = new Date().getTime();
-
-            let currentCost = 25000;
-            let nextDeadline = null;
-            let phaseName = "";
-
-            if (NOW < START_PHASE_1) {
-                currentCost = 20000; 
-                nextDeadline = START_PHASE_1;
-                phaseName = "CURRENT PROMO";
-            } else if (NOW >= START_PHASE_1 && NOW < START_PHASE_2) {
-                currentCost = 10000;
-                nextDeadline = START_PHASE_2;
-                phaseName = "TIER 1 (10K PTS)";
-            } else if (NOW >= START_PHASE_2 && NOW < START_PHASE_3) {
-                currentCost = 15000;
-                nextDeadline = START_PHASE_3;
-                phaseName = "TIER 2 (15K PTS)";
-            } else if (NOW >= START_PHASE_3 && NOW < NORMAL_PRICE_DATE) {
-                currentCost = 20000;
-                nextDeadline = NORMAL_PRICE_DATE;
-                phaseName = "FINAL TIER (20K PTS)";
-            } else {
-                currentCost = 25000; 
-                nextDeadline = null; 
-            }
-
-            setSpinCost(currentCost);
-
-            if (nextDeadline) {
-                const difference = nextDeadline - NOW;
-                const d = Math.floor(difference / (1000 * 60 * 60 * 24));
-                const h = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const m = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-                const s = Math.floor((difference % (1000 * 60)) / 1000);
-                
-                setTimeLeftPromo(`${phaseName} ENDS IN: ${d}d ${h}h ${m}m ${s}s`);
-            } else {
-                setTimeLeftPromo(null);
-            }
-        };
-
-        calculatePromo(); 
-        const timer = setInterval(calculatePromo, 1000); 
-        
-        return () => clearInterval(timer);
-    }, []);
 
     useEffect(() => {
         if (user) {
@@ -285,8 +224,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 throw new Error("Invalid or empty data returned from database.");
             }
             
-            // ⚠️ Ajuste temporal: Si el backend todavía devuelve 0 o 10000, 
-            // pero estamos en Fever Mode, forzamos visualmente que caiga en una de las nuevas casillas.
+            // ⚠️ Mapeo para que el visualizador encuentre la casilla correcta
             let effectiveWonAmount = wonAmount;
             if (isFeverReady) {
                 if (wonAmount === 0) effectiveWonAmount = '0.05TON';
@@ -315,13 +253,9 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
 
                 if (typeof effectiveWonAmount === 'string') {
-                    if (effectiveWonAmount === '1GOLD') {
+                    if (effectiveWonAmount === 'PUZZLE') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
-                        alert(`🎟️ GOLDEN VOUCHER AQUIRED!\n\nYou found a legendary Golden Voucher. Keep collecting!`);
-                        registerPointWinner("1 GOLD VOUCHER"); 
-                    } else if (effectiveWonAmount === 'PUZZLE') {
-                        if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
-                        alert(`🧩 PIEZA DE PUZZLE ENCONTRADA!\n\n(Lógica de backend pendiente de conexión)`);
+                        alert(`🧩 PIEZA DE PUZZLE ENCONTRADA!\n\nSe ha añadido a tu árbol Gnova.`);
                     } else if (effectiveWonAmount.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
                         
@@ -336,7 +270,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     onUpdateScore(s => s + effectiveWonAmount);
                     if (window.navigator.vibrate) window.navigator.vibrate([100, 50, 100]);
                     
-                    if (effectiveWonAmount >= 50000) {
+                    if (effectiveWonAmount >= 25000) {
                         registerPointWinner(`${(effectiveWonAmount/1000).toFixed(0)}K PTS`);
                     }
 
@@ -401,6 +335,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         setIsSubmittingWallet(false);
     };
 
+    // 🔥 PREPARACIÓN PARA LA TIENDA VIP 🔥
+    // Por ahora mantuve el botón viejo, pero lo cambiaremos por el botón que abre tu tienda de paquetes.
     const handleBuyMoreSpins = async () => {
         if (!user) return; 
         if (!tonConnectUI.account) {
@@ -506,7 +442,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             {/* 🔥 EL WIDGET FLOTANTE DEL ROMPECABEZAS 🔥 */}
             {!onClose && <PuzzleWidget onClick={() => setShowPuzzleModal(true)} />}
 
-
             {/* 🔥 BOTÓN PARA CERRAR LA PESTAÑA O VOLVER AL MENÚ 🔥 */}
             {onClose && (
                 <button onClick={onClose} style={{
@@ -545,7 +480,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     <span style={{background:'#222', padding:'4px 10px', borderRadius:'10px', border:'1px solid #FFD700', color:'#FFD700'}}>VIP: {premiumSpins}</span>
                 </div>
 
-                {/* 🔥 BARRA FEVER MODE (NUEVO) 🔥 */}
+                {/* 🔥 BARRA FEVER MODE 🔥 */}
                 <div style={{ margin: '15px auto 0 auto', width: '250px', background: 'rgba(255,255,255,0.05)', borderRadius: '15px', padding: '5px', border: isFeverReady ? '1px solid #FF0055' : '1px solid #333', boxShadow: isFeverReady ? '0 0 15px rgba(255,0,85,0.4)' : 'none' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 'bold', color: isFeverReady ? '#FF0055' : '#888', marginBottom: '4px', padding: '0 5px' }}>
                         <span>{isFeverReady ? '🔥 FEVER MODE READY 🔥' : 'FEVER MODE CHARGE'}</span>
@@ -604,20 +539,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             </div>
 
-            {!isFlashSaleActive && timeLeftPromo && (
-                <div style={{
-                    background: 'rgba(255, 0, 85, 0.1)', border: '1px solid #FF0055', color: '#FF0055',
-                    padding: '8px 15px', borderRadius: '10px', fontWeight: 'bold', fontSize: '12px',
-                    marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px',
-                    boxShadow: '0 0 10px rgba(255, 0, 85, 0.3)', animation: 'pulse-dot 2s infinite'
-                }}>
-                    <Clock size={16} /> {timeLeftPromo}
-                </div>
-            )}
-
             <div style={{width: '100%', maxWidth: '350px', display: 'flex', flexDirection: 'column', gap: '15px'}}>
                 {renderMainButton()}
                 
+                {/* ⚠️ ESTE BOTÓN SERÁ REEMPLAZADO POR LA TIENDA VIP EN EL SIGUIENTE PASO */}
                 <button 
                     className="btn-neon"
                     onClick={handleBuyMoreSpins}
