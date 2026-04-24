@@ -37,10 +37,35 @@ const SPIN_COST = 15000; // 🔥 PRECIO FIJO
 
 const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
+// 🔥 LISTA DE MENSAJES SARCÁSTICOS DE FAIL
+const FAIL_MESSAGES = [
+    "💀 BUSTED! The house wins. Did you really think it would be that easy? 🤡",
+    "💨 POOF! Your points just vaporized. Try closing your eyes next time. 🙈",
+    "📉 FAIL! The Gnova Gods are laughing at you right now. 🌩️",
+    "🐢 NOPE! My grandma spins better than that. 👵",
+    "🗑️ YIKES! That spin belongs in the trash can. 🚮",
+    "⛔ DENIED! Are you using Internet Explorer to spin? 🐌",
+    "💸 BUSTED! We appreciate your generous donation to the casino. 🎩",
+    "🎪 FAIL! Welcome to the circus, clown! 🤡",
+    "🥊 OUCH! Right in the points. Maybe watch an ad to heal? 🩹",
+    "🧊 NOPE! Cold as ice. Better luck next time... 🥶",
+    "🪨 BUSTED! I've seen rocks with better luck than you. 🗿",
+    "🌬️ FAIL! Have you tried blowing on the screen? Doesn't work, but try it. 🤣",
+    "🏖️ YIKES! Your luck is on vacation today. 🍹",
+    "🔌 DENIED! Error 404: Luck not found. Please insert more points. 💻",
+    "🤏 BUSTED! That was almost a win... just kidding, total fail. 🤪",
+    "🎯 FAIL! You missed the target by a mile. 🏹",
+    "🧲 OOF! You're magically attracted to this skull, aren't you? 💀",
+    "💸 NOPE! We're sending your points to a better place... our pockets. 🏦",
+    "🎢 YIKES! What a roller coaster of disappointment. 🎢",
+    "🏆 DENIED! Wow, 20 fails in a row? You're actually breaking records! 🥇"
+];
+
 export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdateScore }) => {
     const { user } = useAuth();
     const [tonConnectUI] = useTonConnectUI();
     const [spinning, setSpinning] = useState(false);
+    const [failIndex, setFailIndex] = useState(0);
     const [rotation, setRotation] = useState(0);
     
     const [dailySpinsUsed, setDailySpinsUsed] = useState(0); 
@@ -366,8 +391,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                         }
                     }
                 } else {
+                    // 🔥 LÓGICA DEL MENSAJE TROLL CONSECUTIVO 🔥
                     if (window.navigator.vibrate) window.navigator.vibrate(400);
-                    alert("💀 BUSTED! The house wins. Better luck next time!");
+                    alert(FAIL_MESSAGES[failIndex]);
+                    
+                    // Avanza al siguiente mensaje (Si llega a 20, vuelve al 0)
+                    setFailIndex((prevIndex) => (prevIndex + 1) % FAIL_MESSAGES.length);
                 }
             }, 4000);
 
