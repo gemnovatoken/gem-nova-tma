@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import confetti from 'canvas-confetti';
 import { X, Star, Diamond, Zap, Flame, Clock, ShieldAlert, Lock, Unlock, Ticket } from 'lucide-react';
 
 interface VipStoreModalProps {
@@ -28,11 +29,39 @@ interface PresalePackage {
 
 type PurchaseItem = StorePackage | PresalePackage;
 
+// 🔥 SOLUCIÓN PRO: Función Impura EXTERNA al componente de React 🔥
+// Al estar aquí afuera, a React ya no le importa si usa Date.now() o Math.random()
+const triggerConfetti = () => {
+    const duration = 2000;
+    const end = Date.now() + duration;
+    
+    const frame = () => {
+        confetti({
+            particleCount: 5,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 },
+            colors: ['#FFD700', '#FFA500', '#FF8C00'] // Colores oro y naranja
+        });
+        confetti({
+            particleCount: 5,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 },
+            colors: ['#FFD700', '#FFA500', '#FF8C00']
+        });
+    
+        if (Date.now() < end) {
+            requestAnimationFrame(frame);
+        }
+    };
+    frame();
+};
+
 export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel = 1 }) => {
     const [timeLeft, setTimeLeft] = useState("11:59:59");
     const isFlashSale = true; 
 
-    // Temporizador visual
     useEffect(() => {
         const timer = setInterval(() => {
             const d = new Date();
@@ -41,7 +70,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
         return () => clearInterval(timer);
     }, []);
 
-    // 📦 BASE DE DATOS DE PAQUETES
     const storeData: {
         STARS: StorePackage[];
         TON: StorePackage[];
@@ -49,19 +77,19 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
         PRESALE: PresalePackage[];
     } = {
         STARS: [
-            { id: 's1', name: 'Starter Pouch', spins: 20, points: '50K', gnt: 0, base: 100, flash: 50, color: '#FFD700' },
-            { id: 's2', name: 'Streak Chest', spins: 65, points: '150K', gnt: 1, base: 300, flash: 150, color: '#FF9800', popular: true },
-            { id: 's3', name: 'Gnova Briefcase', spins: 150, points: '300K', gnt: 2, base: 600, flash: 300, color: '#FF0055' }
+            { id: 's1', name: 'Starter Pouch', spins: 5, points: '50K', gnt: 0, base: 100, flash: 50, color: '#FFD700' },
+            { id: 's2', name: 'Streak Chest', spins: 12, points: '150K', gnt: 1, base: 300, flash: 150, color: '#FF9800', popular: true },
+            { id: 's3', name: 'Gnova Briefcase', spins: 30, points: '300K', gnt: 2, base: 600, flash: 300, color: '#FF0055' }
         ],
         TON: [
-            { id: 't1', name: 'Seed Investor', spins: 30, points: '100K', gnt: 0, base: 1.0, flash: 0.5, color: '#00F2FE' },
-            { id: 't2', name: 'Venture Capital', spins: 70, points: '200K', gnt: 1, base: 2.0, flash: 1.0, color: '#0088CC', popular: true },
-            { id: 't3', name: 'The Oracle', spins: 160, points: '500K', gnt: 3, base: 4.0, flash: 2.0, color: '#7B2CBF' }
+            { id: 't1', name: 'Seed Investor', spins: 8, points: '100K', gnt: 0, base: 1.0, flash: 0.5, color: '#00F2FE' },
+            { id: 't2', name: 'Venture Capital', spins: 18, points: '200K', gnt: 1, base: 2.0, flash: 1.0, color: '#0088CC', popular: true },
+            { id: 't3', name: 'The Oracle', spins: 40, points: '500K', gnt: 3, base: 4.0, flash: 2.0, color: '#7B2CBF' }
         ],
         POINTS: [
-            { id: 'p1', name: 'Survival Pack', spins: 15, points: 0, gnt: 0, base: '200K', flash: '100K', color: '#4CAF50' },
-            { id: 'p2', name: 'Grinder Stash', spins: 40, points: 0, gnt: 0, base: '500K', flash: '250K', color: '#8BC34A' },
-            { id: 'p3', name: 'The Vault', spins: 90, points: 0, gnt: 0, base: '1.0M', flash: '500K', color: '#00C853', popular: true }
+            { id: 'p1', name: 'Survival Pack', spins: 3, points: 0, gnt: 0, base: '200K', flash: '100K', color: '#4CAF50' },
+            { id: 'p2', name: 'Grinder Stash', spins: 8, points: 0, gnt: 0, base: '500K', flash: '250K', color: '#8BC34A' },
+            { id: 'p3', name: 'The Vault', spins: 18, points: 0, gnt: 0, base: '1.0M', flash: '500K', color: '#00C853', popular: true }
         ],
         PRESALE: [
             { id: 'ido1', name: 'Airdrop Tier', gnt: 50, bonus: '0%', ton: 1 },
@@ -74,9 +102,11 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
 
     const handlePurchase = (item: PurchaseItem) => {
         alert(`🚧 CONECTANDO PASARELA DE PAGO...\n\nIniciando compra de ${item.name}. Pronto conectaremos la API de Telegram Stars y TON Connect aquí.`);
+        
+        // 🔥 Simplemente llamamos a la función pura desde aquí
+        triggerConfetti();
     };
 
-    // 🔥 Creador automático de tarjetas para ahorrar código
     const renderStorePackage = (pkg: StorePackage, currencyIcon: string, buttonText: string) => (
         <div key={pkg.id} style={{
             background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(15,15,20,0.9) 100%)',
@@ -165,7 +195,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
             {/* CONTENIDO DE LA TIENDA (SCROLL CONTINUO) */}
             <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '40px', paddingBottom: '50px' }}>
                 
-                {/* SECCIÓN 1: ESTRELLAS */}
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#FFD700', borderBottom: '1px solid rgba(255,215,0,0.3)', paddingBottom: '10px' }}>
                         <Star size={20} fill="#FFD700" />
@@ -176,7 +205,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                     </div>
                 </div>
 
-                {/* SECCIÓN 2: TON */}
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#00F2FE', borderBottom: '1px solid rgba(0,242,254,0.3)', paddingBottom: '10px' }}>
                         <Diamond size={20} fill="#00F2FE" />
@@ -187,7 +215,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                     </div>
                 </div>
 
-                {/* SECCIÓN 3: POINTS */}
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#4CAF50', borderBottom: '1px solid rgba(76,175,80,0.3)', paddingBottom: '10px' }}>
                         <Zap size={20} fill="#4CAF50" />
@@ -198,11 +225,10 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                     </div>
                 </div>
 
-                {/* SECCIÓN 4: PREVENTA PRIVADA (GATED IDO) */}
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#7B2CBF', borderBottom: '1px solid rgba(123,44,191,0.3)', paddingBottom: '10px' }}>
                         <ShieldAlert size={20} />
-                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>PRIVATE GNT SALE <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(IDO)</span></h3>
+                        <h3 style={{ margin: '0', fontSize: '18px', fontWeight: '900' }}>PRIVATE GNT SALE <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(IDO)</span></h3>
                     </div>
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>

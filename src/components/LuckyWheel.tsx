@@ -2,14 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useTonConnectUI } from '@tonconnect/ui-react';
-import { X, Ticket, Diamond, Video, Trophy, Clock, CheckCircle2, Send, Star, Zap, Flame } from 'lucide-react';
+import { X, Ticket, Diamond, Video, Trophy, Clock, CheckCircle2, Send, Star, Zap, Flame, Lock } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import { PuzzleWidget } from './PuzzleWidget';
 import { PuzzleModal } from './PuzzleModal'; 
-import { VipStoreModal } from './VipStoreModal'; // <--- AGREGA ESTO
-
-// Si instalaste 'canvas-confetti', descomenta esta línea. 
-import confetti from 'canvas-confetti'; 
+import { VipStoreModal } from './VipStoreModal'; 
+import confetti from 'canvas-confetti';
 
 // 🔥 REGISTRAMOS ADSGRAM EN TYPESCRIPT PARA LA RULETA 🔥
 declare global {
@@ -35,7 +33,7 @@ interface WheelWinner {
 const MAX_DAILY_SPINS = 3; 
 const MAX_AD_SPINS = 10;   
 const EXTRA_SPINS_PRICE_TON = 0.10; 
-const SPIN_COST = 15000; // 🔥 PRECIO FIJO ACTUALIZADO
+const SPIN_COST = 15000; // 🔥 PRECIO FIJO
 
 const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
@@ -55,31 +53,29 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
     const [showWinners, setShowWinners] = useState(false);
     const [showPuzzleModal, setShowPuzzleModal] = useState(false);
-    const [showVipStore, setShowVipStore] = useState(false); // <--- AGREGA ESTO
+    const [showVipStore, setShowVipStore] = useState(false); 
     
     const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
     const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
 
-    // 🔥 VENTA FLASH FOMO (Mantenida)
     const isFlashSaleActive = true; 
 
-    // 🔥 1. DETECTOR DE FEVER MODE: ¿Ya vio los 10 videos?
-    const isFeverReady = adSpinsUsed >= MAX_AD_SPINS;
+    // 🔥 LA LLAVE MAESTRA: El Black Market solo se abre con 13 giros jugados
+    const isBlackMarketUnlocked = dailySpinsUsed >= MAX_DAILY_SPINS && adSpinsUsed >= MAX_AD_SPINS;
+    const isFeverReady = isBlackMarketUnlocked;
 
-    // 🔥 2. NUEVA ECONOMÍA VISUAL DE PREMIOS (Alineada con SQL)
+    // 🔥 ECONOMÍA VISUAL DE PREMIOS
     const WHEEL_ITEMS = [
         { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
         { value: 25000,    label: "25K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
         { value: '0.10TON',label: isFlashSaleActive ? "0.20" : "0.10", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }, 
         
-        // ⚠️ CASILLA REEMPLAZABLE 1
         isFeverReady 
             ? { value: 'PUZZLE', label: "+1", sub: "PIEZA", color: "#FFD700", textCol: "#000" }
             : { value: 10000,    label: "10K",  sub: "PTS",   color: "#444",    textCol: "#aaa" }, 
         
         { value: '0.03TON',label: isFlashSaleActive ? "0.06" : "0.03", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
         
-        // ⚠️ CASILLA REEMPLAZABLE 2
         isFeverReady 
             ? { value: '0.05TON',label: "0.05", sub: "TON", color: "#FF0055", textCol: "#fff" }
             : { value: 0,        label: "FAIL", sub: "SKULL", color: "#111",    textCol: "#FF0055" }, 
@@ -161,11 +157,73 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         }
     };
 
+    // 🔥 EL BOTÓN DORADO CLÁSICO RESTAURADO (El Anzuelo)
+    const handleBuyMoreSpins = async () => {
+        if (!user) return; 
+        if (!tonConnectUI.account) {
+            alert("❌ Please connect your TON wallet first!");
+            return;
+        }
+
+        const confirmBuy = window.confirm(`💎 BUY 50,000 POINTS FOR ${EXTRA_SPINS_PRICE_TON} TON?\n\n🎁 BONUS: You will also receive 3 VIP Free Spins!`);
+        if(!confirmBuy) return;
+
+        try {
+            const transaction = {
+                validUntil: Math.floor(Date.now() / 1000) + 360,
+                messages: [{ address: ADMIN_WALLET, amount: (EXTRA_SPINS_PRICE_TON * 1000000000).toString() }],
+            };
+            const result = await tonConnectUI.sendTransaction(transaction);
+            
+            if (result) {
+                const { data: scoreData } = await supabase.from('user_score').select('username').eq('user_id', user.id).single();
+                const exactUsername = scoreData?.username || "HiddenUser";
+
+                const { error: vipError } = await supabase.rpc('buy_vip_tickets', { 
+                    user_id_in: user.id, 
+                    ton_amount: EXTRA_SPINS_PRICE_TON, 
+                    tickets_qty: 3,
+                    username_in: exactUsername 
+                });
+                if (vipError) throw vipError;
+
+                const { error: pointsError } = await supabase.rpc('increment_score', { 
+                    p_user_id: user.id, 
+                    p_amount: 50000 
+                });
+                if (pointsError) throw pointsError;
+
+                setPremiumSpins(prev => prev + 3);
+                onUpdateScore(prev => prev + 50000); 
+
+                alert("🎉 SUCCESS!\n\n+50,000 Points have been added to your balance.\n+3 VIP Spins are ready to use!");
+                try { 
+                    // Si instalaste 'canvas-confetti' y lo importaste arriba, esto funcionará.
+                    // Si no, el catch atrapará el error y no afectará el juego.
+                    if (typeof confetti === 'function') {
+                        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+                    }
+                } catch {
+                    console.log("Confetti animation skipped");
+                }
+            }
+        } catch (err: unknown) {
+            console.error(err);
+            let errorMessage = "Transaction cancelled.";
+            if (err instanceof Error) {
+                errorMessage = err.message;
+            } else if (err && typeof err === 'object' && 'message' in err) {
+                errorMessage = String((err as Record<string, unknown>).message);
+            }
+            alert(`❌ Error: ${errorMessage}`);
+        }
+    };
+
     const executeSpin = async (spinType: 'premium' | 'daily' | 'ad') => {
         if (spinning || !user?.id) return;
 
         if (spinType === 'premium') {
-            const confirmPremium = window.confirm(`💎 USE 1 VIP TICKET?\n\nThis spin will not consume any points. Good luck!`);
+            const confirmPremium = window.confirm(`💎 USE 1 VIP TICKET?\n\nThis spin will not consume any points. Guaranteed Wins active!`);
             if(!confirmPremium) return;
         } else {
             if (score < SPIN_COST) {
@@ -173,7 +231,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 return;
             }
             if (spinType === 'ad') {
-                const confirmAd = window.confirm(`📺 WATCH AD TO UNLOCK SPIN?\n\nThis will still cost you ${SPIN_COST.toLocaleString()} points.`);
+                const confirmAd = window.confirm(`📺 WATCH AD TO UNLOCK SPIN?\n\nThis will cost ${SPIN_COST.toLocaleString()} points.`);
                 if(!confirmAd) return;
                 
                 try {
@@ -226,8 +284,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 throw new Error("Invalid or empty data returned from database.");
             }
             
-            // ⚠️ Mapeo para que el visualizador encuentre la casilla correcta
+            // 🔥 SOLUCIÓN AL BUG DE PARSEO (Limpiamos las comillas extra de Supabase)
+            if (typeof wonAmount === 'string') {
+                wonAmount = wonAmount.replace(/^"|"$/g, '');
+            }
+            
             let effectiveWonAmount = wonAmount;
+            
+            // Mapeo forzado visual si hay inconsistencias
             if (isFeverReady) {
                 if (wonAmount === 0) effectiveWonAmount = '0.05TON';
                 if (wonAmount === 10000) effectiveWonAmount = 'PUZZLE';
@@ -244,7 +308,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             const currentFullSpins = Math.floor(rotation / 360);
             const finalRotation = ((currentFullSpins + 5) * 360) + baseRotation + randomWobble;
 
-
             setRotation(finalRotation);
 
             setTimeout(() => {
@@ -254,10 +317,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
                 else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
 
+                // 🔥 Lógica de Alertas blindada
                 if (typeof effectiveWonAmount === 'string') {
                     if (effectiveWonAmount === 'PUZZLE') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
-                        alert(`🧩 PIEZA DE PUZZLE ENCONTRADA!\n\nSe ha añadido a tu árbol Gnova.`);
+                        alert(`🧩 PUZZLE PIECE FOUND!\n\nIt has been added to your Gnova Tree.`);
                     } else if (effectiveWonAmount.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
                         
@@ -337,70 +401,9 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         setIsSubmittingWallet(false);
     };
 
-    // 🔥 PREPARACIÓN PARA LA TIENDA VIP 🔥
-    // Por ahora mantuve el botón viejo, pero lo cambiaremos por el botón que abre tu tienda de paquetes.
-    const handleBuyMoreSpins = async () => {
-        if (!user) return; 
-        if (!tonConnectUI.account) {
-            alert("❌ Please connect your TON wallet first!");
-            return;
-        }
-
-        const confirmBuy = window.confirm(`💎 BUY 50,000 POINTS FOR ${EXTRA_SPINS_PRICE_TON} TON?\n\n🎁 BONUS: You will also receive 3 VIP Free Spins!`);
-        if(!confirmBuy) return;
-
-        try {
-            const transaction = {
-                validUntil: Math.floor(Date.now() / 1000) + 360,
-                messages: [{ address: ADMIN_WALLET, amount: (EXTRA_SPINS_PRICE_TON * 1000000000).toString() }],
-            };
-            const result = await tonConnectUI.sendTransaction(transaction);
-            
-            if (result) {
-                const { data: scoreData } = await supabase.from('user_score').select('username').eq('user_id', user.id).single();
-                const exactUsername = scoreData?.username || "HiddenUser";
-
-                const { error: vipError } = await supabase.rpc('buy_vip_tickets', { 
-                    user_id_in: user.id, 
-                    ton_amount: EXTRA_SPINS_PRICE_TON, 
-                    tickets_qty: 3,
-                    username_in: exactUsername 
-                });
-                if (vipError) throw vipError;
-
-                const { error: pointsError } = await supabase.rpc('increment_score', { 
-                    p_user_id: user.id, 
-                    p_amount: 50000 
-                });
-                if (pointsError) throw pointsError;
-
-                setPremiumSpins(prev => prev + 3);
-                onUpdateScore(prev => prev + 50000); 
-
-                alert("🎉 SUCCESS!\n\n+50,000 Points have been added to your balance.\n+3 VIP Spins are ready to use!");
-                try { 
-                    confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } }); 
-                } catch {
-                    console.log("Confetti animation skipped");
-                }
-            }
-        } catch (err: unknown) {
-            console.error(err);
-            let errorMessage = "Transaction cancelled.";
-            if (err instanceof Error) {
-                errorMessage = err.message;
-            } else if (err && typeof err === 'object' && 'message' in err) {
-                errorMessage = String((err as Record<string, unknown>).message);
-            }
-            alert(`❌ Error: ${errorMessage}`);
-        }
-    };
-
     const conicGradient = `conic-gradient(
         ${WHEEL_ITEMS.map((item, i) => `${item.color} ${i * (360 / WHEEL_ITEMS.length)}deg ${(i + 1) * (360 / WHEEL_ITEMS.length)}deg`).join(', ')}
     )`;
-
-    
 
     const renderMainButton = () => {
         if (premiumSpins > 0) {
@@ -441,10 +444,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', paddingBottom: '100px', position: 'relative'
         }}>
             
-            {/* 🔥 EL WIDGET FLOTANTE DEL ROMPECABEZAS 🔥 */}
             {!onClose && <PuzzleWidget onClick={() => setShowPuzzleModal(true)} />}
 
-            {/* 🔥 BOTÓN PARA CERRAR LA PESTAÑA O VOLVER AL MENÚ 🔥 */}
             {onClose && (
                 <button onClick={onClose} style={{
                     position:'absolute', top: 10, right: 10, border:'none', color:'#fff', cursor:'pointer',
@@ -452,9 +453,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 }}><X size={24}/></button>
             )}
 
-            {/* 🔥 ALERTA DE VENTA FLASH FOMO 🔥 */}
             {isFlashSaleActive && (
-                <div style={{ width: '100%', background: 'linear-gradient(90deg, #FF0055 0%, #FF4400 100%)', borderRadius: '15px', padding: '15px', marginBottom: '25px', boxShadow: '0 10px 25px rgba(255,0,85,0.4)', border: '2px solid #FFAA00', textAlign: 'center', animation: 'pulse 2s infinite', marginTop: onClose ? '40px' : '0' }}>
+                <div style={{ width: '100%', maxWidth: '350px', background: 'linear-gradient(90deg, #FF0055 0%, #FF4400 100%)', borderRadius: '15px', padding: '15px', marginBottom: '25px', boxShadow: '0 10px 25px rgba(255,0,85,0.4)', border: '2px solid #FFAA00', textAlign: 'center', animation: 'pulse 2s infinite', marginTop: onClose ? '40px' : '0' }}>
                     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px', marginBottom: '5px' }}>
                         <Flame color="#FFD700" fill="#FFD700" />
                         <h2 style={{ margin: 0, color: '#FFF', fontSize: '20px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '1px' }}>Double Rewards Active!</h2>
@@ -482,7 +482,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     <span style={{background:'#222', padding:'4px 10px', borderRadius:'10px', border:'1px solid #FFD700', color:'#FFD700'}}>VIP: {premiumSpins}</span>
                 </div>
 
-                {/* 🔥 BARRA FEVER MODE 🔥 */}
                 <div style={{ margin: '15px auto 0 auto', width: '250px', background: 'rgba(255,255,255,0.05)', borderRadius: '15px', padding: '5px', border: isFeverReady ? '1px solid #FF0055' : '1px solid #333', boxShadow: isFeverReady ? '0 0 15px rgba(255,0,85,0.4)' : 'none' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', fontWeight: 'bold', color: isFeverReady ? '#FF0055' : '#888', marginBottom: '4px', padding: '0 5px' }}>
                         <span>{isFeverReady ? '🔥 FEVER MODE READY 🔥' : 'FEVER MODE CHARGE'}</span>
@@ -544,21 +543,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             <div style={{width: '100%', maxWidth: '350px', display: 'flex', flexDirection: 'column', gap: '15px'}}>
                 {renderMainButton()}
                 
-                <button 
-                    className="btn-neon"
-                    onClick={() => setShowVipStore(true)}
-                    style={{
-                        width: '100%', padding: '16px', fontSize: '16px', 
-                        background: 'linear-gradient(90deg, #FF0055 0%, #FF4400 100%)', 
-                        color: '#FFF', border: '1px solid #FFAA00', 
-                        fontWeight:'900', borderRadius:'14px',
-                        display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
-                        boxShadow: '0 5px 20px rgba(255,0,85,0.4)', textTransform: 'uppercase', letterSpacing: '1px'
-                    }}
-                >
-                    <Zap size={20} fill="#FFF" /> GNOVA BLACK MARKET
-                </button>
-
+                {/* 🔥 BOTÓN CLÁSICO (EL ANZUELO) 🔥 */}
                 <button 
                     className="btn-neon"
                     onClick={handleBuyMoreSpins}
@@ -578,6 +563,38 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                         PAY {EXTRA_SPINS_PRICE_TON} TON
                     </span>
                 </button>
+
+                {/* 🔥 BOTÓN INTELIGENTE DEL BLACK MARKET 🔥 */}
+                {isBlackMarketUnlocked ? (
+                    <button 
+                        className="btn-neon"
+                        onClick={() => setShowVipStore(true)}
+                        style={{
+                            width: '100%', padding: '16px', fontSize: '16px', 
+                            background: 'linear-gradient(90deg, #FF0055 0%, #FF4400 100%)', 
+                            color: '#FFF', border: '1px solid #FFAA00', 
+                            fontWeight:'900', borderRadius:'14px',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px',
+                            boxShadow: '0 5px 20px rgba(255,0,85,0.4)', textTransform: 'uppercase', letterSpacing: '1px'
+                        }}
+                    >
+                        <Flame size={20} fill="#FFF" /> ENTER BLACK MARKET
+                    </button>
+                ) : (
+                    <button 
+                        onClick={() => alert("🔒 BLACK MARKET LOCKED\n\nYou must complete 3 Daily Spins and 10 Ad Spins today to unlock the exclusive Guaranteed Wins market!")}
+                        style={{
+                            width: '100%', padding: '16px', fontSize: '14px', 
+                            background: 'rgba(255,255,255,0.05)', 
+                            color: '#666', border: '1px dashed #444', 
+                            fontWeight:'900', borderRadius:'14px',
+                            display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '4px', cursor: 'pointer'
+                        }}
+                    >
+                        <div style={{display: 'flex', alignItems: 'center', gap: '8px'}}><Lock size={16} /> BLACK MARKET LOCKED</div>
+                        <div style={{fontSize: '10px', color: '#555'}}>COMPLETE 13 SPINS TO UNLOCK</div>
+                    </button>
+                )}
 
                 <button onClick={() => setShowWinners(true)} style={{ width: '100%', padding: '15px', background: '#222', border: '1px solid #444', color: '#FFF', borderRadius: '12px', fontWeight: 'bold', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
                     <Trophy size={18} color="#FFD700" /> VIEW LEADERBOARD
@@ -656,10 +673,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             )}
 
-            {/* 🔥 MODAL DEL ÁRBOL EMERGENTE 🔥 */}
             {showPuzzleModal && <PuzzleModal onClose={() => setShowPuzzleModal(false)} />}
-            {/* 🔥 MODAL DE LA TIENDA VIP 🔥 */}
-{showVipStore && <VipStoreModal onClose={() => setShowVipStore(false)} userLevel={1} />}
+            {showVipStore && <VipStoreModal onClose={() => setShowVipStore(false)} userLevel={1} />}
             <style>{`
                 @keyframes spinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 @keyframes pulse-dot { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
