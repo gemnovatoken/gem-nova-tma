@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { X, Star, Diamond, Zap, Flame, Clock, ShieldAlert, Lock, Unlock, Ticket } from 'lucide-react';
+// 🔥 1. IMPORTAMOS AUTENTICACIÓN Y BASE DE DATOS
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../services/supabase';
 
 interface VipStoreModalProps {
     onClose: () => void;
@@ -29,8 +32,6 @@ interface PresalePackage {
 
 type PurchaseItem = StorePackage | PresalePackage;
 
-// 🔥 SOLUCIÓN PRO: Función Impura EXTERNA al componente de React 🔥
-// Al estar aquí afuera, a React ya no le importa si usa Date.now() o Math.random()
 const triggerConfetti = () => {
     const duration = 2000;
     const end = Date.now() + duration;
@@ -41,7 +42,7 @@ const triggerConfetti = () => {
             angle: 60,
             spread: 55,
             origin: { x: 0 },
-            colors: ['#FFD700', '#FFA500', '#FF8C00'] // Colores oro y naranja
+            colors: ['#FFD700', '#FFA500', '#FF8C00'] 
         });
         confetti({
             particleCount: 5,
@@ -58,8 +59,19 @@ const triggerConfetti = () => {
     frame();
 };
 
+// 🔥 2. TRADUCTOR DE PRECIOS VISUALES A NÚMEROS REALES
+const parseCost = (costStr: string | number): number => {
+    if (typeof costStr === 'number') return costStr;
+    const upperStr = costStr.toUpperCase();
+    if (upperStr.includes('K')) return parseFloat(upperStr) * 1000;
+    if (upperStr.includes('M')) return parseFloat(upperStr) * 1000000;
+    return parseFloat(upperStr);
+};
+
 export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel = 1 }) => {
+    const { user } = useAuth(); // Obtenemos al usuario activo
     const [timeLeft, setTimeLeft] = useState("11:59:59");
+    const [isProcessing, setIsProcessing] = useState(false); // Para evitar doble clic
     const isFlashSale = true; 
 
     useEffect(() => {
@@ -100,18 +112,67 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
         ]
     };
 
-    const handlePurchase = (item: PurchaseItem) => {
-        alert(`🚧 CONECTANDO PASARELA DE PAGO...\n\nIniciando compra de ${item.name}. Pronto conectaremos la API de Telegram Stars y TON Connect aquí.`);
-        
-        // 🔥 Simplemente llamamos a la función pura desde aquí
-        triggerConfetti();
+    // 🔥 3. EL CEREBRO DE LAS COMPRAS
+    const handlePurchase = async (item: PurchaseItem, currencyType: 'STARS' | 'TON' | 'POINTS' | 'PRESALE') => {
+        if (!user) {
+            alert("❌ User session not found. Please log in again.");
+            return;
+        }
+
+        if (currencyType === 'POINTS') {
+            const pkg = item as StorePackage;
+            const realCost = parseCost(isFlashSale ? pkg.flash : pkg.base);
+            
+            const confirmMsg = `🔥 BURN ${realCost.toLocaleString()} POINTS?\n\nYou are buying the "${pkg.name}".\nYou will receive ${pkg.spins} VIP Spins!`;
+            if (!window.confirm(confirmMsg)) return;
+
+            setIsProcessing(true);
+            try {
+                // Llamamos a la función de Supabase
+                const { data, error } = await supabase.rpc('process_store_purchase', {
+                    p_user_id: user.id,
+                    p_package_id: pkg.id,
+                    p_currency: 'POINTS',
+                    p_cost: realCost,
+                    p_spins: pkg.spins,
+                    p_points: 0, // Los paquetes de Puntos no regalan más puntos
+                    p_gnt: pkg.gnt
+                });
+
+                if (error) throw error;
+
+                if (data && data.success) {
+                    triggerConfetti();
+                    alert(`🎉 SUCCESS!\n\nTransaction complete. Close the Black Market to see your new VIP Spins!`);
+                } else {
+                    alert(`📉 FAILED: ${data?.message || 'Insufficient Points balance.'}`);
+                }
+            } catch (err: unknown) {
+                console.error("Purchase Error:", err);
+                let errorMessage = "An unexpected error occurred.";
+                if (err instanceof Error) {
+                    errorMessage = err.message;
+                } else if (err && typeof err === 'object' && 'message' in err) {
+                    errorMessage = String((err as Record<string, unknown>).message);
+                }
+                alert(`❌ SERVER ERROR: ${errorMessage}`);
+            } finally {
+                setIsProcessing(false);
+            }
+
+        } else {
+            // Para TON y STARS lo dejamos preparado para la API oficial
+            alert(`🚧 CONNECTING PAYMENT GATEWAY...\n\nInitiating purchase of ${item.name}. TON Connect / Telegram Stars integration coming soon.`);
+        }
     };
 
-    const renderStorePackage = (pkg: StorePackage, currencyIcon: string, buttonText: string) => (
+    // 🔥 Actualizamos el Render para que sepa qué moneda está usando cada paquete
+    const renderStorePackage = (pkg: StorePackage, currencyIcon: string, buttonText: string, currencyType: 'STARS' | 'TON' | 'POINTS') => (
         <div key={pkg.id} style={{
             background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(15,15,20,0.9) 100%)',
             border: `1px solid ${pkg.popular ? pkg.color : '#333'}`, borderRadius: '16px', padding: '20px',
-            position: 'relative', overflow: 'hidden', boxShadow: pkg.popular ? `0 0 20px ${pkg.color}33` : 'none'
+            position: 'relative', overflow: 'hidden', boxShadow: pkg.popular ? `0 0 20px ${pkg.color}33` : 'none',
+            opacity: isProcessing ? 0.6 : 1
         }}>
             {pkg.popular && (
                 <div style={{ position: 'absolute', top: 15, right: -30, background: pkg.color, color: '#000', fontSize: '10px', fontWeight: '900', padding: '5px 40px', transform: 'rotate(45deg)', boxShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
@@ -151,13 +212,16 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                 </div>
             </div>
 
-            <button onClick={() => handlePurchase(pkg)} style={{
-                width: '100%', padding: '15px', borderRadius: '12px', border: 'none',
-                background: isFlashSale ? 'linear-gradient(90deg, #FF0055, #FF4400)' : '#333',
-                color: '#FFF', fontWeight: '900', fontSize: '16px', cursor: 'pointer',
-                boxShadow: isFlashSale ? '0 5px 15px rgba(255,0,85,0.3)' : 'none', transition: 'transform 0.2s'
+            <button 
+                onClick={() => handlePurchase(pkg, currencyType)} 
+                disabled={isProcessing}
+                style={{
+                    width: '100%', padding: '15px', borderRadius: '12px', border: 'none',
+                    background: isFlashSale ? 'linear-gradient(90deg, #FF0055, #FF4400)' : '#333',
+                    color: '#FFF', fontWeight: '900', fontSize: '16px', cursor: isProcessing ? 'not-allowed' : 'pointer',
+                    boxShadow: isFlashSale ? '0 5px 15px rgba(255,0,85,0.3)' : 'none', transition: 'transform 0.2s'
             }}>
-                {buttonText}
+                {isProcessing ? 'PROCESSING...' : buttonText}
             </button>
         </div>
     );
@@ -175,7 +239,7 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                     <Zap color="#FFD700" fill="#FFD700" size={24} />
                     <h2 style={{ color: '#FFF', margin: 0, fontSize: '22px', fontWeight: '900', letterSpacing: '2px' }}>BLACK MARKET</h2>
                 </div>
-                <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', padding: '8px', cursor: 'pointer' }}>
+                <button onClick={onClose} disabled={isProcessing} style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff', borderRadius: '50%', padding: '8px', cursor: isProcessing ? 'not-allowed' : 'pointer' }}>
                     <X size={20} />
                 </button>
             </div>
@@ -201,7 +265,8 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>IMPULSE PACKS <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(STARS)</span></h3>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        {storeData.STARS.map(pkg => renderStorePackage(pkg, '⭐', 'BUY WITH STARS'))}
+                        {/* Pasamos 'STARS' como tipo de moneda */}
+                        {storeData.STARS.map(pkg => renderStorePackage(pkg, '⭐', 'BUY WITH STARS', 'STARS'))}
                     </div>
                 </div>
 
@@ -211,7 +276,8 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>WHALE PACKS <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(TON)</span></h3>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        {storeData.TON.map(pkg => renderStorePackage(pkg, '💎', 'BUY WITH TON'))}
+                        {/* Pasamos 'TON' como tipo de moneda */}
+                        {storeData.TON.map(pkg => renderStorePackage(pkg, '💎', 'BUY WITH TON', 'TON'))}
                     </div>
                 </div>
 
@@ -221,7 +287,8 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>BURNER PACKS <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(POINTS)</span></h3>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        {storeData.POINTS.map(pkg => renderStorePackage(pkg, 'PTS', 'BURN POINTS'))}
+                        {/* Pasamos 'POINTS' como tipo de moneda */}
+                        {storeData.POINTS.map(pkg => renderStorePackage(pkg, 'PTS', 'BURN POINTS', 'POINTS'))}
                     </div>
                 </div>
 
@@ -253,7 +320,8 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                             <div key={ido.id} style={{
                                 background: 'linear-gradient(90deg, rgba(20,20,25,0.9), rgba(40,20,50,0.9))',
                                 border: '1px solid #7B2CBF', borderRadius: '16px', padding: '15px 20px',
-                                display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                opacity: isProcessing ? 0.6 : 1
                             }}>
                                 <div>
                                     <div style={{ color: '#aaa', fontSize: '12px', fontWeight: 'bold' }}>{ido.name}</div>
@@ -264,8 +332,11 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                                         {ido.bonus} EXTRA BONUS
                                     </div>
                                 </div>
-                                <button onClick={() => handlePurchase(ido)} style={{
-                                    background: '#7B2CBF', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
+                                <button 
+                                    onClick={() => handlePurchase(ido, 'PRESALE')} 
+                                    disabled={isProcessing}
+                                    style={{
+                                    background: '#7B2CBF', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '10px', fontWeight: '900', cursor: isProcessing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '5px'
                                 }}>
                                     {ido.ton} <Diamond size={14}/>
                                 </button>
