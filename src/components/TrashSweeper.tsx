@@ -6,6 +6,7 @@ import { useWallet, ConnectionProvider, WalletProvider } from '@solana/wallet-ad
 import { WalletModalProvider, WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { Connection, Transaction } from '@solana/web3.js';
 import '@solana/wallet-adapter-react-ui/styles.css'; 
+// @ts-expect-error: se revisara
 import { PhantomWalletAdapter, SolflareWalletAdapter } from '@solana/wallet-adapter-wallets';
 import { Buffer } from 'buffer';
 
