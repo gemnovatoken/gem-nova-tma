@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-// 🔥 SOLUCIÓN 1: Agregamos 'Ticket' a la importación
 import { X, Star, Diamond, Zap, Flame, Clock, ShieldAlert, Lock, Unlock, Ticket } from 'lucide-react';
 
 interface VipStoreModalProps {
@@ -7,7 +6,6 @@ interface VipStoreModalProps {
     userLevel?: number;
 }
 
-// 🔥 SOLUCIÓN 2: Definimos cómo es exactamente un Paquete Normal (Stars, TON, Points)
 interface StorePackage {
     id: string;
     name: string;
@@ -20,7 +18,6 @@ interface StorePackage {
     popular?: boolean;
 }
 
-// 🔥 SOLUCIÓN 3: Definimos cómo es un Paquete de Preventa (IDO)
 interface PresalePackage {
     id: string;
     name: string;
@@ -29,14 +26,13 @@ interface PresalePackage {
     ton: number;
 }
 
-// Tipo combinado para la función de compra
 type PurchaseItem = StorePackage | PresalePackage;
 
 export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel = 1 }) => {
-    const [activeTab, setActiveTab] = useState<'STARS' | 'TON' | 'POINTS' | 'PRESALE'>('STARS');
     const [timeLeft, setTimeLeft] = useState("11:59:59");
-    const isFlashSale = true;
+    const isFlashSale = true; 
 
+    // Temporizador visual
     useEffect(() => {
         const timer = setInterval(() => {
             const d = new Date();
@@ -45,7 +41,7 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
         return () => clearInterval(timer);
     }, []);
 
-    // 📦 BASE DE DATOS (Ahora fuertemente tipada)
+    // 📦 BASE DE DATOS DE PAQUETES
     const storeData: {
         STARS: StorePackage[];
         TON: StorePackage[];
@@ -76,10 +72,65 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
         ]
     };
 
-    // 🔥 SOLUCIÓN 4: Quitamos 'any' y usamos nuestro tipo PurchaseItem
     const handlePurchase = (item: PurchaseItem) => {
         alert(`🚧 CONECTANDO PASARELA DE PAGO...\n\nIniciando compra de ${item.name}. Pronto conectaremos la API de Telegram Stars y TON Connect aquí.`);
     };
+
+    // 🔥 Creador automático de tarjetas para ahorrar código
+    const renderStorePackage = (pkg: StorePackage, currencyIcon: string, buttonText: string) => (
+        <div key={pkg.id} style={{
+            background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(15,15,20,0.9) 100%)',
+            border: `1px solid ${pkg.popular ? pkg.color : '#333'}`, borderRadius: '16px', padding: '20px',
+            position: 'relative', overflow: 'hidden', boxShadow: pkg.popular ? `0 0 20px ${pkg.color}33` : 'none'
+        }}>
+            {pkg.popular && (
+                <div style={{ position: 'absolute', top: 15, right: -30, background: pkg.color, color: '#000', fontSize: '10px', fontWeight: '900', padding: '5px 40px', transform: 'rotate(45deg)', boxShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+                    BEST DEAL
+                </div>
+            )}
+            
+            <h3 style={{ margin: '0 0 15px 0', color: '#FFF', fontSize: '18px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: pkg.color, boxShadow: `0 0 10px ${pkg.color}` }} />
+                {pkg.name}
+            </h3>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ color: '#00F2FE', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <Ticket size={16} /> {pkg.spins} VIP SPINS
+                    </div>
+                    {pkg.points !== 0 && (
+                        <div style={{ color: '#aaa', fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <Zap size={14} /> {pkg.points} PTS
+                        </div>
+                    )}
+                    {pkg.gnt > 0 && (
+                        <div style={{ color: '#FFD700', fontWeight: '900', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px', textShadow: '0 0 5px rgba(255,215,0,0.5)' }}>
+                            <ShieldAlert size={14} /> +{pkg.gnt} GNT TOKEN
+                        </div>
+                    )}
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                    <div style={{ color: '#666', textDecoration: 'line-through', fontSize: '14px', fontWeight: 'bold' }}>
+                        {pkg.base} {currencyIcon}
+                    </div>
+                    <div style={{ color: '#FFF', fontSize: '24px', fontWeight: '900', marginTop: '-5px', textShadow: isFlashSale ? '0 0 10px rgba(255,0,85,0.5)' : 'none' }}>
+                        {pkg.flash} {currencyIcon}
+                    </div>
+                </div>
+            </div>
+
+            <button onClick={() => handlePurchase(pkg)} style={{
+                width: '100%', padding: '15px', borderRadius: '12px', border: 'none',
+                background: isFlashSale ? 'linear-gradient(90deg, #FF0055, #FF4400)' : '#333',
+                color: '#FFF', fontWeight: '900', fontSize: '16px', cursor: 'pointer',
+                boxShadow: isFlashSale ? '0 5px 15px rgba(255,0,85,0.3)' : 'none', transition: 'transform 0.2s'
+            }}>
+                {buttonText}
+            </button>
+        </div>
+    );
 
     return (
         <div style={{
@@ -88,7 +139,7 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             padding: '20px 10px', overflowY: 'auto', backdropFilter: 'blur(15px)'
         }}>
-            {/* HEADER */}
+            {/* HEADER FIJO */}
             <div style={{ width: '100%', maxWidth: '400px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Zap color="#FFD700" fill="#FFD700" size={24} />
@@ -101,7 +152,7 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
 
             {/* FLASH SALE BANNER */}
             {isFlashSale && (
-                <div style={{ width: '100%', maxWidth: '400px', background: 'linear-gradient(90deg, #FF0055, #FF4400)', borderRadius: '12px', padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', boxShadow: '0 5px 20px rgba(255,0,85,0.4)', border: '1px solid #FFAA00' }}>
+                <div style={{ width: '100%', maxWidth: '400px', background: 'linear-gradient(90deg, #FF0055, #FF4400)', borderRadius: '12px', padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', boxShadow: '0 5px 20px rgba(255,0,85,0.4)', border: '1px solid #FFAA00' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#FFF', fontWeight: '900', fontSize: '14px' }}>
                         <Flame fill="#FFD700" color="#FFD700" /> 50% FLASH SALE
                     </div>
@@ -111,95 +162,53 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                 </div>
             )}
 
-            {/* TABS (NAVEGACIÓN) */}
-            <div style={{ display: 'flex', gap: '8px', width: '100%', maxWidth: '400px', marginBottom: '20px', overflowX: 'auto', paddingBottom: '5px' }} className="no-scrollbar">
-                {[
-                    { id: 'STARS', icon: <Star size={16}/>, label: 'STARS' },
-                    { id: 'TON', icon: <Diamond size={16}/>, label: 'TON' },
-                    { id: 'POINTS', icon: <Zap size={16}/>, label: 'BURN' },
-                    { id: 'PRESALE', icon: <ShieldAlert size={16}/>, label: 'IDO' }
-                ].map(tab => (
-                    // 🔥 SOLUCIÓN 5: Quitamos el 'as any' y lo casteamos correctamente
-                    <button key={tab.id} onClick={() => setActiveTab(tab.id as 'STARS' | 'TON' | 'POINTS' | 'PRESALE')}
-                        style={{
-                            flex: 1, minWidth: '85px', padding: '10px 5px', borderRadius: '10px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: '900',
-                            background: activeTab === tab.id ? 'rgba(255,255,255,0.1)' : 'transparent',
-                            color: activeTab === tab.id ? '#FFF' : '#666',
-                            border: activeTab === tab.id ? '1px solid rgba(255,255,255,0.2)' : '1px solid transparent',
-                            transition: 'all 0.3s'
-                        }}>
-                        {tab.icon} {tab.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* CONTENIDO DE LA TIENDA */}
-            <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {/* CONTENIDO DE LA TIENDA (SCROLL CONTINUO) */}
+            <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '40px', paddingBottom: '50px' }}>
                 
-                {/* RENDERIZADO DE STARS, TON Y POINTS */}
-                {activeTab !== 'PRESALE' && storeData[activeTab].map((pkg: StorePackage) => (
-                    <div key={pkg.id} style={{
-                        background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(15,15,20,0.9) 100%)',
-                        border: `1px solid ${pkg.popular ? pkg.color : '#333'}`, borderRadius: '16px', padding: '20px',
-                        position: 'relative', overflow: 'hidden', boxShadow: pkg.popular ? `0 0 20px ${pkg.color}33` : 'none'
-                    }}>
-                        {pkg.popular && (
-                            <div style={{ position: 'absolute', top: 15, right: -30, background: pkg.color, color: '#000', fontSize: '10px', fontWeight: '900', padding: '5px 40px', transform: 'rotate(45deg)', boxShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
-                                BEST DEAL
-                            </div>
-                        )}
-                        
-                        <h3 style={{ margin: '0 0 15px 0', color: '#FFF', fontSize: '18px', fontWeight: '900', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: pkg.color, boxShadow: `0 0 10px ${pkg.color}` }} />
-                            {pkg.name}
-                        </h3>
-
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <div style={{ color: '#00F2FE', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <Ticket size={16} /> {pkg.spins} VIP SPINS
-                                </div>
-                                {pkg.points !== 0 && (
-                                    <div style={{ color: '#aaa', fontWeight: 'bold', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <Zap size={14} /> {pkg.points} PTS
-                                    </div>
-                                )}
-                                {pkg.gnt > 0 && (
-                                    <div style={{ color: '#FFD700', fontWeight: '900', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '5px', textShadow: '0 0 5px rgba(255,215,0,0.5)' }}>
-                                        <ShieldAlert size={14} /> +{pkg.gnt} GNT TOKEN
-                                    </div>
-                                )}
-                            </div>
-
-                            <div style={{ textAlign: 'right' }}>
-                                <div style={{ color: '#666', textDecoration: 'line-through', fontSize: '14px', fontWeight: 'bold' }}>
-                                    {pkg.base} {activeTab === 'STARS' ? '⭐' : (activeTab === 'TON' ? '💎' : 'PTS')}
-                                </div>
-                                <div style={{ color: '#FFF', fontSize: '24px', fontWeight: '900', marginTop: '-5px', textShadow: isFlashSale ? '0 0 10px rgba(255,0,85,0.5)' : 'none' }}>
-                                    {pkg.flash} {activeTab === 'STARS' ? '⭐' : (activeTab === 'TON' ? '💎' : 'PTS')}
-                                </div>
-                            </div>
-                        </div>
-
-                        <button onClick={() => handlePurchase(pkg)} style={{
-                            width: '100%', padding: '15px', borderRadius: '12px', border: 'none',
-                            background: isFlashSale ? 'linear-gradient(90deg, #FF0055, #FF4400)' : '#333',
-                            color: '#FFF', fontWeight: '900', fontSize: '16px', cursor: 'pointer',
-                            boxShadow: isFlashSale ? '0 5px 15px rgba(255,0,85,0.3)' : 'none', transition: 'transform 0.2s'
-                        }}>
-                            {activeTab === 'POINTS' ? 'BURN POINTS' : 'BUY NOW'}
-                        </button>
+                {/* SECCIÓN 1: ESTRELLAS */}
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#FFD700', borderBottom: '1px solid rgba(255,215,0,0.3)', paddingBottom: '10px' }}>
+                        <Star size={20} fill="#FFD700" />
+                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>IMPULSE PACKS <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(STARS)</span></h3>
                     </div>
-                ))}
-
-                {/* RENDERIZADO DE LA PRE-VENTA PRIVADA (GATED) */}
-                {activeTab === 'PRESALE' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        
-                        {/* AVISO DEL BANCO CENTRAL */}
+                        {storeData.STARS.map(pkg => renderStorePackage(pkg, '⭐', 'BUY WITH STARS'))}
+                    </div>
+                </div>
+
+                {/* SECCIÓN 2: TON */}
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#00F2FE', borderBottom: '1px solid rgba(0,242,254,0.3)', paddingBottom: '10px' }}>
+                        <Diamond size={20} fill="#00F2FE" />
+                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>WHALE PACKS <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(TON)</span></h3>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        {storeData.TON.map(pkg => renderStorePackage(pkg, '💎', 'BUY WITH TON'))}
+                    </div>
+                </div>
+
+                {/* SECCIÓN 3: POINTS */}
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#4CAF50', borderBottom: '1px solid rgba(76,175,80,0.3)', paddingBottom: '10px' }}>
+                        <Zap size={20} fill="#4CAF50" />
+                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>BURNER PACKS <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(POINTS)</span></h3>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        {storeData.POINTS.map(pkg => renderStorePackage(pkg, 'PTS', 'BURN POINTS'))}
+                    </div>
+                </div>
+
+                {/* SECCIÓN 4: PREVENTA PRIVADA (GATED IDO) */}
+                <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px', color: '#7B2CBF', borderBottom: '1px solid rgba(123,44,191,0.3)', paddingBottom: '10px' }}>
+                        <ShieldAlert size={20} />
+                        <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>PRIVATE GNT SALE <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(IDO)</span></h3>
+                    </div>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid #FFD700', padding: '15px', borderRadius: '16px', textAlign: 'center' }}>
                             <h3 style={{ color: '#FFD700', margin: '0 0 10px 0', fontSize: '16px', fontWeight: '900' }}>🏦 GNOVA CENTRAL BANK</h3>
-                            <p style={{ color: '#aaa', fontSize: '12px', margin: '0 0 10px 0', lineHeight: '1.4' }}>The Private GNT Sale is exclusively for elite players. Your tokens are locked until the official DEX listing.</p>
+                            <p style={{ color: '#aaa', fontSize: '12px', margin: '0 0 10px 0', lineHeight: '1.4' }}>Exclusively for elite players. Tokens are locked until official DEX listing.</p>
                             <div style={{ background: '#000', padding: '10px', borderRadius: '8px', color: userLevel >= 5 ? '#4CAF50' : '#FF0055', fontWeight: 'bold', fontSize: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}>
                                 {userLevel >= 5 ? <Unlock size={14}/> : <Lock size={14}/>}
                                 YOUR LEVEL: {userLevel} (REQ: LVL 5)
@@ -207,10 +216,10 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                         </div>
 
                         {userLevel < 5 && (
-                            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#666' }}>
-                                <Lock size={48} style={{ margin: '0 auto 15px auto', opacity: 0.5 }} />
-                                <h3 style={{ margin: 0, color: '#fff' }}>ACCESS DENIED</h3>
-                                <p style={{ fontSize: '14px' }}>Play the wheel and level up your account to access the private token sale.</p>
+                            <div style={{ textAlign: 'center', padding: '30px 20px', color: '#666', border: '1px dashed #444', borderRadius: '16px' }}>
+                                <Lock size={40} style={{ margin: '0 auto 10px auto', opacity: 0.5 }} />
+                                <h3 style={{ margin: 0, color: '#fff', fontSize: '16px' }}>ACCESS DENIED</h3>
+                                <p style={{ fontSize: '12px' }}>Level up your account to unlock these investment tiers.</p>
                             </div>
                         )}
 
@@ -237,13 +246,9 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                             </div>
                         ))}
                     </div>
-                )}
-            </div>
+                </div>
 
-            <style>{`
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+            </div>
         </div>
     );
 };
