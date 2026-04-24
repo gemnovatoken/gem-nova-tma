@@ -735,7 +735,15 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             )}
 
             {showPuzzleModal && <PuzzleModal onClose={() => setShowPuzzleModal(false)} />}
-            {showVipStore && <VipStoreModal onClose={() => setShowVipStore(false)} userLevel={1} />}
+            {/* 🔥 MODAL DE LA TIENDA VIP ACTUALIZADO */}
+            {showVipStore && (
+                <VipStoreModal 
+                    onClose={() => setShowVipStore(false)} 
+                    userLevel={1} 
+                    onUpdateScore={onUpdateScore} // Pasamos la función para actualizar puntos
+                    setPremiumSpins={setPremiumSpins} // Pasamos la función para actualizar tickets VIP
+                    />
+                )}
             <style>{`
                 @keyframes spinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 @keyframes pulse-dot { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
