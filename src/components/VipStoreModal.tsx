@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import { X, Star, Diamond, Zap, Flame, Clock, ShieldAlert, Lock, Unlock, Ticket } from 'lucide-react';
-// 🔥 1. IMPORTAMOS AUTENTICACIÓN Y BASE DE DATOS
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase';
+// 🔥 IMPORTAMOS TON CONNECT PARA LOS PAGOS EN LA TIENDA
+import { useTonConnectUI } from '@tonconnect/ui-react';
 
-// 🔥 AGREGADO: Las props para que la ruleta nos preste su "pizarra de puntaje"
 interface VipStoreModalProps {
     onClose: () => void;
     userLevel?: number;
@@ -35,34 +35,20 @@ interface PresalePackage {
 
 type PurchaseItem = StorePackage | PresalePackage;
 
+const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
+
 const triggerConfetti = () => {
     const duration = 2000;
     const end = Date.now() + duration;
     
     const frame = () => {
-        confetti({
-            particleCount: 5,
-            angle: 60,
-            spread: 55,
-            origin: { x: 0 },
-            colors: ['#FFD700', '#FFA500', '#FF8C00'] 
-        });
-        confetti({
-            particleCount: 5,
-            angle: 120,
-            spread: 55,
-            origin: { x: 1 },
-            colors: ['#FFD700', '#FFA500', '#FF8C00']
-        });
-    
-        if (Date.now() < end) {
-            requestAnimationFrame(frame);
-        }
+        confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#FFD700', '#FFA500', '#FF8C00'] });
+        confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#FFD700', '#FFA500', '#FF8C00'] });
+        if (Date.now() < end) requestAnimationFrame(frame);
     };
     frame();
 };
 
-// 🔥 2. TRADUCTOR DE PRECIOS VISUALES A NÚMEROS REALES
 const parseCost = (costStr: string | number): number => {
     if (typeof costStr === 'number') return costStr;
     const upperStr = costStr.toUpperCase();
@@ -71,11 +57,11 @@ const parseCost = (costStr: string | number): number => {
     return parseFloat(upperStr);
 };
 
-// 🔥 AGREGADO: Recibimos las props onUpdateScore y setPremiumSpins
 export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel = 1, onUpdateScore, setPremiumSpins }) => {
-    const { user } = useAuth(); // Obtenemos al usuario activo
+    const { user } = useAuth();
+    const [tonConnectUI] = useTonConnectUI(); // 🔥 INICIALIZAMOS LA BILLETERA
     const [timeLeft, setTimeLeft] = useState("11:59:59");
-    const [isProcessing, setIsProcessing] = useState(false); // Para evitar doble clic
+    const [isProcessing, setIsProcessing] = useState(false);
     const isFlashSale = true; 
 
     useEffect(() => {
@@ -98,14 +84,15 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
             { id: 's3', name: 'Gnova Briefcase', spins: 30, points: '300K', gnt: 2, base: 600, flash: 300, color: '#FF0055' }
         ],
         TON: [
-            { id: 't1', name: 'Seed Investor', spins: 8, points: '100K', gnt: 0, base: 1.0, flash: 0.5, color: '#00F2FE' },
-            { id: 't2', name: 'Venture Capital', spins: 18, points: '200K', gnt: 1, base: 2.0, flash: 1.0, color: '#0088CC', popular: true },
-            { id: 't3', name: 'The Oracle', spins: 40, points: '500K', gnt: 3, base: 4.0, flash: 2.0, color: '#7B2CBF' }
+            { id: 't1', name: 'Seed Investor', spins: 3, points: '50K', gnt: 0, base: 0.20, flash: 0.10, color: '#00F2FE' },
+            { id: 't2', name: 'Venture Capital', spins: 10, points: '200K', gnt: 1, base: 1.0, flash: 0.50, color: '#0088CC', popular: true },
+            { id: 't3', name: 'The Oracle', spins: 25, points: '500K', gnt: 3, base: 2.0, flash: 1.0, color: '#7B2CBF' }
         ],
         POINTS: [
-            { id: 'p1', name: 'Survival Pack', spins: 3, points: 0, gnt: 0, base: '200K', flash: '100K', color: '#4CAF50' },
-            { id: 'p2', name: 'Grinder Stash', spins: 8, points: 0, gnt: 0, base: '500K', flash: '250K', color: '#8BC34A' },
-            { id: 'p3', name: 'The Vault', spins: 18, points: 0, gnt: 0, base: '1.0M', flash: '500K', color: '#00C853', popular: true }
+            // 🔥 PRECIOS DE QUEMA DE PUNTOS AJUSTADOS PARA PROTEGER LIQUIDEZ
+            { id: 'p1', name: 'Survival Pack', spins: 1, points: 0, gnt: 0, base: '300K', flash: '150K', color: '#4CAF50' },
+            { id: 'p2', name: 'Grinder Stash', spins: 3, points: 0, gnt: 0, base: '700K', flash: '350K', color: '#8BC34A' },
+            { id: 'p3', name: 'The Vault', spins: 10, points: 0, gnt: 0, base: '2.0M', flash: '1.0M', color: '#00C853', popular: true }
         ],
         PRESALE: [
             { id: 'ido1', name: 'Airdrop Tier', gnt: 50, bonus: '0%', ton: 1 },
@@ -116,15 +103,18 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
         ]
     };
 
-    // 🔥 3. EL CEREBRO DE LAS COMPRAS
     const handlePurchase = async (item: PurchaseItem, currencyType: 'STARS' | 'TON' | 'POINTS' | 'PRESALE') => {
         if (!user) {
             alert("❌ User session not found. Please log in again.");
             return;
         }
 
+        const pkg = item as StorePackage;
+
+        // ==========================================
+        // 🟢 COMPRA CON PUNTOS (BURN)
+        // ==========================================
         if (currencyType === 'POINTS') {
-            const pkg = item as StorePackage;
             const realCost = parseCost(isFlashSale ? pkg.flash : pkg.base);
             
             const confirmMsg = `🔥 BURN ${realCost.toLocaleString()} POINTS?\n\nYou are buying the "${pkg.name}".\nYou will receive ${pkg.spins} VIP Spins!`;
@@ -132,7 +122,7 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
 
             setIsProcessing(true);
             try {
-                // Llamamos a la función de Supabase
+                // 🔥 CORRECCIÓN: Llamamos directo a Supabase sin usar la blockchain aquí
                 const { data, error } = await supabase.rpc('process_store_purchase', {
                     p_user_id: user.id,
                     p_package_id: pkg.id,
@@ -147,11 +137,8 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
 
                 if (data && data.success) {
                     triggerConfetti();
-                    
-                    // 🔥 AGREGADO: AQUÍ SE ACTUALIZA TU PANTALLA EN TIEMPO REAL 🔥
-                    onUpdateScore(prev => prev - realCost); // Te quita los puntos del encabezado
-                    setPremiumSpins(prev => prev + pkg.spins); // Te suma los giros VIP
-                    
+                    onUpdateScore(prev => prev - realCost); 
+                    setPremiumSpins(prev => prev + pkg.spins); 
                     alert(`🎉 SUCCESS!\n\nTransaction complete. Close the Black Market to see your new VIP Spins!`);
                 } else {
                     alert(`📉 FAILED: ${data?.message || 'Insufficient Points balance.'}`);
@@ -159,23 +146,81 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
             } catch (err: unknown) {
                 console.error("Purchase Error:", err);
                 let errorMessage = "An unexpected error occurred.";
-                if (err instanceof Error) {
-                    errorMessage = err.message;
-                } else if (err && typeof err === 'object' && 'message' in err) {
-                    errorMessage = String((err as Record<string, unknown>).message);
-                }
+                if (err instanceof Error) errorMessage = err.message;
+                else if (err && typeof err === 'object' && 'message' in err) errorMessage = String((err as Record<string, unknown>).message);
                 alert(`❌ SERVER ERROR: ${errorMessage}`);
             } finally {
                 setIsProcessing(false);
             }
 
+        // ==========================================
+        // 🔵 COMPRA CON TON (CRIPTOMONEDA REAL)
+        // ==========================================
+        } else if (currencyType === 'TON') {
+            if (!tonConnectUI.account) {
+                alert("❌ Please connect your TON wallet first!");
+                return;
+            }
+
+            const tonCost = typeof pkg.flash === 'number' ? pkg.flash : parseFloat(pkg.flash as string);
+            const confirmBuy = window.confirm(`💎 BUY "${pkg.name}" FOR ${tonCost} TON?\n\nYou will receive ${pkg.spins} VIP Spins!`);
+            if(!confirmBuy) return;
+
+            setIsProcessing(true);
+            try {
+                // 1. Ejecutar la transacción en la Blockchain
+                const transaction = {
+                    validUntil: Math.floor(Date.now() / 1000) + 360,
+                    messages: [{ address: ADMIN_WALLET, amount: (tonCost * 1000000000).toString() }],
+                };
+                const result = await tonConnectUI.sendTransaction(transaction);
+                
+                // 2. Si el pago fue exitoso, entregar los premios por Supabase
+                if (result) {
+                    const extraPoints = pkg.points ? parseCost(pkg.points) : 0;
+
+                    const { data, error } = await supabase.rpc('process_store_purchase', {
+                        p_user_id: user.id,
+                        p_package_id: pkg.id,
+                        p_currency: 'TON',
+                        p_cost: tonCost,
+                        p_spins: pkg.spins,
+                        p_points: extraPoints,
+                        p_gnt: pkg.gnt
+                    });
+
+                    if (error) throw error;
+
+                    // 🔥 CORRECCIÓN: Aquí sí usamos la variable 'data' para validar (Quita el error de ESLint)
+                    if (data && data.success) {
+                        triggerConfetti();
+                        if (extraPoints > 0) onUpdateScore(prev => prev + extraPoints);
+                        setPremiumSpins(prev => prev + pkg.spins);
+
+                        alert(`🎉 SUCCESS!\n\n${tonCost} TON received. Your VIP Spins and bonuses have been added!`);
+                    } else {
+                        // Respaldo de seguridad en caso extremo
+                        alert(`⚠️ WARNING: Payment successful, but DB sync delayed: ${data?.message || 'Unknown issue'}. Contact support.`);
+                    }
+                }
+            } catch (err: unknown) {
+                console.error("TON Purchase Error:", err);
+                let errorMessage = "Transaction cancelled by user or network error.";
+                if (err instanceof Error) errorMessage = err.message;
+                else if (err && typeof err === 'object' && 'message' in err) errorMessage = String((err as Record<string, unknown>).message);
+                alert(`❌ Error: ${errorMessage}`);
+            } finally {
+                setIsProcessing(false);
+            }
+
+        // ==========================================
+        // ⭐ OTRAS COMPRAS (En desarrollo)
+        // ==========================================
         } else {
-            // Para TON y STARS lo dejamos preparado para la API oficial
-            alert(`🚧 CONNECTING PAYMENT GATEWAY...\n\nInitiating purchase of ${item.name}. TON Connect / Telegram Stars integration coming soon.`);
+            alert(`🚧 CONNECTING PAYMENT GATEWAY...\n\nInitiating purchase of ${item.name}. Telegram Stars integration coming soon.`);
         }
     };
 
-    // 🔥 Actualizamos el Render para que sepa qué moneda está usando cada paquete
     const renderStorePackage = (pkg: StorePackage, currencyIcon: string, buttonText: string, currencyType: 'STARS' | 'TON' | 'POINTS') => (
         <div key={pkg.id} style={{
             background: 'linear-gradient(145deg, rgba(30,30,35,0.9) 0%, rgba(15,15,20,0.9) 100%)',
@@ -242,7 +287,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
             display: 'flex', flexDirection: 'column', alignItems: 'center',
             padding: '20px 10px', overflowY: 'auto', backdropFilter: 'blur(15px)'
         }}>
-            {/* HEADER FIJO */}
             <div style={{ width: '100%', maxWidth: '400px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <Zap color="#FFD700" fill="#FFD700" size={24} />
@@ -253,7 +297,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                 </button>
             </div>
 
-            {/* FLASH SALE BANNER */}
             {isFlashSale && (
                 <div style={{ width: '100%', maxWidth: '400px', background: 'linear-gradient(90deg, #FF0055, #FF4400)', borderRadius: '12px', padding: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px', boxShadow: '0 5px 20px rgba(255,0,85,0.4)', border: '1px solid #FFAA00' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#FFF', fontWeight: '900', fontSize: '14px' }}>
@@ -265,7 +308,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                 </div>
             )}
 
-            {/* CONTENIDO DE LA TIENDA (SCROLL CONTINUO) */}
             <div style={{ width: '100%', maxWidth: '400px', display: 'flex', flexDirection: 'column', gap: '40px', paddingBottom: '50px' }}>
                 
                 <div>
@@ -274,7 +316,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>IMPULSE PACKS <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(STARS)</span></h3>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        {/* Pasamos 'STARS' como tipo de moneda */}
                         {storeData.STARS.map(pkg => renderStorePackage(pkg, '⭐', 'BUY WITH STARS', 'STARS'))}
                     </div>
                 </div>
@@ -285,7 +326,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>WHALE PACKS <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(TON)</span></h3>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        {/* Pasamos 'TON' como tipo de moneda */}
                         {storeData.TON.map(pkg => renderStorePackage(pkg, '💎', 'BUY WITH TON', 'TON'))}
                     </div>
                 </div>
@@ -296,7 +336,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                         <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '900' }}>BURNER PACKS <span style={{fontSize:'12px', color:'#aaa', fontWeight:'normal'}}>(POINTS)</span></h3>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                        {/* Pasamos 'POINTS' como tipo de moneda */}
                         {storeData.POINTS.map(pkg => renderStorePackage(pkg, 'PTS', 'BURN POINTS', 'POINTS'))}
                     </div>
                 </div>
