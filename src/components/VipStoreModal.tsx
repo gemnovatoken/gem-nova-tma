@@ -5,9 +5,12 @@ import { X, Star, Diamond, Zap, Flame, Clock, ShieldAlert, Lock, Unlock, Ticket 
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase';
 
+// 🔥 AGREGADO: Las props para que la ruleta nos preste su "pizarra de puntaje"
 interface VipStoreModalProps {
     onClose: () => void;
     userLevel?: number;
+    onUpdateScore: React.Dispatch<React.SetStateAction<number>>;
+    setPremiumSpins: React.Dispatch<React.SetStateAction<number>>;
 }
 
 interface StorePackage {
@@ -68,7 +71,8 @@ const parseCost = (costStr: string | number): number => {
     return parseFloat(upperStr);
 };
 
-export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel = 1 }) => {
+// 🔥 AGREGADO: Recibimos las props onUpdateScore y setPremiumSpins
+export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel = 1, onUpdateScore, setPremiumSpins }) => {
     const { user } = useAuth(); // Obtenemos al usuario activo
     const [timeLeft, setTimeLeft] = useState("11:59:59");
     const [isProcessing, setIsProcessing] = useState(false); // Para evitar doble clic
@@ -143,6 +147,11 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
 
                 if (data && data.success) {
                     triggerConfetti();
+                    
+                    // 🔥 AGREGADO: AQUÍ SE ACTUALIZA TU PANTALLA EN TIEMPO REAL 🔥
+                    onUpdateScore(prev => prev - realCost); // Te quita los puntos del encabezado
+                    setPremiumSpins(prev => prev + pkg.spins); // Te suma los giros VIP
+                    
                     alert(`🎉 SUCCESS!\n\nTransaction complete. Close the Black Market to see your new VIP Spins!`);
                 } else {
                     alert(`📉 FAILED: ${data?.message || 'Insufficient Points balance.'}`);
