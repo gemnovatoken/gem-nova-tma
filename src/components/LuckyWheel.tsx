@@ -89,24 +89,35 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const isBlackMarketUnlocked = dailySpinsUsed >= MAX_DAILY_SPINS && adSpinsUsed >= MAX_AD_SPINS;
     const isFeverReady = isBlackMarketUnlocked;
 
-    // 🔥 ECONOMÍA VISUAL DE PREMIOS
+    // 🔥 ECONOMÍA VISUAL DE PREMIOS (8 CASILLAS DINÁMICAS)
     const WHEEL_ITEMS = [
         { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
-        { value: 25000,    label: "25K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
-        { value: '0.10TON',label: isFlashSaleActive ? "0.20" : "0.10", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }, 
         
+        { value: 50000,    label: "50K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
+        
+        { value: '0.01TON',label: isFlashSaleActive ? "0.02" : "0.01", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
+        
+        // Dinámico 1: Puzzle (Fever) vs 100K (Normal)
         isFeverReady 
-            ? { value: 'PUZZLE', label: "+1", sub: "PIEZA", color: "#FFD700", textCol: "#000" }
-            : { value: 10000,    label: "10K",  sub: "PTS",   color: "#444",    textCol: "#aaa" }, 
+            ? { value: 'PUZZLE', label: "+1",   sub: "PIEZA", color: "#FFD700", textCol: "#000" }
+            : { value: 100000,   label: "100K", sub: "PTS",   color: "#7B2CBF", textCol: "#fff" }, 
         
         { value: '0.03TON',label: isFlashSaleActive ? "0.06" : "0.03", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
         
+        // Dinámico 2: 0.05 TON (Fever) vs FAIL (Normal)
         isFeverReady 
-            ? { value: '0.05TON',label: "0.05", sub: "TON", color: "#FF0055", textCol: "#fff" }
+            ? { value: '0.05TON',label: isFlashSaleActive ? "0.10" : "0.05", sub: "TON", color: "#FF0055", textCol: "#fff" }
             : { value: 0,        label: "FAIL", sub: "SKULL", color: "#111",    textCol: "#FF0055" }, 
         
-        { value: '0.01TON',label: isFlashSaleActive ? "0.02" : "0.01", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
-        { value: '0.05TON',label: isFlashSaleActive ? "0.10" : "0.05", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#E040FB", textCol: "#fff" }  
+        // Dinámico 3: 0.10 TON (Fever) vs 25K (Normal)
+        isFeverReady
+            ? { value: '0.10TON',label: isFlashSaleActive ? "0.20" : "0.10", sub: "TON", color: "#FF0055", textCol: "#fff" }
+            : { value: 25000,    label: "25K",  sub: "PTS",   color: "#FF9800", textCol: "#fff" },
+            
+        // Dinámico 4: 100K (Fever) vs 10K (Normal)
+        isFeverReady
+            ? { value: 100000,   label: "100K", sub: "PTS",   color: "#7B2CBF", textCol: "#fff" }
+            : { value: 10000,    label: "10K",  sub: "PTS",   color: "#888",    textCol: "#fff" } 
     ];
 
     useEffect(() => {
@@ -326,17 +337,25 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 }
             }
             
+            // ... (Después de limpiar las comillas de wonAmount)
             let effectiveWonAmount = wonAmount;
             
-            // Mapeo seguro visual para el Fever Mode
+            // 🛡️ Mapeo Seguro y Dinámico para evitar bugs visuales
             if (isFeverReady) {
+                // En Fever Mode, estas casillas no existen, forzamos la visualización al premio adyacente
                 if (wonAmount === 0) effectiveWonAmount = '0.05TON';
                 if (wonAmount === 10000) effectiveWonAmount = 'PUZZLE';
+                if (wonAmount === 25000) effectiveWonAmount = 100000;
+            } else {
+                // En Modo Normal, los criptos raros no están dibujados en las 8 casillas. 
+                // Aterrizan visualmente en 0.03TON, pero las alertas y el pago serán correctos.
+                if (wonAmount === '0.10TON' || wonAmount === '0.05TON') {
+                    effectiveWonAmount = '0.03TON'; 
+                }
             }
 
             const winningIndex = WHEEL_ITEMS.findIndex(item => item.value === effectiveWonAmount);
-            const targetIndex = winningIndex !== -1 ? winningIndex : 5; 
-            // --- FIN DE LA LÓGICA DE LECTURA (Reemplaza hasta aquí) ---
+            const targetIndex = winningIndex !== -1 ? winningIndex : 5;
 
             const segmentAngle = 360 / WHEEL_ITEMS.length; 
             const centerOffset = segmentAngle / 2; 
