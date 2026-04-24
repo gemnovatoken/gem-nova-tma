@@ -3,7 +3,6 @@ import confetti from 'canvas-confetti';
 import { X, Star, Diamond, Zap, Flame, Clock, ShieldAlert, Lock, Unlock, Ticket } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase';
-// 🔥 IMPORTAMOS TON CONNECT PARA LOS PAGOS EN LA TIENDA
 import { useTonConnectUI } from '@tonconnect/ui-react';
 
 interface VipStoreModalProps {
@@ -59,7 +58,7 @@ const parseCost = (costStr: string | number): number => {
 
 export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel = 1, onUpdateScore, setPremiumSpins }) => {
     const { user } = useAuth();
-    const [tonConnectUI] = useTonConnectUI(); // 🔥 INICIALIZAMOS LA BILLETERA
+    const [tonConnectUI] = useTonConnectUI();
     const [timeLeft, setTimeLeft] = useState("11:59:59");
     const [isProcessing, setIsProcessing] = useState(false);
     const isFlashSale = true; 
@@ -84,15 +83,16 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
             { id: 's3', name: 'Gnova Briefcase', spins: 30, points: '300K', gnt: 2, base: 600, flash: 300, color: '#FF0055' }
         ],
         TON: [
+            // 🔥 Ajustados los topes de TON a un máximo más controlado
             { id: 't1', name: 'Seed Investor', spins: 3, points: '50K', gnt: 0, base: 0.20, flash: 0.10, color: '#00F2FE' },
-            { id: 't2', name: 'Venture Capital', spins: 10, points: '200K', gnt: 1, base: 1.0, flash: 0.50, color: '#0088CC', popular: true },
-            { id: 't3', name: 'The Oracle', spins: 25, points: '500K', gnt: 3, base: 2.0, flash: 1.0, color: '#7B2CBF' }
+            { id: 't2', name: 'Venture Capital', spins: 8, points: '200K', gnt: 1, base: 1.0, flash: 0.50, color: '#0088CC', popular: true },
+            { id: 't3', name: 'The Oracle', spins: 15, points: '500K', gnt: 3, base: 2.0, flash: 1.0, color: '#7B2CBF' }
         ],
         POINTS: [
-            // 🔥 PRECIOS DE QUEMA DE PUNTOS AJUSTADOS PARA PROTEGER LIQUIDEZ
-            { id: 'p1', name: 'Survival Pack', spins: 1, points: 0, gnt: 0, base: '300K', flash: '150K', color: '#4CAF50' },
-            { id: 'p2', name: 'Grinder Stash', spins: 3, points: 0, gnt: 0, base: '700K', flash: '350K', color: '#8BC34A' },
-            { id: 'p3', name: 'The Vault', spins: 10, points: 0, gnt: 0, base: '2.0M', flash: '1.0M', color: '#00C853', popular: true }
+            // 🔥 PRECIOS DUPLICADOS Y ETIQUETA DIARIA (Tope de 15 giros)
+            { id: 'p1', name: 'Survival Pack (1/Day)', spins: 1, points: 0, gnt: 0, base: '600K', flash: '300K', color: '#4CAF50' },
+            { id: 'p2', name: 'Grinder Stash (1/Day)', spins: 5, points: 0, gnt: 0, base: '1.4M', flash: '700K', color: '#8BC34A' },
+            { id: 'p3', name: 'The Vault (1/Day)', spins: 15, points: 0, gnt: 0, base: '4.0M', flash: '2.0M', color: '#00C853', popular: true }
         ],
         PRESALE: [
             { id: 'ido1', name: 'Airdrop Tier', gnt: 50, bonus: '0%', ton: 1 },
@@ -122,14 +122,13 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
 
             setIsProcessing(true);
             try {
-                // 🔥 CORRECCIÓN: Llamamos directo a Supabase sin usar la blockchain aquí
                 const { data, error } = await supabase.rpc('process_store_purchase', {
                     p_user_id: user.id,
                     p_package_id: pkg.id,
                     p_currency: 'POINTS',
                     p_cost: realCost,
                     p_spins: pkg.spins,
-                    p_points: 0, // Los paquetes de Puntos no regalan más puntos
+                    p_points: 0, 
                     p_gnt: pkg.gnt
                 });
 
@@ -141,7 +140,14 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                     setPremiumSpins(prev => prev + pkg.spins); 
                     alert(`🎉 SUCCESS!\n\nTransaction complete. Close the Black Market to see your new VIP Spins!`);
                 } else {
-                    alert(`📉 FAILED: ${data?.message || 'Insufficient Points balance.'}`);
+                    // 🔥 MESA DE AYUDA PRO: Leer el código de error exacto
+                    if (data?.message === 'DAILY_LIMIT') {
+                        alert(`🛑 LIMIT REACHED!\n\nYou can only buy the "${pkg.name}" once per day.\nCome back tomorrow!`);
+                    } else if (data?.message === 'INSUFFICIENT_FUNDS') {
+                        alert(`📉 FAILED: You don't have enough points for this package.`);
+                    } else {
+                        alert(`📉 FAILED: ${data?.message}`);
+                    }
                 }
             } catch (err: unknown) {
                 console.error("Purchase Error:", err);
@@ -168,14 +174,12 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
 
             setIsProcessing(true);
             try {
-                // 1. Ejecutar la transacción en la Blockchain
                 const transaction = {
                     validUntil: Math.floor(Date.now() / 1000) + 360,
                     messages: [{ address: ADMIN_WALLET, amount: (tonCost * 1000000000).toString() }],
                 };
                 const result = await tonConnectUI.sendTransaction(transaction);
                 
-                // 2. Si el pago fue exitoso, entregar los premios por Supabase
                 if (result) {
                     const extraPoints = pkg.points ? parseCost(pkg.points) : 0;
 
@@ -191,7 +195,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
 
                     if (error) throw error;
 
-                    // 🔥 CORRECCIÓN: Aquí sí usamos la variable 'data' para validar (Quita el error de ESLint)
                     if (data && data.success) {
                         triggerConfetti();
                         if (extraPoints > 0) onUpdateScore(prev => prev + extraPoints);
@@ -199,7 +202,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
 
                         alert(`🎉 SUCCESS!\n\n${tonCost} TON received. Your VIP Spins and bonuses have been added!`);
                     } else {
-                        // Respaldo de seguridad en caso extremo
                         alert(`⚠️ WARNING: Payment successful, but DB sync delayed: ${data?.message || 'Unknown issue'}. Contact support.`);
                     }
                 }
@@ -214,7 +216,7 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
             }
 
         // ==========================================
-        // ⭐ OTRAS COMPRAS (En desarrollo)
+        // ⭐ OTRAS COMPRAS (STARS / PRESALE)
         // ==========================================
         } else {
             alert(`🚧 CONNECTING PAYMENT GATEWAY...\n\nInitiating purchase of ${item.name}. Telegram Stars integration coming soon.`);
