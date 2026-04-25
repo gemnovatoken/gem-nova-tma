@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useTonConnectUI } from '@tonconnect/ui-react';
@@ -33,11 +33,10 @@ interface WheelWinner {
 const MAX_DAILY_SPINS = 3; 
 const MAX_AD_SPINS = 10;   
 const EXTRA_SPINS_PRICE_TON = 0.10; 
-const SPIN_COST = 15000; // 🔥 PRECIO FIJO
+const SPIN_COST = 15000; 
 
 const ADMIN_WALLET = 'UQD7qJo2-AYe7ehX9_nEk4FutxnmbdiSx3aLlwlB9nENZ43q';
 
-// 🔥 LISTA DE MENSAJES SARCÁSTICOS DE FAIL
 const FAIL_MESSAGES = [
     "💀 BUSTED! The house wins. Did you really think it would be that easy? 🤡",
     "💨 POOF! Your points just vaporized. Try closing your eyes next time. 🙈",
@@ -77,51 +76,83 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [walletInput, setWalletInput] = useState("");
     const [isSubmittingWallet, setIsSubmittingWallet] = useState(false);
     const [showWinners, setShowWinners] = useState(false);
-    const [showPuzzleModal, setShowPuzzleModal] = useState(false);
-    const [showVipStore, setShowVipStore] = useState(false); 
     
+    // 🔥 ESTADOS REALES PARA EL ROMPECABEZAS 🔥
+    const [showPuzzleModal, setShowPuzzleModal] = useState(false);
+    const [puzzlePieces, setPuzzlePieces] = useState(0);
+    const [puzzleReward, setPuzzleReward] = useState(0.10);
+    const [puzzleLocked, setPuzzleLocked] = useState(false);
+    const [puzzleTimeLeft, setPuzzleTimeLeft] = useState("48h 00m");
+
+    const [showVipStore, setShowVipStore] = useState(false); 
     const [winnersList, setWinnersList] = useState<WheelWinner[]>([]);
     const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
 
     const isFlashSaleActive = true; 
-
-    // 🔥 LA LLAVE MAESTRA: El Black Market solo se abre con 13 giros jugados
     const isBlackMarketUnlocked = dailySpinsUsed >= MAX_DAILY_SPINS && adSpinsUsed >= MAX_AD_SPINS;
     const isFeverReady = isBlackMarketUnlocked;
 
-    // 🔥 ECONOMÍA VISUAL DE PREMIOS (8 CASILLAS DINÁMICAS)
     const WHEEL_ITEMS = [
         { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
-        
         { value: 50000,    label: "50K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
-        
         { value: '0.01TON',label: isFlashSaleActive ? "0.02" : "0.01", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
-        
-        // Dinámico 1: Puzzle (Fever) vs 100K (Normal)
         isFeverReady 
             ? { value: 'PUZZLE', label: "+1",   sub: "PIEZA", color: "#FFD700", textCol: "#000" }
             : { value: 100000,   label: "100K", sub: "PTS",   color: "#7B2CBF", textCol: "#fff" }, 
-        
         { value: '0.03TON',label: isFlashSaleActive ? "0.06" : "0.03", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
-        
-        // Dinámico 2: 0.05 TON (Fever) vs FAIL (Normal)
         isFeverReady 
             ? { value: '0.05TON',label: isFlashSaleActive ? "0.10" : "0.05", sub: "TON", color: "#FF0055", textCol: "#fff" }
             : { value: 0,        label: "FAIL", sub: "SKULL", color: "#111",    textCol: "#FF0055" }, 
-        
-        // Dinámico 3: 0.10 TON (Fever) vs 25K (Normal)
         isFeverReady
             ? { value: '0.10TON',label: isFlashSaleActive ? "0.20" : "0.10", sub: "TON", color: "#FF0055", textCol: "#fff" }
             : { value: 25000,    label: "25K",  sub: "PTS",   color: "#FF9800", textCol: "#fff" },
-            
-        // Dinámico 4: 100K (Fever) vs 10K (Normal)
         isFeverReady
             ? { value: 100000,   label: "100K", sub: "PTS",   color: "#7B2CBF", textCol: "#fff" }
             : { value: 10000,    label: "10K",  sub: "PTS",   color: "#888",    textCol: "#fff" } 
     ];
 
+    // 🔥 FUNCIÓN PARA LEER EL PUZLE DESDE SUPABASE (Blindada Nivel PRO)
+    const fetchPuzzleData = useCallback(async () => {
+        if (!user) return;
+        try {
+            const { data, error } = await supabase
+                .from('user_puzzles')
+                .select('pieces_collected, current_reward, is_locked, expires_at')
+                .eq('user_id', user.id)
+                .single();
+
+            // 🔥 SOLUCIÓN PRO: Leemos y usamos la variable 'error'.
+            // Si el error es 'PGRST116' (No hay filas), lo ignoramos porque es un usuario nuevo.
+            // Si es otro error (ej. se cayó la base de datos), lo registramos sin romper la app.
+            if (error && error.code !== 'PGRST116') {
+                console.warn("Puzzle DB Warning:", error.message);
+            }
+
+            if (data) {
+                setPuzzlePieces(data.pieces_collected || 0);
+                setPuzzleReward(data.current_reward || 0.10);
+                setPuzzleLocked(data.is_locked || false);
+                
+                if (data.expires_at) {
+                    const diff = new Date(data.expires_at).getTime() - new Date().getTime();
+                    if (diff > 0) {
+                        const h = Math.floor(diff / (1000 * 60 * 60));
+                        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                        setPuzzleTimeLeft(`${h}h ${m}m`);
+                    } else {
+                        setPuzzleTimeLeft("0h 0m");
+                        setPuzzleLocked(true);
+                    }
+                }
+            }
+        } catch (err: unknown) {
+            console.error("Error fetching puzzle", err);
+        }
+    }, [user]);
+
     useEffect(() => {
         if (user) {
+            fetchPuzzleData(); // Cargamos el puzle al iniciar
             setTimeout(() => {
                 const today = new Date().toISOString().split('T')[0];
                 const savedData = localStorage.getItem(`lucky_wheel_${user.id}`);
@@ -138,14 +169,15 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                             setAdSpinsUsed(0);
                             setPremiumSpins(parsed.premiumSpins || 0); 
                         }
-                    } catch (e) {
+                    // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
+                    } catch (e: unknown) {
                         console.error("Storage parse error", e);
                     }
                 }
                 setDataLoaded(true); 
             }, 0);
         }
-    }, [user]);
+    }, [user, fetchPuzzleData]);
 
     useEffect(() => {
         if (user && dataLoaded) {
@@ -188,12 +220,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 wallet_in: null 
             });
             fetchWinners(); 
-        } catch (e) {
+        // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
+        } catch (e: unknown) {
             console.error("Error logging point winner", e);
         }
     };
 
-    // 🔥 EL BOTÓN DORADO CLÁSICO RESTAURADO (El Anzuelo)
     const handleBuyMoreSpins = async () => {
         if (!user) return; 
         if (!tonConnectUI.account) {
@@ -234,13 +266,12 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
                 alert("🎉 SUCCESS!\n\n+50,000 Points have been added to your balance.\n+3 VIP Spins are ready to use!");
                 try { 
-                    // Si instalaste 'canvas-confetti' y lo importaste arriba, esto funcionará.
-                    // Si no, el catch atrapará el error y no afectará el juego.
                     if (typeof confetti === 'function') {
                         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
                     }
-                } catch {
-                    console.log("Confetti animation skipped");
+                // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
+                } catch (e: unknown) {
+                    console.log("Confetti animation skipped", e);
                 }
             }
         } catch (err: unknown) {
@@ -273,7 +304,9 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 try {
                     const AdController = window.Adsgram.init({ blockId: "24433" });
                     await AdController.show();
-                } catch {
+                // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
+                } catch (err: unknown) {
+                    console.log("Ad Error", err);
                     alert("⚠️ You must watch the full video to spin the wheel!");
                     return; 
                 }
@@ -304,18 +337,14 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 username_in: exactUsername 
             });
 
-            // --- INICIO DE LA LÓGICA DE LECTURA (Copia desde aquí) ---
             if (error) throw error;
 
-            // 🔥 EL ARREGLO MAESTRO DEL PARSEO (Traductor de Supabase - 100% TypeScript Puro) 🔥
             let rawWonAmount: unknown;
 
             if (Array.isArray(data) && data.length > 0) {
-                // Supabase a veces devuelve [{ prize_value: ... }]
                 const firstItem = data[0] as Record<string, unknown>;
                 rawWonAmount = firstItem.prize_value !== undefined ? firstItem.prize_value : (firstItem.reward !== undefined ? firstItem.reward : data[0]);
             } else if (data !== null && typeof data === 'object') {
-                // Otras veces devuelve un objeto directo { prize_value: ... }
                 const dataObj = data as Record<string, unknown>;
                 rawWonAmount = ('prize_value' in dataObj) ? dataObj.prize_value : ('reward' in dataObj ? dataObj.reward : data);
             } else {
@@ -328,27 +357,20 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             
             let wonAmount = rawWonAmount as string | number;
             
-            // Limpiamos cualquier comilla JSONB residual de Supabase
             if (typeof wonAmount === 'string') {
                 wonAmount = wonAmount.replace(/^"|"$/g, '');
-                // Si es un número en formato de texto (ej. "25000" o "0"), lo pasamos a Número Real
                 if (/^\d+$/.test(wonAmount)) {
                     wonAmount = parseInt(wonAmount, 10);
                 }
             }
             
-            // ... (Después de limpiar las comillas de wonAmount)
             let effectiveWonAmount = wonAmount;
             
-            // 🛡️ Mapeo Seguro y Dinámico para evitar bugs visuales
             if (isFeverReady) {
-                // En Fever Mode, estas casillas no existen, forzamos la visualización al premio adyacente
                 if (wonAmount === 0) effectiveWonAmount = '0.05TON';
                 if (wonAmount === 10000) effectiveWonAmount = 'PUZZLE';
                 if (wonAmount === 25000) effectiveWonAmount = 100000;
             } else {
-                // En Modo Normal, los criptos raros no están dibujados en las 8 casillas. 
-                // Aterrizan visualmente en 0.03TON, pero las alertas y el pago serán correctos.
                 if (wonAmount === '0.10TON' || wonAmount === '0.05TON') {
                     effectiveWonAmount = '0.03TON'; 
                 }
@@ -374,11 +396,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
                 else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
 
-                // 🔥 Lógica de Alertas blindada
                 if (typeof effectiveWonAmount === 'string') {
                     if (effectiveWonAmount === 'PUZZLE') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
                         alert(`🧩 PUZZLE PIECE FOUND!\n\nIt has been added to your Gnova Tree.`);
+                        fetchPuzzleData(); // 🔥 ACTUALIZAMOS EL PUZLE AL GANAR PIEZA
                     } else if (effectiveWonAmount.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
                         
@@ -410,11 +432,9 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                         }
                     }
                 } else {
-                    // 🔥 LÓGICA DEL MENSAJE TROLL CONSECUTIVO 🔥
                     if (window.navigator.vibrate) window.navigator.vibrate(400);
                     alert(FAIL_MESSAGES[failIndex]);
                     
-                    // Avanza al siguiente mensaje (Si llega a 20, vuelve al 0)
                     setFailIndex((prevIndex) => (prevIndex + 1) % FAIL_MESSAGES.length);
                 }
             }, 4000);
@@ -455,7 +475,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             alert(`✅ REWARD CLAIMED!\n\nPrize: ${wonTonPrize}\nStatus: PENDING.\n\nYour reward will be sent to your wallet soon.`);
             setWonTonPrize(null);
             fetchWinners();
-        } catch (err) {
+        // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
+        } catch (err: unknown) {
             console.error(err);
             alert("Error submitting claim. Please contact support.");
         }
@@ -505,6 +526,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', paddingBottom: '100px', position: 'relative'
         }}>
             
+            {/* Si tienes PuzzleWidget, puedes pasarle los states si los necesita, por ahora solo el onClick */}
             {!onClose && <PuzzleWidget onClick={() => setShowPuzzleModal(true)} />}
 
             {onClose && (
@@ -734,14 +756,24 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 </div>
             )}
 
-            {showPuzzleModal && <PuzzleModal onClose={() => setShowPuzzleModal(false)} />}
-            {/* 🔥 MODAL DE LA TIENDA VIP ACTUALIZADO */}
+            {/* 🔥 EL MODAL DEL PUZLE CONECTADO A LOS ESTADOS REALES 🔥 */}
+            {showPuzzleModal && (
+                <PuzzleModal 
+                    onClose={() => setShowPuzzleModal(false)}
+                    piecesCollected={puzzlePieces}
+                    currentReward={puzzleReward}
+                    isLocked={puzzleLocked}
+                    timeLeft={puzzleTimeLeft}
+                    onPuzzleUpdate={fetchPuzzleData} 
+                />
+            )}
+            
             {showVipStore && (
                 <VipStoreModal 
                     onClose={() => setShowVipStore(false)} 
                     userLevel={1} 
-                    onUpdateScore={onUpdateScore} // Pasamos la función para actualizar puntos
-                    setPremiumSpins={setPremiumSpins} // Pasamos la función para actualizar tickets VIP
+                    onUpdateScore={onUpdateScore} 
+                    setPremiumSpins={setPremiumSpins} 
                     />
                 )}
             <style>{`
