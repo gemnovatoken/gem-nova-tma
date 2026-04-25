@@ -83,13 +83,11 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
             { id: 's3', name: 'Gnova Briefcase', spins: 30, points: '300K', gnt: 2, base: 600, flash: 300, color: '#FF0055' }
         ],
         TON: [
-            // 🔥 Ajustados los topes de TON a un máximo más controlado
             { id: 't1', name: 'Seed Investor', spins: 3, points: '50K', gnt: 0, base: 0.20, flash: 0.10, color: '#00F2FE' },
             { id: 't2', name: 'Venture Capital', spins: 8, points: '200K', gnt: 1, base: 1.0, flash: 0.50, color: '#0088CC', popular: true },
             { id: 't3', name: 'The Oracle', spins: 15, points: '500K', gnt: 3, base: 2.0, flash: 1.0, color: '#7B2CBF' }
         ],
         POINTS: [
-            // 🔥 PRECIOS DUPLICADOS Y ETIQUETA DIARIA (Tope de 15 giros)
             { id: 'p1', name: 'Survival Pack (1/Day)', spins: 1, points: 0, gnt: 0, base: '600K', flash: '300K', color: '#4CAF50' },
             { id: 'p2', name: 'Grinder Stash (1/Day)', spins: 5, points: 0, gnt: 0, base: '1.4M', flash: '700K', color: '#8BC34A' },
             { id: 'p3', name: 'The Vault (1/Day)', spins: 15, points: 0, gnt: 0, base: '4.0M', flash: '2.0M', color: '#00C853', popular: true }
@@ -140,7 +138,6 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
                     setPremiumSpins(prev => prev + pkg.spins); 
                     alert(`🎉 SUCCESS!\n\nTransaction complete. Close the Black Market to see your new VIP Spins!`);
                 } else {
-                    // 🔥 MESA DE AYUDA PRO: Leer el código de error exacto
                     if (data?.message === 'DAILY_LIMIT') {
                         alert(`🛑 LIMIT REACHED!\n\nYou can only buy the "${pkg.name}" once per day.\nCome back tomorrow!`);
                     } else if (data?.message === 'INSUFFICIENT_FUNDS') {
@@ -216,10 +213,98 @@ export const VipStoreModal: React.FC<VipStoreModalProps> = ({ onClose, userLevel
             }
 
         // ==========================================
-        // ⭐ OTRAS COMPRAS (STARS / PRESALE)
+        // ⭐ COMPRA CON TELEGRAM STARS (NATIVO)
+        // ==========================================
+        } else if (currencyType === 'STARS') {
+            const starsCost = typeof pkg.flash === 'number' ? pkg.flash : parseFloat(pkg.flash as string);
+            const confirmBuy = window.confirm(`⭐ BUY "${pkg.name}" FOR ${starsCost} STARS?\n\nYou will receive ${pkg.spins} VIP Spins!`);
+            if (!confirmBuy) return;
+
+            setIsProcessing(true);
+            try {
+                // 1. Pedir a nuestra Supabase Edge Function que genere el Link de Pago
+                const { data: invoiceData, error: invoiceError } = await supabase.functions.invoke('create-telegram-invoice', {
+                    body: { 
+                        packageId: pkg.id, 
+                        packageName: pkg.name, 
+                        starsCost: starsCost, 
+                        userId: user.id 
+                    }
+                });
+
+                if (invoiceError) throw invoiceError;
+                if (!invoiceData || !invoiceData.success) throw new Error(invoiceData?.error || "Failed to generate invoice link.");
+
+                const invoiceUrl = invoiceData.invoiceLink;
+
+                // 🔥 SOLUCIÓN PRO: Creamos un molde local para que TypeScript acepte la nueva función
+                interface ModernTelegram {
+                    WebApp: {
+                        openInvoice: (url: string, callback: (status: string) => void) => void;
+                    };
+                }
+                
+                // Forzamos a TypeScript a leer window.Telegram con nuestro nuevo molde
+                const tg = window.Telegram as unknown as ModernTelegram;
+
+                // 2. Usar la API Nativa de Telegram para abrir la ventana de pago
+                if (tg && tg.WebApp && typeof tg.WebApp.openInvoice === 'function') {
+                    tg.WebApp.openInvoice(invoiceUrl, async (status: string) => {
+                        
+                        if (status === 'paid') {
+                            // 🔥 PAGO EXITOSO: Ejecutamos la entrega de premios en Supabase
+                            try {
+                                const extraPoints = pkg.points ? parseCost(pkg.points) : 0;
+                                const { data: purchaseData, error: purchaseError } = await supabase.rpc('process_store_purchase', {
+                                    p_user_id: user.id,
+                                    p_package_id: pkg.id,
+                                    p_currency: 'STARS',
+                                    p_cost: starsCost,
+                                    p_spins: pkg.spins,
+                                    p_points: extraPoints,
+                                    p_gnt: pkg.gnt
+                                });
+
+                                if (purchaseError) throw purchaseError;
+
+                                if (purchaseData && purchaseData.success) {
+                                    triggerConfetti();
+                                    if (extraPoints > 0) onUpdateScore(prev => prev + extraPoints);
+                                    setPremiumSpins(prev => prev + pkg.spins);
+
+                                    alert(`🎉 SUCCESS!\n\n${starsCost} Stars processed. Your VIP Spins and bonuses are ready!`);
+                                } else {
+                                    alert(`⚠️ WARNING: DB sync delayed: ${purchaseData?.message || 'Unknown issue'}. Support ID: ${user.id}`);
+                                }
+                            } catch (e) {
+                                console.error("Error giving Stars rewards:", e);
+                                alert("⚠️ Stars paid, but we couldn't deliver the rewards automatically. Please contact support.");
+                            }
+                        } else if (status === 'cancelled') {
+                            console.log("Stars payment cancelled by user.");
+                        } else {
+                            alert("❌ Stars payment failed or is pending.");
+                        }
+                        setIsProcessing(false);
+                    });
+                } else {
+                    alert("❌ You must open this app inside Telegram (or your Telegram version needs an update) to pay with Stars.");
+                    setIsProcessing(false);
+                }
+            } catch (err: unknown) {
+                console.error("Stars Purchase Error:", err);
+                let errorMessage = "Failed to initiate Stars payment.";
+                if (err instanceof Error) errorMessage = err.message;
+                alert(`❌ Error: ${errorMessage}`);
+                setIsProcessing(false);
+            }
+
+        // ==========================================
+        // 🛡️ OTRAS COMPRAS (PRESALE)
         // ==========================================
         } else {
-            alert(`🚧 CONNECTING PAYMENT GATEWAY...\n\nInitiating purchase of ${item.name}. Telegram Stars integration coming soon.`);
+            alert(`🚧 CONNECTING GATEWAY...\n\nInitiating purchase of ${item.name}.`);
+            setIsProcessing(false);
         }
     };
 
