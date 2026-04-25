@@ -5,17 +5,28 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase';
 import * as animejs from 'animejs';
 
-// 🔥 SOLUCIÓN NIVEL DIOS (Cero 'any'):
-// Creamos un molde estricto de las funciones de Anime.js que usamos
+// Molde estricto para TypeScript
 interface AnimeEngine {
     (params: Record<string, unknown>): void;
     stagger: (value: number | string | number[], options?: Record<string, unknown>) => unknown;
 }
 
-// Extraemos la función con un doble casteo seguro usando 'unknown' en lugar de 'any'
-const anime = ((animejs as unknown as { default: AnimeEngine }).default || animejs) as AnimeEngine;
+// 🔥 LA CURA PARA VERCEL: Extracción dinámica y segura
+// Evaluamos cómo Vercel empaquetó la librería y extraemos la función sin romper nada.
+const getAnime = (): AnimeEngine | null => {
+    try {
+        if (typeof animejs === 'function') return animejs as unknown as AnimeEngine;
+        const animeDefault = (animejs as unknown as { default: unknown }).default;
+        if (typeof animeDefault === 'function') return animeDefault as AnimeEngine;
+        return null;
+    } catch {
+        return null;
+    }
+};
 
-// Props reales que nos pasará LuckyWheel
+const anime = getAnime();
+
+// Props reales
 interface PuzzleModalProps {
     onClose: () => void;
     piecesCollected: number;
@@ -25,7 +36,6 @@ interface PuzzleModalProps {
     onPuzzleUpdate: () => void;
 }
 
-// Interfaz para el casteo seguro de Telegram Stars
 interface ModernTelegram {
     WebApp: {
         openInvoice: (url: string, callback: (status: string) => void) => void;
@@ -52,6 +62,13 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
     const upcomingRewards = [0.10, 0.15, 0.20, 0.30, 0.50, 1.0, 5.0, 25.0];
 
     useEffect(() => {
+        // 🛡️ EL ESCUDO: Si Vercel no cargó bien Anime.js, detenemos las animaciones, 
+        // pero evitamos la Pantalla Negra de la Muerte.
+        if (!anime) {
+            console.warn("Anime.js loading bypassed to prevent crash.");
+            return;
+        }
+
         anime({
             targets: '.puzzle-overlay-anim',
             opacity: [0, 1],
@@ -105,14 +122,18 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
                         } else if (purchaseData && purchaseData.success) {
                             
                             triggerGODConfetti();
-                            anime({
-                                targets: `.piece-index-${piecesCollected}`,
-                                scale: [1, 1.3, 1],
-                                rotate: '1turn',
-                                background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
-                                duration: 800,
-                                easing: 'easeInOutSine'
-                            });
+                            
+                            // 🛡️ ESCUDO: Solo animamos si la librería cargó bien
+                            if (anime) {
+                                anime({
+                                    targets: `.piece-index-${piecesCollected}`,
+                                    scale: [1, 1.3, 1],
+                                    rotate: '1turn',
+                                    background: 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)',
+                                    duration: 800,
+                                    easing: 'easeInOutSine'
+                                });
+                            }
 
                             if (purchaseData.puzzleCompleted) {
                                 setTimeout(() => alert(`🏆 JACKPOT!\n\nPuzzle completed! You won ${purchaseData.reward} TON.`), 1000);
@@ -144,7 +165,7 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(5, 5, 10, 0.95)', zIndex: 9500,
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            padding: '20px', overflowY: 'auto', backdropFilter: 'blur(10px)', opacity: 0
+            padding: '20px', overflowY: 'auto', backdropFilter: 'blur(10px)', opacity: anime ? 0 : 1 // Si no hay anime, la opacidad inicia en 1
         }}>
             
             <div style={{ width: '100%', maxWidth: '400px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
@@ -199,7 +220,7 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
                                     display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column',
                                     boxShadow: isCollected ? '0 5px 15px rgba(255,215,0,0.4)' : (isNextToBuy ? '0 0 15px rgba(0,242,254,0.2)' : 'inset 0 0 10px rgba(0,0,0,0.5)'),
                                     transform: isCollected ? 'scale(1)' : 'scale(0.95)',
-                                    transition: 'all 0.3s ease', opacity: 0
+                                    transition: 'all 0.3s ease', opacity: anime ? 0 : 1 // Visibles por defecto si falla la animación
                                 }}>
                                     {isCollected ? (
                                         <Diamond size={24} color="#FFF" />
