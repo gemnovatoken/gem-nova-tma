@@ -5,14 +5,11 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase';
 import * as animejs from 'animejs';
 
-// Molde estricto para TypeScript
 interface AnimeEngine {
     (params: Record<string, unknown>): void;
     stagger: (value: number | string | number[], options?: Record<string, unknown>) => unknown;
 }
 
-// 🔥 LA CURA PARA VERCEL: Extracción dinámica y segura
-// Evaluamos cómo Vercel empaquetó la librería y extraemos la función sin romper nada.
 const getAnime = (): AnimeEngine | null => {
     try {
         if (typeof animejs === 'function') return animejs as unknown as AnimeEngine;
@@ -26,10 +23,11 @@ const getAnime = (): AnimeEngine | null => {
 
 const anime = getAnime();
 
-// Props reales
+// 🔥 CAMBIO PRO: Agregamos 'piecesBought' para rastrear cuántas ha comprado con Stars
 interface PuzzleModalProps {
     onClose: () => void;
     piecesCollected: number;
+    piecesBought: number; 
     currentReward: number;
     isLocked: boolean;
     timeLeft: string;
@@ -46,9 +44,26 @@ const triggerGODConfetti = () => {
     confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 }, colors: ['#FFD700', '#00F2FE', '#FFFFFF'] });
 };
 
+// Calcula las piezas totales según el premio
+const getTotalPiecesForReward = (reward: number): number => {
+    if (reward <= 0.15) return 6;
+    if (reward <= 0.20) return 9;
+    if (reward <= 0.30) return 12;
+    if (reward <= 0.50) return 18;
+    if (reward <= 1.0) return 24;
+    return 30; 
+};
+
+// 🔥 NUEVA LÓGICA: Calcula el límite de compras según tu regla de escalada
+const getMaxBuysForTotal = (totalPieces: number): number => {
+    // Fórmula que sigue tu patrón: 6->3, 9->4, 12->5, 18->7, 24->9, 30->11
+    return Math.floor(3 + (totalPieces - 6) / 3);
+};
+
 export const PuzzleModal: React.FC<PuzzleModalProps> = ({ 
     onClose, 
     piecesCollected, 
+    piecesBought, // Lo recibimos
     currentReward, 
     isLocked, 
     timeLeft,
@@ -56,14 +71,16 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
 }) => {
     const { user } = useAuth();
     const [isProcessing, setIsProcessing] = useState(false);
-    const totalPieces = 6;
+    
+    const totalPieces = getTotalPiecesForReward(currentReward);
+    const maxBuyable = getMaxBuysForTotal(totalPieces); // Límite actual
+    const hasReachedBuyLimit = piecesBought >= maxBuyable; // ¿Chocó con la pared?
+
     const PIECE_COST_STARS = 9; 
 
     const upcomingRewards = [0.10, 0.15, 0.20, 0.30, 0.50, 1.0, 5.0, 25.0];
 
     useEffect(() => {
-        // 🛡️ EL ESCUDO: Si Vercel no cargó bien Anime.js, detenemos las animaciones, 
-        // pero evitamos la Pantalla Negra de la Muerte.
         if (!anime) {
             console.warn("Anime.js loading bypassed to prevent crash.");
             return;
@@ -80,7 +97,7 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
             targets: '.puzzle-piece-anim',
             translateY: [-50, 0],
             opacity: [0, 1],
-            delay: anime.stagger(100), 
+            delay: anime.stagger(50),
             easing: 'easeOutElastic(1, .6)',
             duration: 1000
         });
@@ -89,15 +106,21 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
     const handleBuyMissingPiece = async () => {
         if (!user) return;
         
-        const confirmBuy = window.confirm(`⭐ BUY MISSING PIECE FOR ${PIECE_COST_STARS} STARS?\n\nComplete the puzzle faster to win ${currentReward} TON!`);
+        // Bloqueo de seguridad extra por si hackean la UI
+        if (hasReachedBuyLimit) {
+            alert(`🛑 PURCHASE LIMIT REACHED!\n\nYou can only buy a maximum of ${maxBuyable} pieces for this level. You must win the rest by spinning the wheel!`);
+            return;
+        }
+
+        const confirmBuy = window.confirm(`⭐ BUY MISSING PIECE FOR ${PIECE_COST_STARS} STARS?\n\nLimit: ${piecesBought}/${maxBuyable} pieces bought.`);
         if(!confirmBuy) return;
 
         setIsProcessing(true);
         try {
             const { data: invoiceData, error: invoiceError } = await supabase.functions.invoke('create-telegram-invoice', {
                 body: { 
-                    packageId: `MISSING_PIECE`, 
-                    packageName: `Puzzle Piece (${piecesCollected + 1}/6)`, 
+                    packageId: `MISSING_PIECE_${currentReward}`, 
+                    packageName: `Piece (${piecesCollected + 1}/${totalPieces})`, 
                     starsCost: PIECE_COST_STARS, 
                     userId: user.id 
                 }
@@ -123,7 +146,6 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
                             
                             triggerGODConfetti();
                             
-                            // 🛡️ ESCUDO: Solo animamos si la librería cargó bien
                             if (anime) {
                                 anime({
                                     targets: `.piece-index-${piecesCollected}`,
@@ -160,12 +182,18 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
         }
     };
 
+    const getGridColumns = () => {
+        if (totalPieces <= 9) return 3;
+        if (totalPieces <= 16) return 4;
+        return 5; 
+    };
+
     return (
         <div className="puzzle-overlay-anim" style={{
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(5, 5, 10, 0.95)', zIndex: 9500,
             display: 'flex', flexDirection: 'column', alignItems: 'center',
-            padding: '20px', overflowY: 'auto', backdropFilter: 'blur(10px)', opacity: anime ? 0 : 1 // Si no hay anime, la opacidad inicia en 1
+            padding: '20px', overflowY: 'auto', backdropFilter: 'blur(10px)', opacity: anime ? 0 : 1
         }}>
             
             <div style={{ width: '100%', maxWidth: '400px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
@@ -195,50 +223,60 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
 
                 <div style={{ 
                     background: 'rgba(20,20,25,0.8)', border: '1px solid #333', borderRadius: '20px', 
-                    padding: '30px 20px', position: 'relative', overflow: 'hidden'
+                    padding: '30px 15px', position: 'relative', overflow: 'hidden'
                 }}>
                     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '150px', height: '150px', background: '#FFD700', filter: 'blur(80px)', opacity: 0.1, zIndex: 0 }}></div>
                     
-                        <h3 style={{ margin: '0 0 5px 0', fontSize: '14px', color: '#aaa', zIndex: 1, position: 'relative' }}>CURRENT TARGET</h3>                    
-                        <div style={{ fontSize: '42px', fontWeight: '900', color: '#fff', textShadow: '0 0 15px rgba(255,215,0,0.5)', zIndex: 1, position: 'relative', marginBottom: '20px' }}>
+                    <h3 style={{ margin: '0 0 5px 0', fontSize: '14px', color: '#aaa', zIndex: 1, position: 'relative' }}>CURRENT TARGET</h3>                    
+                    <div style={{ fontSize: '42px', fontWeight: '900', color: '#fff', textShadow: '0 0 15px rgba(255,215,0,0.5)', zIndex: 1, position: 'relative', marginBottom: '20px' }}>
                         {currentReward.toFixed(2)} <span style={{ fontSize: '20px', color: '#FFD700' }}>TON</span>
                     </div>
 
                     <div style={{ 
-                        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', 
-                        maxWidth: '250px', margin: '0 auto', zIndex: 1, position: 'relative' 
+                        display: 'grid', 
+                        gridTemplateColumns: `repeat(${getGridColumns()}, 1fr)`, 
+                        gap: totalPieces > 12 ? '6px' : '10px', 
+                        maxWidth: '280px', margin: '0 auto', zIndex: 1, position: 'relative' 
                     }}>
                         {[...Array(totalPieces)].map((_, i) => {
                             const isCollected = i < piecesCollected;
                             const isNextToBuy = i === piecesCollected && !isLocked; 
+                            const iconSize = totalPieces > 18 ? 14 : 20; 
 
                             return (
                                 <div key={i} className={`puzzle-piece-anim piece-index-${i}`} style={{
-                                    aspectRatio: '1', borderRadius: '12px', position: 'relative', overflow: 'hidden',
+                                    aspectRatio: '1', borderRadius: totalPieces > 18 ? '8px' : '12px', position: 'relative', overflow: 'hidden',
                                     background: isCollected ? 'linear-gradient(135deg, #FFD700 0%, #FFA500 100%)' : 'rgba(255,255,255,0.05)',
-                                    border: isCollected ? 'none' : (isNextToBuy ? '2px dashed #00F2FE' : '1px dashed #444'),
+                                    border: isCollected ? 'none' : (isNextToBuy ? (hasReachedBuyLimit ? '2px dashed #FF0055' : '2px dashed #00F2FE') : '1px dashed #444'),
                                     display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column',
-                                    boxShadow: isCollected ? '0 5px 15px rgba(255,215,0,0.4)' : (isNextToBuy ? '0 0 15px rgba(0,242,254,0.2)' : 'inset 0 0 10px rgba(0,0,0,0.5)'),
+                                    boxShadow: isCollected ? '0 5px 15px rgba(255,215,0,0.4)' : (isNextToBuy ? (hasReachedBuyLimit ? '0 0 15px rgba(255,0,85,0.2)' : '0 0 15px rgba(0,242,254,0.2)') : 'inset 0 0 10px rgba(0,0,0,0.5)'),
                                     transform: isCollected ? 'scale(1)' : 'scale(0.95)',
-                                    transition: 'all 0.3s ease', opacity: anime ? 0 : 1 // Visibles por defecto si falla la animación
+                                    transition: 'all 0.3s ease', opacity: anime ? 0 : 1
                                 }}>
                                     {isCollected ? (
-                                        <Diamond size={24} color="#FFF" />
+                                        <Diamond size={iconSize} color="#FFF" />
                                     ) : isNextToBuy ? (
-                                        <button 
-                                            onClick={handleBuyMissingPiece}
-                                            disabled={isProcessing}
-                                            style={{ 
-                                                width: '100%', height: '100%', background: 'transparent', border: 'none', 
-                                                color: '#00F2FE', display: 'flex', flexDirection: 'column', 
-                                                alignItems: 'center', justifyContent: 'center', cursor: isProcessing ? 'not-allowed' : 'pointer' 
-                                        }}>
-                                            <Star size={16} fill="#00F2FE" style={{marginBottom: '2px'}}/>
-                                            <span style={{fontSize: '10px', fontWeight: '900'}}>GET</span>
-                                            <span style={{fontSize: '12px', fontWeight: '900', color: '#FFF'}}>{PIECE_COST_STARS} ⭐</span>
-                                        </button>
+                                        // 🔥 CAMBIO PRO: Evaluamos si ya chocó con el límite de compras
+                                        hasReachedBuyLimit ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', color: '#FF0055', opacity: 0.8 }}>
+                                                <Lock size={iconSize - 4} color="#FF0055" style={{marginBottom: '2px'}}/>
+                                                <span style={{fontSize: totalPieces > 18 ? '7px' : '9px', fontWeight: '900', textAlign: 'center', lineHeight: '1'}}>MAX<br/>BOUGHT</span>
+                                            </div>
+                                        ) : (
+                                            <button 
+                                                onClick={handleBuyMissingPiece}
+                                                disabled={isProcessing}
+                                                style={{ 
+                                                    width: '100%', height: '100%', background: 'transparent', border: 'none', 
+                                                    color: '#00F2FE', display: 'flex', flexDirection: 'column', 
+                                                    alignItems: 'center', justifyContent: 'center', cursor: isProcessing ? 'not-allowed' : 'pointer' 
+                                            }}>
+                                                <Star size={iconSize - 4} fill="#00F2FE" style={{marginBottom: '2px'}}/>
+                                                <span style={{fontSize: totalPieces > 18 ? '8px' : '10px', fontWeight: '900', color: '#FFF'}}>{PIECE_COST_STARS}⭐</span>
+                                            </button>
+                                        )
                                     ) : (
-                                        <Lock size={20} color="#333" />
+                                        <Lock size={iconSize - 2} color="#333" />
                                     )}
                                 </div>
                             );
@@ -247,6 +285,10 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
                     
                     <div style={{ marginTop: '20px', color: '#00F2FE', fontWeight: 'bold', fontSize: '14px', zIndex: 1, position: 'relative' }}>
                         {piecesCollected} / {totalPieces} PIECES COLLECTED
+                    </div>
+                    {/* Indicador de límite de compras */}
+                    <div style={{ marginTop: '5px', color: hasReachedBuyLimit ? '#FF0055' : '#888', fontSize: '11px', fontWeight: 'bold' }}>
+                        STARS PURCHASES: {piecesBought} / {maxBuyable}
                     </div>
                 </div>
 

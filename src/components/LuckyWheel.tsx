@@ -80,6 +80,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     // 🔥 ESTADOS REALES PARA EL ROMPECABEZAS 🔥
     const [showPuzzleModal, setShowPuzzleModal] = useState(false);
     const [puzzlePieces, setPuzzlePieces] = useState(0);
+    const [puzzlePiecesBought, setPuzzlePiecesBought] = useState(0); // NUEVO ESTADO
     const [puzzleReward, setPuzzleReward] = useState(0.10);
     const [puzzleLocked, setPuzzleLocked] = useState(false);
     const [puzzleTimeLeft, setPuzzleTimeLeft] = useState("48h 00m");
@@ -115,21 +116,21 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const fetchPuzzleData = useCallback(async () => {
         if (!user) return;
         try {
+            // 🔥 CAMBIO PRO 1: Le pedimos a Supabase el dato de piezas compradas
             const { data, error } = await supabase
                 .from('user_puzzles')
-                .select('pieces_collected, current_reward, is_locked, expires_at')
+                .select('pieces_collected, pieces_bought_current_cycle, current_reward, is_locked, expires_at')
                 .eq('user_id', user.id)
                 .single();
 
-            // 🔥 SOLUCIÓN PRO: Leemos y usamos la variable 'error'.
-            // Si el error es 'PGRST116' (No hay filas), lo ignoramos porque es un usuario nuevo.
-            // Si es otro error (ej. se cayó la base de datos), lo registramos sin romper la app.
             if (error && error.code !== 'PGRST116') {
                 console.warn("Puzzle DB Warning:", error.message);
             }
 
             if (data) {
                 setPuzzlePieces(data.pieces_collected || 0);
+                // 🔥 CAMBIO PRO 2: Guardamos las piezas compradas en el estado de React
+                setPuzzlePiecesBought(data.pieces_bought_current_cycle || 0); 
                 setPuzzleReward(data.current_reward || 0.10);
                 setPuzzleLocked(data.is_locked || false);
                 
@@ -152,7 +153,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
 
     useEffect(() => {
         if (user) {
-            fetchPuzzleData(); // Cargamos el puzle al iniciar
+            fetchPuzzleData(); 
             setTimeout(() => {
                 const today = new Date().toISOString().split('T')[0];
                 const savedData = localStorage.getItem(`lucky_wheel_${user.id}`);
@@ -169,7 +170,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                             setAdSpinsUsed(0);
                             setPremiumSpins(parsed.premiumSpins || 0); 
                         }
-                    // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
                     } catch (e: unknown) {
                         console.error("Storage parse error", e);
                     }
@@ -220,7 +220,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 wallet_in: null 
             });
             fetchWinners(); 
-        // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
         } catch (e: unknown) {
             console.error("Error logging point winner", e);
         }
@@ -269,7 +268,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     if (typeof confetti === 'function') {
                         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
                     }
-                // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
                 } catch (e: unknown) {
                     console.log("Confetti animation skipped", e);
                 }
@@ -304,7 +302,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 try {
                     const AdController = window.Adsgram.init({ blockId: "24433" });
                     await AdController.show();
-                // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
                 } catch (err: unknown) {
                     console.log("Ad Error", err);
                     alert("⚠️ You must watch the full video to spin the wheel!");
@@ -400,7 +397,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     if (effectiveWonAmount === 'PUZZLE') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
                         alert(`🧩 PUZZLE PIECE FOUND!\n\nIt has been added to your Gnova Tree.`);
-                        fetchPuzzleData(); // 🔥 ACTUALIZAMOS EL PUZLE AL GANAR PIEZA
+                        fetchPuzzleData(); 
                     } else if (effectiveWonAmount.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
                         
@@ -475,7 +472,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             alert(`✅ REWARD CLAIMED!\n\nPrize: ${wonTonPrize}\nStatus: PENDING.\n\nYour reward will be sent to your wallet soon.`);
             setWonTonPrize(null);
             fetchWinners();
-        // 🔥 SOLUCIÓN ESLINT: catch tipado estricto
         } catch (err: unknown) {
             console.error(err);
             alert("Error submitting claim. Please contact support.");
@@ -526,7 +522,6 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', paddingBottom: '100px', position: 'relative'
         }}>
             
-            {/* Si tienes PuzzleWidget, puedes pasarle los states si los necesita, por ahora solo el onClick */}
             {!onClose && <PuzzleWidget onClick={() => setShowPuzzleModal(true)} />}
 
             {onClose && (
@@ -761,6 +756,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 <PuzzleModal 
                     onClose={() => setShowPuzzleModal(false)}
                     piecesCollected={puzzlePieces}
+                    piecesBought={puzzlePiecesBought} // 🔥 CAMBIO PRO: Pasamos la variable
                     currentReward={puzzleReward}
                     isLocked={puzzleLocked}
                     timeLeft={puzzleTimeLeft}
@@ -774,8 +770,9 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     userLevel={1} 
                     onUpdateScore={onUpdateScore} 
                     setPremiumSpins={setPremiumSpins} 
-                    />
-                )}
+                />
+            )}
+            
             <style>{`
                 @keyframes spinSlow { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                 @keyframes pulse-dot { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
