@@ -98,9 +98,10 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
         { value: '1TON',   label: "1 TON",  sub: "JACKPOT", color: "#0088CC", textCol: "#fff" }, 
         { value: 50000,    label: "50K",    sub: "PTS",     color: "#222",    textCol: "#fff" }, 
         { value: '0.01TON',label: isFlashSaleActive ? "0.02" : "0.01", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
-        isFeverReady 
-            ? { value: 'PUZZLE', label: "+1",   sub: "PIEZA", color: "#FFD700", textCol: "#000" }
-            : { value: 100000,   label: "100K", sub: "PTS",   color: "#7B2CBF", textCol: "#fff" }, 
+        
+        // 🔥 CAMBIO PRO: La pieza ahora es PERMANENTE desde el giro 1, y en INGLÉS
+        { value: 'PUZZLE', label: "+1",   sub: "PIECE", color: "#FFD700", textCol: "#000" }, 
+        
         { value: '0.03TON',label: isFlashSaleActive ? "0.06" : "0.03", sub: "TON", color: isFlashSaleActive ? "#FF0055" : "#00F2FE", textCol: "#fff" }, 
         isFeverReady 
             ? { value: '0.05TON',label: isFlashSaleActive ? "0.10" : "0.05", sub: "TON", color: "#FF0055", textCol: "#fff" }
