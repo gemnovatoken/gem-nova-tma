@@ -209,6 +209,25 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
         }
     };
 
+
+    // 🔥 NUEVA INYECCIÓN: Función para rendirse y empezar de cero gratis
+    const handleResetFree = async () => {
+        if (!user) return;
+        const confirmReset = window.confirm(`⚠️ START OVER FREE?\n\nYou will lose your current progress and drop back to the 0.10 TON target.`);
+        if(!confirmReset) return;
+
+        setIsProcessing(true);
+        try {
+            const { error } = await supabase.rpc('reset_puzzle_free', { p_user_id: user.id });
+            if (error) throw error;
+            alert("🔄 PUZZLE RESET!\n\nYou are back at the start. Good luck!");
+            onPuzzleUpdate();
+        } catch (err: unknown) {
+            alert(`❌ Error: ${err instanceof Error ? err.message : 'Unknown'}`);
+        }
+        setIsProcessing(false);
+    };
+
     const handleRedeemReward = async () => {
         if (!user) return;
         setIsProcessing(true);
@@ -431,9 +450,15 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
                                     <Zap size={18} /> START NEXT LEVEL (FREE)
                                 </button>
                             ) : (
-                                <button onClick={handleUnfreezePuzzle} disabled={isProcessing} style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #FF0055, #FF4400)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 5px 15px rgba(255,0,85,0.4)' }}>
-                                    <Unlock size={18} /> PAY {UNFREEZE_COST_STARS} ⭐ TO RESTART
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                    <button onClick={handleUnfreezePuzzle} disabled={isProcessing} style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #FF0055, #FF4400)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 5px 15px rgba(255,0,85,0.4)' }}>
+                                        <Unlock size={18} /> PAY {UNFREEZE_COST_STARS} ⭐ TO KEEP LEVEL
+                                    </button>
+                                    
+                                    <button onClick={handleResetFree} disabled={isProcessing} style={{ width: '100%', padding: '15px', background: 'transparent', color: '#aaa', border: '1px solid #444', borderRadius: '10px', fontWeight: 'bold', fontSize: '14px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                                        START OVER FREE (DROP TO 0.10 TON)
+                                    </button>
+                                </div>
                             )}
                         </div>
                     ) : (
