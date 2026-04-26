@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { X, Clock, Diamond, Lock, Unlock, Zap, ShieldAlert, Star, Flame, Trophy, ArrowRightCircle, CheckCircle2 } from 'lucide-react';import { useAuth } from '../hooks/useAuth';
+import { X, Clock, Diamond, Lock, Unlock, Zap, ShieldAlert, Star, Flame, Ticket, Trophy, ArrowRightCircle, CheckCircle2, Box } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase';
 import * as animejs from 'animejs';
 
@@ -30,6 +31,7 @@ interface PuzzleModalProps {
     currentReward: number;
     isLocked: boolean;
     timeLeft: string;
+    puzzleFragments?: number; // 🔥 NUEVO: Recibimos los fragmentos
     onPuzzleUpdate: () => void;
 }
 
@@ -71,6 +73,7 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
     currentReward, 
     isLocked, 
     timeLeft,
+    puzzleFragments = 0, // Por defecto 0 si no llega el dato
     onPuzzleUpdate 
 }) => {
     const { user } = useAuth();
@@ -78,7 +81,6 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
     
     const totalPieces = getTotalPiecesForReward(currentReward);
     
-    // 🔥 ESTADO CRÍTICO: ¿El puzle está completado?
     const isPuzzleComplete = piecesCollected >= totalPieces;
     
     const maxBuyable = getMaxBuysForTotal(totalPieces);
@@ -92,7 +94,8 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
     const PIECE_COST_STARS = 9; 
     const PREMIUM_PIECE_COST = 25;
     const UNFREEZE_COST_STARS = 9;
-    const SKIP_WAIT_COST_STARS = 25; // El costo de saltarse el temporizador
+    const SKIP_WAIT_COST_STARS = 25; 
+    const FRAGMENTS_NEEDED = 5; // Costo del canje en la bóveda
 
     const upcomingRewards = [0.10, 0.15, 0.20, 0.30, 0.50, 1.0, 5.0, 25.0];
 
@@ -206,12 +209,10 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
         }
     };
 
-    // 🔥 NUEVO: Función para Redimir el premio al balance
     const handleRedeemReward = async () => {
         if (!user) return;
         setIsProcessing(true);
         try {
-            // Llamaremos a un RPC futuro llamado 'redeem_puzzle_reward'
             const { error } = await supabase.rpc('redeem_puzzle_reward', { p_user_id: user.id });
             if (error) throw error;
             
@@ -225,7 +226,6 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
         setIsProcessing(false);
     };
 
-    // 🔥 NUEVO: Función para saltar el tiempo de espera por 25 Stars
     const handleSkipWait = async () => {
         if (!user) return;
         const confirmBuy = window.confirm(`🚀 SKIP WAIT FOR ${SKIP_WAIT_COST_STARS} STARS?\n\nStart the next level immediately!`);
@@ -244,7 +244,6 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
             if (tg && tg.WebApp && typeof tg.WebApp.openInvoice === 'function') {
                 tg.WebApp.openInvoice(invoiceData.invoiceLink, async (status: string) => {
                     if (status === 'paid') {
-                        // Llamaremos a un RPC futuro para subir de nivel
                         const { error: skipError } = await supabase.rpc('skip_puzzle_wait', { p_user_id: user.id });
                         if (skipError) alert("⚠️ Error Syncing Database.");
                         else {
@@ -261,6 +260,34 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
             alert(`❌ Error: ${errorMessage}`);
             setIsProcessing(false);
         }
+    };
+
+    // 🔥 NUEVO: Función para Canjear Fragmentos de la Bóveda
+    const handleRedeemFragments = async (rewardType: 'VIP' | 'GNT') => {
+        if (puzzleFragments < FRAGMENTS_NEEDED) {
+            alert(`⚠️ Not enough fragments!\nYou need ${FRAGMENTS_NEEDED} to redeem a prize.`);
+            return;
+        }
+
+        const confirmCanje = window.confirm(`💎 REDEEM ${FRAGMENTS_NEEDED} FRAGMENTS?\n\nYou will receive: ${rewardType === 'VIP' ? '2 VIP Tickets' : '1 GNT Token'}`);
+        if (!confirmCanje) return;
+
+        setIsProcessing(true);
+        try {
+            // Este RPC lo crearemos en Supabase en el siguiente paso
+            const { error } = await supabase.rpc('redeem_puzzle_fragments', { 
+                p_user_id: user?.id, 
+                p_reward_type: rewardType 
+            });
+
+            if (error) throw error;
+            alert(`🎉 SUCCESS! You received ${rewardType === 'VIP' ? '2 VIP Tickets' : '1 GNT Token'}!`);
+            onPuzzleUpdate(); // Actualiza la UI para descontar los fragmentos
+        } catch (err) {
+            console.error(err);
+            alert("⚠️ Error redeeming fragments.");
+        }
+        setIsProcessing(false);
     };
 
     const getGridColumns = () => {
@@ -285,20 +312,28 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
                 </button>
             </div>
 
-            <div style={{ width: '100%', maxWidth: '400px', marginTop: '30px', textAlign: 'center' }}>
+            <div style={{ width: '100%', maxWidth: '400px', marginTop: '20px', textAlign: 'center' }}>
                 
+                {/* 🔥 EL RELOJ CRUEL: Siempre vivo, siempre presionando 🔥 */}
                 <div style={{ 
-                    background: isLocked ? 'rgba(255,0,85,0.1)' : (isPuzzleComplete ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255, 152, 0, 0.1)'), 
-                    border: isLocked ? '1px solid #FF0055' : (isPuzzleComplete ? '1px solid #4CAF50' : '1px solid #FF9800'), 
-                    color: isLocked ? '#FF0055' : (isPuzzleComplete ? '#4CAF50' : '#FF9800'), 
+                    background: isLocked ? 'rgba(255,0,85,0.1)' : 'rgba(255, 152, 0, 0.1)', 
+                    border: isLocked ? '1px solid #FF0055' : '1px solid #FF9800', 
+                    color: isLocked ? '#FF0055' : '#FF9800', 
                     padding: '10px 20px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '10px',
-                    fontWeight: '900', fontSize: '18px', marginBottom: '25px', 
-                    boxShadow: isLocked ? '0 0 15px rgba(255,0,85,0.3)' : (isPuzzleComplete ? '0 0 15px rgba(76,175,80,0.3)' : '0 0 15px rgba(255,152,0,0.3)'),
-                    animation: (isLocked || isPuzzleComplete) ? 'none' : 'pulse-soft 2s infinite'
+                    fontWeight: '900', fontSize: '18px', marginBottom: '20px', 
+                    boxShadow: isLocked ? '0 0 15px rgba(255,0,85,0.3)' : '0 0 15px rgba(255,152,0,0.3)',
+                    animation: isLocked ? 'none' : 'pulse-soft 2s infinite'
                 }}>
-                    {isLocked ? <ShieldAlert size={20} /> : (isPuzzleComplete ? <CheckCircle2 size={20} /> : <Clock size={20} />)}
-                    {isLocked ? 'PUZZLE EXPIRED' : (isPuzzleComplete ? 'PUZZLE COMPLETE' : `EXPIRES: ${timeLeft}`)}
+                    {isLocked ? <ShieldAlert size={20} /> : <Clock size={20} />}
+                    {isLocked ? 'PUZZLE EXPIRED' : `EXPIRES: ${timeLeft}`}
                 </div>
+
+                {isPuzzleComplete && (
+                    <div style={{ color: '#4CAF50', fontSize: '12px', fontWeight: 'bold', marginBottom: '15px', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                        <CheckCircle2 size={14} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '4px' }}/> 
+                        Target Reached! Waiting for clock...
+                    </div>
+                )}
 
                 <div style={{ background: 'rgba(20,20,25,0.8)', border: '1px solid #333', borderRadius: '20px', padding: '30px 15px', position: 'relative', overflow: 'hidden' }}>
                     <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '150px', height: '150px', background: isPuzzleComplete ? '#4CAF50' : '#FFD700', filter: 'blur(80px)', opacity: 0.1, zIndex: 0 }}></div>
@@ -308,7 +343,6 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
                         {currentReward.toFixed(2)} <span style={{ fontSize: '20px', color: isPuzzleComplete ? '#4CAF50' : '#FFD700' }}>TON</span>
                     </div>
 
-                    {/* 🔥 RENDERIZADO CONDICIONAL: Grid vs Celebración 🔥 */}
                     {!isPuzzleComplete ? (
                         <>
                             <div style={{ display: 'grid', gridTemplateColumns: `repeat(${getGridColumns()}, 1fr)`, gap: totalPieces > 12 ? '6px' : '10px', maxWidth: '280px', margin: '0 auto', zIndex: 1, position: 'relative' }}>
@@ -370,11 +404,14 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px', zIndex: 1, position: 'relative' }}>
                             <Trophy size={60} color="#FFD700" style={{ filter: 'drop-shadow(0 0 15px rgba(255,215,0,0.5))' }} />
-                            <p style={{ color: '#aaa', fontSize: '14px', margin: 0, padding: '0 20px' }}>You collected all pieces! Redeem your reward and wait for the next level, or skip the wait instantly.</p>
                             
                             <button onClick={handleRedeemReward} disabled={isProcessing} style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #4CAF50, #2E7D32)', color: '#fff', border: '1px solid #4CAF50', borderRadius: '10px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 5px 15px rgba(76,175,80,0.4)' }}>
                                 <Diamond size={18} /> REDEEM {currentReward} TON
                             </button>
+                            
+                            <div style={{ width: '100%', height: '1px', background: '#333', margin: '5px 0' }}></div>
+                            
+                            <p style={{ color: '#aaa', fontSize: '12px', margin: 0, padding: '0 10px' }}>Wait for the clock to reach 0 to start the next target for free, or skip the wait now:</p>
                             
                             <button onClick={handleSkipWait} disabled={isProcessing} style={{ width: '100%', padding: '15px', background: 'rgba(177,0,255,0.1)', color: '#E0B0FF', border: '1px solid #B100FF', borderRadius: '10px', fontWeight: '900', fontSize: '14px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
                                 <ArrowRightCircle size={18} /> SKIP WAIT & LEVEL UP ({SKIP_WAIT_COST_STARS}⭐)
@@ -383,25 +420,72 @@ export const PuzzleModal: React.FC<PuzzleModalProps> = ({
                     )}
                 </div>
 
-                {/* Esta sección de congelamiento solo se muestra si NO está completado */}
-                {!isPuzzleComplete && (
-                    <div style={{ marginTop: '30px' }}>
-                        {isLocked ? (
-                            <div style={{ background: 'rgba(255,0,85,0.1)', border: '1px solid #FF0055', borderRadius: '15px', padding: '15px' }}>
-                                <p style={{ color: '#fff', fontSize: '13px', marginBottom: '15px', marginTop: 0 }}>Your time expired. Your pieces are lost, but you can restart the {currentReward} TON level.</p>
+                <div style={{ marginTop: '20px' }}>
+                    {isLocked ? (
+                        <div style={{ background: 'rgba(255,0,85,0.1)', border: '1px solid #FF0055', borderRadius: '15px', padding: '15px' }}>
+                            <p style={{ color: '#fff', fontSize: '13px', marginBottom: '15px', marginTop: 0 }}>Your time expired. {isPuzzleComplete ? 'But you completed the puzzle! You can start the next one for free.' : `Your pieces are lost, but you can restart the ${currentReward} TON level.`}</p>
+                            
+                            {/* 🔥 NUEVO: Si expiró PERO lo completó, el reinicio es GRATIS y pasa de nivel */}
+                            {isPuzzleComplete ? (
+                                <button onClick={handleSkipWait} disabled={isProcessing} style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #4CAF50, #2E7D32)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 5px 15px rgba(76,175,80,0.4)' }}>
+                                    <Zap size={18} /> START NEXT LEVEL (FREE)
+                                </button>
+                            ) : (
                                 <button onClick={handleUnfreezePuzzle} disabled={isProcessing} style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #FF0055, #FF4400)', color: '#fff', border: 'none', borderRadius: '10px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 5px 15px rgba(255,0,85,0.4)' }}>
                                     <Unlock size={18} /> PAY {UNFREEZE_COST_STARS} ⭐ TO RESTART
                                 </button>
-                            </div>
-                        ) : (
-                            <button onClick={onClose} disabled={isProcessing} style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #0088CC, #00F2FE)', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 5px 15px rgba(0,242,254,0.4)' }}>
-                                <Zap size={18} /> KEEP SPINNING
-                            </button>
-                        )}
-                    </div>
-                )}
+                            )}
+                        </div>
+                    ) : (
+                        <button onClick={onClose} disabled={isProcessing} style={{ width: '100%', padding: '15px', background: 'linear-gradient(90deg, #0088CC, #00F2FE)', color: '#000', border: 'none', borderRadius: '10px', fontWeight: '900', fontSize: '16px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', boxShadow: '0 5px 15px rgba(0,242,254,0.4)' }}>
+                            <Zap size={18} /> KEEP SPINNING
+                        </button>
+                    )}
+                </div>
 
-                <div style={{ marginTop: '40px', width: '100%', textAlign: 'left' }}>
+                {/* 🔥 LA BÓVEDA DE FRAGMENTOS (VAULT) 🔥 */}
+                <div style={{ marginTop: '30px', width: '100%', textAlign: 'left', background: 'rgba(20,20,25,0.9)', borderRadius: '15px', border: '1px solid #444', padding: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Box color="#00F2FE" />
+                            <div style={{ fontSize: '16px', color: '#fff', fontWeight: '900', letterSpacing: '1px' }}>THE VAULT</div>
+                        </div>
+                        <div style={{ background: 'rgba(0, 242, 254, 0.1)', border: '1px solid #00F2FE', padding: '4px 10px', borderRadius: '8px', color: '#00F2FE', fontWeight: 'bold', fontSize: '12px' }}>
+                            {puzzleFragments} FRAGMENTS
+                        </div>
+                    </div>
+                    
+                    <p style={{ color: '#aaa', fontSize: '11px', margin: '0 0 15px 0', lineHeight: '1.4' }}>Extra puzzle pieces are stored here. Collect {FRAGMENTS_NEEDED} fragments to redeem exclusive rewards!</p>
+
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button 
+                            onClick={() => handleRedeemFragments('VIP')} 
+                            disabled={isProcessing || puzzleFragments < FRAGMENTS_NEEDED}
+                            style={{ flex: 1, padding: '12px 5px', background: puzzleFragments >= FRAGMENTS_NEEDED ? 'rgba(255,215,0,0.1)' : 'rgba(255,255,255,0.05)', border: puzzleFragments >= FRAGMENTS_NEEDED ? '1px solid #FFD700' : '1px dashed #444', borderRadius: '10px', cursor: puzzleFragments >= FRAGMENTS_NEEDED ? 'pointer' : 'not-allowed', opacity: puzzleFragments >= FRAGMENTS_NEEDED ? 1 : 0.5, transition: 'all 0.3s' }}
+                        >
+                            <Ticket size={16} color="#FFD700" style={{ margin: '0 auto 5px auto', display: 'block' }}/>
+                            <div style={{ color: '#FFD700', fontSize: '11px', fontWeight: 'bold' }}>2 VIP TICKETS</div>
+                            <div style={{ color: '#888', fontSize: '9px', marginTop: '2px' }}>Cost: {FRAGMENTS_NEEDED} Frag</div>
+                        </button>
+
+                        <button 
+                            onClick={() => handleRedeemFragments('GNT')} 
+                            disabled={isProcessing || puzzleFragments < FRAGMENTS_NEEDED}
+                            style={{ flex: 1, padding: '12px 5px', background: puzzleFragments >= FRAGMENTS_NEEDED ? 'rgba(177,0,255,0.1)' : 'rgba(255,255,255,0.05)', border: puzzleFragments >= FRAGMENTS_NEEDED ? '1px solid #B100FF' : '1px dashed #444', borderRadius: '10px', cursor: puzzleFragments >= FRAGMENTS_NEEDED ? 'pointer' : 'not-allowed', opacity: puzzleFragments >= FRAGMENTS_NEEDED ? 1 : 0.5, transition: 'all 0.3s' }}
+                        >
+                            <Diamond size={16} color="#B100FF" style={{ margin: '0 auto 5px auto', display: 'block' }}/>
+                            <div style={{ color: '#E0B0FF', fontSize: '11px', fontWeight: 'bold' }}>1 GNT TOKEN</div>
+                            <div style={{ color: '#888', fontSize: '9px', marginTop: '2px' }}>Cost: {FRAGMENTS_NEEDED} Frag</div>
+                        </button>
+                    </div>
+                    
+                    {/* Barra de progreso visual para la bóveda */}
+                    <div style={{ width: '100%', height: '6px', background: '#111', borderRadius: '3px', marginTop: '15px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${Math.min((puzzleFragments / FRAGMENTS_NEEDED) * 100, 100)}%`, background: 'linear-gradient(90deg, #0088CC, #00F2FE)', transition: 'width 0.5s ease' }}></div>
+                    </div>
+                </div>
+
+                <div style={{ marginTop: '30px', width: '100%', textAlign: 'left' }}>
                     <div style={{ fontSize: '12px', color: '#aaa', fontWeight: 'bold', marginBottom: '15px', letterSpacing: '1px' }}>NEXT TARGETS</div>
                     <div className="no-scrollbar" style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
                         {upcomingRewards.map((reward, i) => {
