@@ -91,7 +91,9 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [activeTab, setActiveTab] = useState<'crypto' | 'points'>('crypto');
 
     const isFlashSaleActive = true; 
-    const isBlackMarketUnlocked = dailySpinsUsed >= MAX_DAILY_SPINS && adSpinsUsed >= MAX_AD_SPINS;
+// 🔥 MODO DIOS ACTIVADO PARA PRUEBAS (Recuerda quitar esto cuando termines)
+    // const isBlackMarketUnlocked = dailySpinsUsed >= MAX_DAILY_SPINS && adSpinsUsed >= MAX_AD_SPINS;
+    const isBlackMarketUnlocked = true;
     const isFeverReady = isBlackMarketUnlocked;
 
     const WHEEL_ITEMS = [
