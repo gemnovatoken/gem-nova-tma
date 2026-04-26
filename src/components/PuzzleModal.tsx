@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { X, Clock, Diamond, Lock, Unlock, Zap, ShieldAlert, Star, Flame, Trophy, ArrowRightCircle } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
+import { X, Clock, Diamond, Lock, Unlock, Zap, ShieldAlert, Star, Flame, Trophy, ArrowRightCircle, CheckCircle2 } from 'lucide-react';import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../services/supabase';
 import * as animejs from 'animejs';
 
