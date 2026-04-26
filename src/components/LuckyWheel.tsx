@@ -82,6 +82,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
     const [puzzlePieces, setPuzzlePieces] = useState(0);
     const [puzzlePiecesBought, setPuzzlePiecesBought] = useState(0); // NUEVO ESTADO
     const [puzzlePremiumBought, setPuzzlePremiumBought] = useState(0);
+    const [puzzleFragments, setPuzzleFragments] = useState(0);
     const [puzzleReward, setPuzzleReward] = useState(0.10);
     const [puzzleLocked, setPuzzleLocked] = useState(false);
     const [puzzleTimeLeft, setPuzzleTimeLeft] = useState("48h 00m");
@@ -123,7 +124,8 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             // 🔥 CAMBIO PRO 1: Le pedimos a Supabase el dato de piezas compradas
             const { data, error } = await supabase
                 .from('user_puzzles')
-                .select('pieces_collected, pieces_bought_current_cycle, premium_bought_current_cycle, current_reward, is_locked, expires_at')                .eq('user_id', user.id)
+                .select('pieces_collected, pieces_bought_current_cycle, premium_bought_current_cycle, puzzle_fragments, current_reward, is_locked, expires_at')                
+                .eq('user_id', user.id)
                 .single();
 
             if (error && error.code !== 'PGRST116') {
@@ -135,6 +137,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 // 🔥 CAMBIO PRO 2: Guardamos las piezas compradas en el estado de React
                 setPuzzlePiecesBought(data.pieces_bought_current_cycle || 0); 
                 setPuzzlePremiumBought(data.premium_bought_current_cycle || 0);
+                setPuzzleFragments(data.puzzle_fragments || 0);
                 setPuzzleReward(data.current_reward || 0.10);
                 setPuzzleLocked(data.is_locked || false);
                 
@@ -781,6 +784,7 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                     currentReward={puzzleReward}
                     isLocked={puzzleLocked}
                     timeLeft={puzzleTimeLeft}
+                    puzzleFragments={puzzleFragments}
                     onPuzzleUpdate={fetchPuzzleData} 
                 />
             )}
