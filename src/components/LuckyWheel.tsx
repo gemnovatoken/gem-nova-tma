@@ -367,6 +367,11 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
             
             let effectiveWonAmount = wonAmount;
             
+            // 🔥 PARCHE PRO: Si la BD manda un FRAGMENT, visualmente lo aterrizamos en la casilla de PUZZLE
+            if (wonAmount === 'FRAGMENT') {
+                effectiveWonAmount = 'PUZZLE';
+            }
+            
             if (isFeverReady) {
                 if (wonAmount === 0) effectiveWonAmount = '0.05TON';
                 if (wonAmount === 10000) effectiveWonAmount = 'PUZZLE';
@@ -397,15 +402,26 @@ export const LuckyWheel: React.FC<LuckyWheelProps> = ({ onClose, score, onUpdate
                 else if (spinType === 'daily') setDailySpinsUsed(prev => prev + 1);
                 else if (spinType === 'ad') setAdSpinsUsed(prev => prev + 1);
 
+                // 🔥 EL ESCUDO ANTI-TYPESCRIPT: Le juramos que es un string
                 if (typeof effectiveWonAmount === 'string') {
-                    if (effectiveWonAmount === 'PUZZLE') {
+                    const strPrize = effectiveWonAmount as string; // <-- Aserción de tipo
+
+                    if (strPrize === 'PUZZLE') {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 500]);
-                        alert(`🧩 PUZZLE PIECE FOUND!\n\nIt has been added to your Gnova Tree.`);
+                        
+                        // Revisamos el premio REAL de la base de datos para la alerta
+                        if (wonAmount === 'FRAGMENT') {
+                            alert(`💎 MAGIC FRAGMENT FOUND!\n\nYour puzzle is full or locked, so this piece was sent to your Vault!`);
+                        } else {
+                            alert(`🧩 PUZZLE PIECE FOUND!\n\nIt has been added to your Gnova Tree.`);
+                        }
                         fetchPuzzleData(); 
-                    } else if (effectiveWonAmount.includes('TON')) {
+                        
+                    } else if (strPrize.includes('TON')) {
                         if (window.navigator.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
                         
-                        const finalPrize = isFlashSaleActive ? `${parseFloat(effectiveWonAmount.replace('TON','')) * 2} TON` : effectiveWonAmount;
+                        // Ahora usamos strPrize, y TypeScript ya no llora
+                        const finalPrize = isFlashSaleActive ? `${parseFloat(strPrize.replace('TON','')) * 2} TON` : strPrize;
                         setWonTonPrize(finalPrize);
                         
                         if (tonConnectUI.account?.address) {
